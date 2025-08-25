@@ -35,13 +35,22 @@ model User {
   review             Review?
   reviewRef          ReviewRef?
   notification       Notification[]
-  messagesSent       Message[]           @relation("SentMessages")
-  messagesReceived   Message[]           @relation("ReceivedMessages")
+  messagesSent       Message[]            @relation("SentMessages")
+  messagesReceived   Message[]            @relation("ReceivedMessages")
   chatParticipant    ChatParticipant[]
   book               Book[]
   order              Order[]
   course             Course[]
   courseBundle       CourseBundle[]
+  event              Event[]
+  eventBooking       EventBooking[]
+  article            Article[]
+  content            Content[]
+  batch              Batch[]
+  createdCoupons     Coupon[]             @relation("CouponCreated")
+  usedCoupons        Coupon[]             @relation("CouponUsedBy")
+  quizAttempt        QuizAttempt[]
+  certificateRequest CertificateRequest[]
 
   @@map("users")
 }
@@ -276,8 +285,10 @@ model Course {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  author  User           @relation(fields: [authorId], references: [id])
-  bundles CourseBundle[] @relation("BundleCourses") // Many-to-Many relation with CourseBundle
+  author             User                 @relation(fields: [authorId], references: [id])
+  bundles            CourseBundle[]       @relation("BundleCourses") // Many-to-Many relation with CourseBundle
+  quiz               Quiz[]
+  certificateRequest CertificateRequest[]
 
   @@map("courses")
 }
@@ -296,6 +307,164 @@ model CourseBundle {
   courses Course[] @relation("BundleCourses")
 
   @@map("course_bundles")
+}
+
+model Quiz {
+  id           String   @id @default(uuid()) // PK
+  courseId     String
+  deadline     String?
+  time         String? // e.g. "30m" or "01:00:00"
+  questions    Int      @default(0)
+  totalAttempt Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  course        Course        @relation(fields: [courseId], references: [id])
+  questionsList Question[]
+  quizAttempt   QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id        String   @id @default(uuid()) // PK
+  quizId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  quiz    Quiz      @relation(fields: [quizId], references: [id])
+  options Options[]
+
+  @@map("questions")
+}
+
+model Options {
+  id          String   @id @default(uuid()) // PK
+  questionId  String
+  optionLevel String // e.g. A, B, C, D
+  optionText  String
+  isCorrect   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  question Question @relation(fields: [questionId], references: [id])
+
+  @@map("options")
+}
+
+model QuizAttempt {
+  id            String   @id @default(uuid()) // PK
+  quizId        String
+  userId        String
+  timeTaken     String? // e.g. "15m", "00:12:45"
+  marksObtained Int      @default(0)
+  totalMarks    Int
+  grade         String?
+  correctRate   Float    @default(0.0) // % of correct answers
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  quiz Quiz @relation(fields: [quizId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("quiz_attempts")
+}
+
+model CertificateRequest {
+  id         String     @id @default(uuid()) // PK
+  authorId   String // FK to User (student requesting)
+  courseId   String // FK to Course
+  status     UserStatus @default(pending)
+  isComplete Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // Relations
+  author User   @relation(fields: [authorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("certificate_requests")
+}
+
+model Event {
+  id             String     @id @default(uuid()) // Primary Key
+  authorId       String // FK to User
+  title          String
+  slogan         String
+  type           String
+  thumbnail      String
+  organizedBy    String
+  price          Float
+  location       String
+  date           String
+  startTime      String
+  endTime        String
+  description    String
+  speakerSlogan  String
+  scheduleSlogan Boolean    @default(false)
+  registered     Int        @default(0)
+  status         UserStatus @default(pending)
+  isDeleted      Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  author       User           @relation(fields: [authorId], references: [id])
+  eventBooking EventBooking[]
+
+  @@map("events")
+}
+
+model EventBooking {
+  id            String        @id @default(uuid()) // Primary Key
+  eventId       String
+  userId        String
+  name          String
+  phone         String
+  email         String
+  organization  String
+  profession    String
+  city          String
+  country       String
+  amount        Float
+  status        OrderStatus   @default(pending)
+  paymentStatus PaymentStatus @default(unpaid)
+  transactionId String
+  document      String?
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("event_bookings")
+}
+
+model Coupon {
+  id       String @id @default(uuid()) // Primary Key
+  authorId String // FK → User (who created the coupon)
+
+  modelType   CouponModel // Enum to represent reference type (Course, Event, etc.)
+  referenceId String // Generic FK (depending on modelType)
+
+  name     String
+  expireAt DateTime
+  code     String   @unique
+  discount Float
+
+  // Relations
+  author User   @relation("CouponCreated", fields: [authorId], references: [id])
+  usedBy User[] @relation("CouponUsedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
 }
 
 model Package {
@@ -355,6 +524,27 @@ model Payment {
   account User @relation(references: [id], fields: [userId])
 
   @@map("payments")
+}
+
+model Batch {
+  id       String @id @default(uuid()) // Primary Key
+  authorId String // FK → User (Instructor / Creator)
+
+  title       String
+  description String
+  image       String?
+  category    String
+  rarity      String?
+  popularity  Int     @default(0)
+
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("batches")
 }
 
 model Review {
@@ -453,6 +643,82 @@ model Message {
   @@map("messages")
 }
 
+model Article {
+  id          String   @id @default(uuid()) // Primary Key
+  authorId    String // FK to User
+  title       String
+  category    String
+  thumbnail   String?
+  description String
+  seen        Int      @default(0)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("articles")
+}
+
+model Content {
+  id          String @id @default(uuid()) // Primary Key
+  createdById String // FK to User (admin/editor)
+
+  aboutUs            String?
+  termsAndConditions String?
+  privacyPolicy      String?
+
+  // Support / Contacts
+  supports         Int     @default(0)
+  customerLocation String?
+  customerNumber   String?
+  customerEmail    String?
+
+  contractLocation String?
+  contractNumber   String?
+  contractEmail    String?
+
+  officeLocation String?
+  officeNumber   String?
+  officeEmail    String?
+
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdBy User  @relation(fields: [createdById], references: [id])
+  faq       FAQ[] // one Content can have multiple FAQs
+
+  @@map("contents")
+}
+
+model FAQ {
+  id        String @id @default(uuid()) // Primary Key
+  contentId String // FK → Content
+
+  question String
+  answer   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  content Content @relation(fields: [contentId], references: [id])
+
+  @@map("faqs")
+}
+
+model Support {
+  id        String   @id @default(uuid()) // Primary Key
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("supports")
+}
+
 enum UserRole {
   super_admin
   company_admin
@@ -519,6 +785,12 @@ enum CourseLevel {
   intermediate
   advanced
   expert
+}
+
+enum CouponModel {
+  courses
+  events
+  books
 }
 
 enum PaymentStatus {
