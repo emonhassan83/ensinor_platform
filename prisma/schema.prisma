@@ -33,7 +33,15 @@ model User {
   subscription       Subscription?
   payment            Payment?
   review             Review?
-  ReviewRef          ReviewRef?
+  reviewRef          ReviewRef?
+  notification       Notification[]
+  messagesSent       Message[]           @relation("SentMessages")
+  messagesReceived   Message[]           @relation("ReceivedMessages")
+  chatParticipant    ChatParticipant[]
+  book               Book[]
+  order              Order[]
+  course             Course[]
+  courseBundle       CourseBundle[]
 
   @@map("users")
 }
@@ -201,6 +209,95 @@ model Company {
   @@map("companies")
 }
 
+model Book {
+  id            String     @id @default(uuid())
+  authorId      String
+  title         String
+  description   String?
+  writer        String
+  category      String
+  price         Float
+  thumbnails    String
+  file          String
+  popularity    Int        @default(0)
+  publishedDate DateTime?
+  status        UserStatus @default(pending)
+  isDeleted     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  author User    @relation(fields: [authorId], references: [id]) // FK relation to User table
+  order  Order[]
+
+  @@map("books")
+}
+
+model Order {
+  id            String        @id @default(uuid()) // Primary Key
+  userId        String // FK to User table (customer)
+  bookId        String // FK to Author/User table
+  amount        Float
+  status        OrderStatus   @default(pending)
+  paymentStatus PaymentStatus @default(unpaid)
+  transactionId String?
+  documents     String[] // Array of document URLs or file paths
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  book Book @relation(fields: [bookId], references: [id])
+
+  @@map("orders")
+}
+
+model Course {
+  id               String      @id @default(uuid()) // Primary Key
+  authorId         String // FK to User (Instructor)
+  title            String
+  shortDescription String
+  category         String
+  level            CourseLevel
+  language         String
+  points           Int         @default(0)
+  deadline         String?
+  price            Float
+  description      String
+  thumbnail        String?
+  lectures         Int         @default(0)
+  duration         String?
+  hasCertificate   Boolean     @default(false)
+  popularity       Int         @default(0)
+  totalCompleted   Int         @default(0)
+  status           UserStatus  @default(pending)
+  avgRating        Float       @default(0.0)
+  ratingCount      Int         @default(0)
+  isDeleted        Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  author  User           @relation(fields: [authorId], references: [id])
+  bundles CourseBundle[] @relation("BundleCourses") // Many-to-Many relation with CourseBundle
+
+  @@map("courses")
+}
+
+model CourseBundle {
+  id          String   @id @default(uuid()) // Primary Key
+  authorId    String // FK to User (Instructor)
+  description String
+  price       Float
+  discount    Float    @default(0.0)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author  User     @relation(fields: [authorId], references: [id])
+  courses Course[] @relation("BundleCourses")
+
+  @@map("course_bundles")
+}
+
 model Package {
   id           String              @id @default(uuid())
   title        String
@@ -256,7 +353,6 @@ model Payment {
   updatedAt       DateTime         @updatedAt
 
   account User @relation(references: [id], fields: [userId])
-  // reference User @relation(references: [id], fields: [userId])
 
   @@map("payments")
 }
@@ -291,6 +387,72 @@ model ReviewRef {
   @@map("review_refs")
 }
 
+model Notification {
+  id          String               @id @default(uuid())
+  receiverId  String?
+  referenceId String?
+  model_type  NotificationModeType
+  message     String
+  description String               @default("")
+  date        DateTime             @default(now())
+  read        Boolean              @default(false)
+  isDeleted   Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  receiver User? @relation(fields: [receiverId], references: [id])
+
+  @@map("notifications")
+}
+
+model Chat {
+  id           String            @id @default(uuid())
+  participants ChatParticipant[]
+  type         String // e.g., "private", "group"
+  groupName    String? // Optional, for group chats
+  groupImage   String? // Optional, for group chats
+  status       ChatStatus        @default(accepted)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  messages Message[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id     String @id @default(uuid())
+  userId String @unique
+  chatId String @unique
+
+  user User @relation(fields: [userId], references: [id])
+  chat Chat @relation(fields: [chatId], references: [id])
+
+  @@unique([userId, chatId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id       String   @id @default(uuid())
+  text     String?
+  imageUrl String[]
+  seen     Boolean  @default(false)
+
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+  senderId String
+
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId String
+
+  chat   Chat   @relation(fields: [chatId], references: [id])
+  chatId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messages")
+}
+
 enum UserRole {
   super_admin
   company_admin
@@ -323,6 +485,15 @@ enum ReviewModelType {
   course
 }
 
+enum NotificationModeType {
+  courses
+  users
+  quiz
+  orders
+  payments
+  events
+}
+
 enum UserStatus {
   pending
   active
@@ -336,7 +507,28 @@ enum Gender {
   unknown
 }
 
+enum OrderStatus {
+  pending
+  completed
+  cancelled
+  refunded
+}
+
+enum CourseLevel {
+  beginner
+  intermediate
+  advanced
+  expert
+}
+
 enum PaymentStatus {
   unpaid
   paid
+  failed
+  refunded
+}
+
+enum ChatStatus {
+  accepted
+  blocked
 }
