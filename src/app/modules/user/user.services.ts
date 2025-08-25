@@ -172,7 +172,6 @@ const getAllUser = async (
       id: true,
       email: true,
       role: true,
-      needPasswordChange: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -201,7 +200,6 @@ const getMyProfile = async (authUser: any) => {
     select: {
       email: true,
       role: true,
-      needPasswordChange: true,
       status: true,
     },
   });

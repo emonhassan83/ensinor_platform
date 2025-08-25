@@ -1,4 +1,4 @@
-import { Gender, UserStatus } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
 import { z } from 'zod';
 
 const createAdmin = z.object({
@@ -60,9 +60,6 @@ const createReceptionist = z.object({
       }),
       dateOfBirth: z.string().optional(),
       experience: z.number().int().default(0),
-      gender: z.nativeEnum(Gender, {
-        required_error: 'Gender is required!',
-      }),
       designation: z.string({
         required_error: 'Designation is required!',
       }),
@@ -103,9 +100,6 @@ const createDoctor = z.object({
           required_error: 'Address is required!',
         })
         .nullable(),
-      gender: z.nativeEnum(Gender, {
-        required_error: 'Gender is required!',
-      }),
       dateOfBirth: z.string().optional(),
       registrationNumber: z.string({
         required_error: 'Reg number is required',
@@ -159,9 +153,6 @@ const createPatient = z.object({
           required_error: 'Address is required for records.',
         })
         .optional(),
-      gender: z.nativeEnum(Gender, {
-        required_error: 'Gender is required!',
-      }),
       dateOfBirth: z.string().optional(),
     }),
   }),

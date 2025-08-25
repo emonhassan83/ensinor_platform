@@ -14,14 +14,15 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(uuid())
-  email              String              @unique
-  password           String
-  role               UserRole
-  needPasswordChange Boolean             @default(true)
-  status             UserStatus          @default(active)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id         String     @id @default(uuid())
+  email      String     @unique
+  password   String
+  role       UserRole
+  lastActive DateTime   @default(now())
+  status     UserStatus @default(active)
+  isDeleted  Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   superAdmin         SuperAdmin?
   companyAdmin       CompanyAdmin?
@@ -29,252 +30,265 @@ model User {
   employee           Employee?
   instructor         Instructor?
   student            Student?
+  subscription       Subscription?
+  payment            Payment?
+  review             Review?
+  ReviewRef          ReviewRef?
 
   @@map("users")
 }
 
 model SuperAdmin {
-  id            String     @id @unique @default(uuid())
-  firstName     String
-  lastName      String
-  email         String     @unique
-  contactNumber String
-  profilePhoto  String?
-  address       String?
-  status        UserStatus @default(active)
-  isDeleted     Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  dateOfBirth String
+  contactNo   String
+  city        String?
+  country     String?
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  user User @relation(references: [email], fields: [email])
+  user User @relation(references: [id], fields: [userId])
 
   @@map("super_admin")
 }
 
 model CompanyAdmin {
-  id                  String     @id @default(uuid())
-  firstName           String
-  lastName            String
-  email               String     @unique
-  profilePhoto        String?
-  coverPhoto          String?
-  bio                 String?
-  contactNumber       String
-  address             String?
-  gender              Gender
-  dateOfBirth         DateTime?
-  registrationNumber  String
-  experience          Int        @default(0)
-  appointmentFee      Int
-  qualification       String
-  currentWorkingPlace String
-  designation         String
-  status              UserStatus @default(pending)
-  isDeleted           Boolean    @default(false)
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-  user                User       @relation(references: [email], fields: [email])
-  averageRating       Float      @default(0.0)
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  dateOfBirth String
+  contactNo   String
+  city        String?
+  country     String?
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user               User                @relation(references: [id], fields: [userId])
+  businessInstructor BusinessInstructor?
+  employee           Employee?
+  company            Company?
 
   @@map("company_admins")
 }
 
 model BusinessInstructor {
-  id            String     @id @unique @default(uuid())
-  firstName     String
-  lastName      String
-  email         String     @unique
-  profilePhoto  String?
-  coverPhoto    String?
-  bio           String?
-  contactNumber String
-  address       String?
-  gender        Gender
-  dateOfBirth   DateTime?
-  status        UserStatus @default(active)
-  isDeleted     Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  companyId   String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  dateOfBirth String
+  contactNo   String
+  city        String?
+  country     String?
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  user User @relation(references: [email], fields: [email])
+  user    User         @relation(references: [id], fields: [userId])
+  company CompanyAdmin @relation(references: [id], fields: [companyId])
 
   @@map("business_instructors")
 }
 
 model Employee {
-  id                String     @id @unique @default(uuid())
-  firstName         String
-  lastName          String
-  email             String     @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int        @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int        @default(0)
-  status            UserStatus @default(pending)
-  isDeleted         Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  companyId   String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  dateOfBirth String
+  contactNo   String
+  city        String?
+  country     String?
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  user User @relation(references: [email], fields: [email])
+  user    User         @relation(references: [id], fields: [userId])
+  company CompanyAdmin @relation(references: [id], fields: [companyId])
 
   @@map("employees")
 }
 
 model Instructor {
-  id                String     @id @default(uuid())
-  firstName         String
-  lastName          String
-  email             String     @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int        @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int        @default(0)
-  status            UserStatus @default(pending)
-  isDeleted         Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  user              User       @relation(references: [email], fields: [email])
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  contactNo   String
+  designation String
+  bio         String?
+  city        String?
+  country     String?
+  university  String?
+  session     String?
+  subjects    String
+  linkedIn    String?
+  facebook    String?
+  twitter     String?
+  instagram   String?
+  website     String?
+  avgRating   Float      @default(0.0)
+  ratingCount Int        @default(0)
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user User @relation(references: [id], fields: [userId])
 
   @@map("instructors")
 }
 
 model Student {
-  id                String     @id @default(uuid())
-  firstName         String
-  lastName          String
-  email             String     @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int        @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int        @default(0)
-  status            UserStatus @default(pending)
-  isDeleted         Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  user              User       @relation(references: [email], fields: [email])
+  id          String     @id @unique @default(uuid())
+  userId      String     @unique
+  name        String
+  email       String     @unique
+  photoUrl    String
+  bio         String?
+  interests   String[]
+  dateOfBirth String
+  contactNo   String
+  city        String?
+  country     String?
+  university  String?
+  session     String?
+  subjects    String
+  status      UserStatus @default(active)
+  isDeleted   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user User @relation(references: [id], fields: [userId])
 
   @@map("students")
 }
 
-model Branding {
-  id                String   @id @default(uuid())
-  firstName         String
-  lastName          String
-  email             String   @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int      @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int      @default(0)
-  isDeleted         Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model Company {
+  id           String     @id @default(uuid())
+  userId       String     @unique
+  name         String
+  industryType String
+  logo         String?
+  color        String?
+  employee     Int        @default(0)
+  instructor   Int        @default(0)
+  size         Int        @default(0)
+  status       UserStatus @default(active)
+  isDeleted    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  @@map("branding")
+  author CompanyAdmin @relation(references: [id], fields: [userId])
+
+  @@map("companies")
 }
 
 model Package {
-  id                String     @id @default(uuid())
-  firstName         String
-  lastName          String
-  email             String     @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int        @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int        @default(0)
-  status            UserStatus @default(pending)
-  isDeleted         Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id           String              @id @default(uuid())
+  title        String
+  logo         String
+  audience     PackageAudience
+  features     String[]
+  billingCycle PackageBillingCycle
+  price        Int
+  popularity   Int                 @default(0)
+  isDeleted    Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  subscription Subscription?
 
   @@map("packages")
 }
 
-model Support {
-  id                String     @id @default(uuid())
-  firstName         String
-  lastName          String
-  email             String     @unique
-  profilePhoto      String?
-  coverPhoto        String?
-  bio               String?
-  contactNumber     String
-  address           String?
-  dateOfBirth       String?
-  experience        Int        @default(0)
-  gender            Gender
-  designation       String
-  qualification     String
-  specialization    String[]
-  yearsOfExperience Int        @default(0)
-  status            UserStatus @default(pending)
-  isDeleted         Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+model Subscription {
+  id            String        @id @default(uuid())
+  packageId     String        @unique
+  userId        String        @unique
+  transactionId String?
+  amount        Float
+  paymentStatus PaymentStatus
+  status        PaymentStatus
+  expiredAt     DateTime      @default(now())
+  isExpired     Boolean       @default(false)
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  @@map("supports")
+  package Package @relation(references: [id], fields: [packageId])
+  user    User    @relation(references: [id], fields: [userId])
+
+  @@map("subscriptions")
 }
 
 model Payment {
-  id                 String        @id @default(uuid())
-  appointmentId      String        @unique
-  amount             Float         @default(0.00)
-  transactionId      String        @unique
-  status             PaymentStatus @default(unpaid)
-  paymentGatewayData Json?
+  id              String           @id @default(uuid())
+  userId          String           @unique
+  referenceId     String
+  modelType       PaymentModelType
+  transactionId   String           @unique
+  amount          Float            @default(0.00)
+  commission      Float            @default(0.00)
+  status          PaymentStatus    @default(unpaid)
+  paymentMethod   String
+  paymentIntentId String?
+  isPaid          Boolean          @default(false)
+  isSellerPaid    Boolean          @default(false)
+  isDeleted       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  account User @relation(references: [id], fields: [userId])
+  // reference User @relation(references: [id], fields: [userId])
 
   @@map("payments")
 }
 
 model Review {
-  id       String @id @default(uuid())
-  doctorId String
+  id          String          @id @default(uuid())
+  userId      String          @unique
+  referenceId String
+  modelType   ReviewModelType
+  rating      Float
+  comment     String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  rating    Float
+  author    User       @relation(references: [id], fields: [userId])
+  ReviewRef ReviewRef?
+
+  @@map("reviews")
+}
+
+model ReviewRef {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  reviewId  String   @unique
   comment   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("reviews")
+  author User   @relation(references: [id], fields: [userId])
+  review Review @relation(references: [id], fields: [reviewId])
+
+  @@map("review_refs")
 }
 
 enum UserRole {
@@ -286,10 +300,33 @@ enum UserRole {
   student
 }
 
+enum PackageAudience {
+  company_admin
+  student
+}
+
+enum PackageBillingCycle {
+  monthly
+  halfYearly
+  annually
+}
+
+enum PaymentModelType {
+  order
+  subscription
+  eventBooking
+  enrolledCourse
+}
+
+enum ReviewModelType {
+  instructor
+  course
+}
+
 enum UserStatus {
-  blocked
-  active
   pending
+  active
+  blocked
   deleted
 }
 

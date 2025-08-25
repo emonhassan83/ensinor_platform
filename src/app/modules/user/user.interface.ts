@@ -10,7 +10,6 @@ export type IUser = {
     id: string;
     email: string;
     role: string;
-    needPasswordChange: boolean;
     status: UserStatus;
     createdAt: Date;
     updatedAt: Date;
