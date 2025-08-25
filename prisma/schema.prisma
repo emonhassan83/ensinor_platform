@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  password           String
+  role               UserRole
+  needPasswordChange Boolean             @default(true)
+  status             UserStatus          @default(active)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  superAdmin         SuperAdmin?
+  companyAdmin       CompanyAdmin?
+  businessInstructor BusinessInstructor?
+  employee           Employee?
+  instructor         Instructor?
+  student            Student?
+
+  @@map("users")
+}
+
+model SuperAdmin {
+  id            String     @id @unique @default(uuid())
+  firstName     String
+  lastName      String
+  email         String     @unique
+  contactNumber String
+  profilePhoto  String?
+  address       String?
+  status        UserStatus @default(active)
+  isDeleted     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user User @relation(references: [email], fields: [email])
+
+  @@map("super_admin")
+}
+
+model CompanyAdmin {
+  id                  String     @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String     @unique
+  profilePhoto        String?
+  coverPhoto          String?
+  bio                 String?
+  contactNumber       String
+  address             String?
+  gender              Gender
+  dateOfBirth         DateTime?
+  registrationNumber  String
+  experience          Int        @default(0)
+  appointmentFee      Int
+  qualification       String
+  currentWorkingPlace String
+  designation         String
+  status              UserStatus @default(pending)
+  isDeleted           Boolean    @default(false)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  user                User       @relation(references: [email], fields: [email])
+  averageRating       Float      @default(0.0)
+
+  @@map("company_admins")
+}
+
+model BusinessInstructor {
+  id            String     @id @unique @default(uuid())
+  firstName     String
+  lastName      String
+  email         String     @unique
+  profilePhoto  String?
+  coverPhoto    String?
+  bio           String?
+  contactNumber String
+  address       String?
+  gender        Gender
+  dateOfBirth   DateTime?
+  status        UserStatus @default(active)
+  isDeleted     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user User @relation(references: [email], fields: [email])
+
+  @@map("business_instructors")
+}
+
+model Employee {
+  id                String     @id @unique @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int        @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int        @default(0)
+  status            UserStatus @default(pending)
+  isDeleted         Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user User @relation(references: [email], fields: [email])
+
+  @@map("employees")
+}
+
+model Instructor {
+  id                String     @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int        @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int        @default(0)
+  status            UserStatus @default(pending)
+  isDeleted         Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  user              User       @relation(references: [email], fields: [email])
+
+  @@map("instructors")
+}
+
+model Student {
+  id                String     @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int        @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int        @default(0)
+  status            UserStatus @default(pending)
+  isDeleted         Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  user              User       @relation(references: [email], fields: [email])
+
+  @@map("students")
+}
+
+model Branding {
+  id                String   @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String   @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int      @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int      @default(0)
+  isDeleted         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("branding")
+}
+
+model Package {
+  id                String     @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int        @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int        @default(0)
+  status            UserStatus @default(pending)
+  isDeleted         Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@map("packages")
+}
+
+model Support {
+  id                String     @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String     @unique
+  profilePhoto      String?
+  coverPhoto        String?
+  bio               String?
+  contactNumber     String
+  address           String?
+  dateOfBirth       String?
+  experience        Int        @default(0)
+  gender            Gender
+  designation       String
+  qualification     String
+  specialization    String[]
+  yearsOfExperience Int        @default(0)
+  status            UserStatus @default(pending)
+  isDeleted         Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@map("supports")
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  appointmentId      String        @unique
+  amount             Float         @default(0.00)
+  transactionId      String        @unique
+  status             PaymentStatus @default(unpaid)
+  paymentGatewayData Json?
+
+  @@map("payments")
+}
+
+model Review {
+  id       String @id @default(uuid())
+  doctorId String
+
+  rating    Float
+  comment   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+enum UserRole {
+  super_admin
+  company_admin
+  business_instructors
+  employee
+  instructor
+  student
+}
+
+enum UserStatus {
+  blocked
+  active
+  pending
+  deleted
+}
+
+enum Gender {
+  male
+  female
+  unknown
+}
+
+enum PaymentStatus {
+  unpaid
+  paid
+}
