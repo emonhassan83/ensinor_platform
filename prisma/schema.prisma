@@ -51,6 +51,14 @@ model User {
   usedCoupons        Coupon[]             @relation("CouponUsedBy")
   quizAttempt        QuizAttempt[]
   certificateRequest CertificateRequest[]
+  department         Department[]
+  invitation         Invitation[]
+  enrolledCourse     EnrolledCourse[]
+  assignCourse       AssignCourse[]
+  certificate        Certificate[]
+  wishlist           Wishlist[]
+  withdrawRequest    WithdrawRequest[]
+  gradingSystem      GradingSystem[]
 
   @@map("users")
 }
@@ -96,6 +104,39 @@ model CompanyAdmin {
   company            Company?
 
   @@map("company_admins")
+}
+
+model Department {
+  id        String   @id @default(uuid()) // PK
+  authorId  String
+  image     String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author     User         @relation(fields: [authorId], references: [id])
+  invitation Invitation[]
+
+  @@map("departments")
+}
+
+model Invitation {
+  id           String   @id @default(uuid()) // You can keep this OR remove if only composite PK needed
+  userId       String // FK to User
+  departmentId String // FK to Department
+  firstName    String
+  lastName     String
+  groupName    String?
+  email        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+
+  @@unique([userId, departmentId]) // Composite Unique (like PK across both)
+  @@map("invitations")
 }
 
 model BusinessInstructor {
@@ -218,6 +259,24 @@ model Company {
   @@map("companies")
 }
 
+model CompanyRequest {
+  id                    String   @id @default(uuid())
+  fullName              String
+  organizationEmail     String
+  companyType           String
+  phoneNumber           String
+  role                  String
+  companySize           String
+  numberOfPeopleToTrain String
+  trainingNeeds         String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("company_requests")
+}
+
+// Book Related Models
+
 model Book {
   id            String     @id @default(uuid())
   authorId      String
@@ -260,6 +319,8 @@ model Order {
   @@map("orders")
 }
 
+// Course Related Models
+
 model Course {
   id               String      @id @default(uuid()) // Primary Key
   authorId         String // FK to User (Instructor)
@@ -287,10 +348,29 @@ model Course {
 
   author             User                 @relation(fields: [authorId], references: [id])
   bundles            CourseBundle[]       @relation("BundleCourses") // Many-to-Many relation with CourseBundle
+  courseContent      CourseContent[]
   quiz               Quiz[]
   certificateRequest CertificateRequest[]
+  enrolledCourse     EnrolledCourse[]
+  assignCourse       AssignCourse[]
+  certificate        Certificate[]
+  gradingSystem      GradingSystem[]
 
   @@map("courses")
+}
+
+model CourseContent {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String
+  video     String
+  duration  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("course_contents")
 }
 
 model CourseBundle {
@@ -375,6 +455,52 @@ model QuizAttempt {
   @@map("quiz_attempts")
 }
 
+model EnrolledCourse {
+  id            String      @id @default(uuid())
+  authorId      String
+  courseId      String
+  completedRate Int         @default(0)
+  courseMark    String?
+  grade         CourseGrade
+  avgGradeId    String? // Could reference a grading summary if needed
+  learningTime  Int         @default(0) // in minutes
+  isComplete    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  author User   @relation(fields: [authorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("enrolled_courses")
+}
+
+model AssignCourse {
+  id            String      @id @default(uuid())
+  authorId      String // FK to User (instructor/admin assigning course)
+  courseId      String // FK to Course
+  completedRate Float       @default(0.0)
+  courseMark    Json? // Storing marks per module or quiz
+  grade         CourseGrade
+  avgGradeId    String? // Could reference a grading summary if needed
+  learningTime  Float       @default(0.0) // in hours
+  isComplete    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  author User   @relation(fields: [authorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("assign_courses")
+}
+
+enum CourseGrade {
+  A
+  B
+  C
+  D
+  F
+}
+
 model CertificateRequest {
   id         String     @id @default(uuid()) // PK
   authorId   String // FK to User (student requesting)
@@ -391,6 +517,36 @@ model CertificateRequest {
   @@map("certificate_requests")
 }
 
+model Certificate {
+  id           String   @id @default(uuid())
+  authorId     String
+  courseId     String
+  company      String
+  logo         String
+  student      String
+  courseName   String
+  instructor   String
+  studyHour    Float
+  topics       String[]
+  completeDate String
+  reference    String
+  signature    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id])
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@map("certificates")
+}
+
+enum CertificateStatus {
+  pending
+  approved
+  rejected
+}
+
+//* Event Related Models
 model Event {
   id             String     @id @default(uuid()) // Primary Key
   authorId       String // FK to User
@@ -413,10 +569,55 @@ model Event {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  author       User           @relation(fields: [authorId], references: [id])
-  eventBooking EventBooking[]
+  author        User            @relation(fields: [authorId], references: [id])
+  eventBooking  EventBooking[]
+  eventSchedule EventSchedule[]
+  eventSpeaker  EventSpeaker[]
 
   @@map("events")
+}
+
+model EventSchedule {
+  id        String   @id @default(uuid())
+  eventId   String
+  day       String
+  date      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event            Event                  @relation(fields: [eventId], references: [id])
+  scheduleSpeakers EventScheduleSpeaker[]
+
+  @@map("event_schedules")
+}
+
+model EventSpeaker {
+  id         String   @id @default(uuid())
+  eventId    String
+  photo      String?
+  name       String
+  profession String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@map("event_speakers")
+}
+
+model EventScheduleSpeaker {
+  id              String   @id @default(uuid())
+  eventScheduleId String
+  name            String
+  profession      String
+  photo           String?
+  speaksTime      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  schedule EventSchedule @relation(fields: [eventScheduleId], references: [id])
+
+  @@map("event_schedule_speakers")
 }
 
 model EventBooking {
@@ -577,6 +778,89 @@ model ReviewRef {
   @@map("review_refs")
 }
 
+model WithdrawRequest {
+  id               String        @id @default(uuid())
+  userId           String
+  amount           Float
+  stripeTransferId String
+  paymentMethod    PaymentMethod
+  status           OrderStatus   @default(pending)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("withdraw_requests")
+}
+
+enum PaymentMethod {
+  Stripe
+  PayPal
+  BankTransfer
+}
+
+model CV {
+  id           String          @id @default(uuid())
+  author       String
+  name         String
+  designation  String
+  photo        String
+  phone        String
+  email        String
+  linkedin     String
+  website      String
+  location     String
+  aboutMe      String
+  skills       String[]
+  educations   Education[]
+  experiences  Experience[]
+  certificates CVCertificate[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model Education {
+  id          String   @id @default(uuid())
+  cvId        String
+  cv          CV       @relation(fields: [cvId], references: [id])
+  institution String
+  degree      String
+  location    String
+  result      String
+  startTime   String
+  endTime     String
+  type        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Experience {
+  id          String   @id @default(uuid())
+  cvId        String
+  cv          CV       @relation(fields: [cvId], references: [id])
+  companyName String
+  designation String
+  jobType     String
+  startTime   String
+  endTime     String
+  description String
+  skills      String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CVCertificate {
+  id            String   @id @default(uuid())
+  cvId          String
+  cv            CV       @relation(fields: [cvId], references: [id])
+  instituteName String
+  degree        String
+  credentialId  String
+  file          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Notification {
   id          String               @id @default(uuid())
   receiverId  String?
@@ -641,6 +925,60 @@ model Message {
   updatedAt DateTime @updatedAt
 
   @@map("messages")
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  modelType String //! Can use enum if you define ModelType enum
+  reference String // Reference ID to the related model
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("wishlists")
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  name      String
+  modelType String //! Can use enum if you define ModelType enum
+  reference String // Reference ID to the related model
+  file      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("resources")
+}
+
+model GradingSystem {
+  id        String   @id @default(uuid())
+  courseId  String
+  authorId  String
+  name      String // e.g., "Final Exam Grading"
+  grades    Grade[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User   @relation(fields: [authorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@map("grading_systems")
+}
+
+model Grade {
+  id              String   @id @default(uuid())
+  gradingSystemId String
+  minScore        Float
+  maxScore        Float
+  gradeLabel      String // e.g., "A", "B", "C"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  gradingSystem GradingSystem @relation(fields: [gradingSystemId], references: [id])
+
+  @@map("grades")
 }
 
 model Article {
@@ -709,7 +1047,7 @@ model FAQ {
 }
 
 model Support {
-  id        String   @id @default(uuid()) // Primary Key
+  id        String   @id @default(uuid())
   name      String
   email     String
   message   String
@@ -717,6 +1055,31 @@ model Support {
   updatedAt DateTime @updatedAt
 
   @@map("supports")
+}
+
+model Newsletter {
+  id           String           @id @default(uuid())
+  email        String           @unique // Subscriber email
+  recurrence   RecurrenceType   @default(once) // How often to send newsletter
+  scheduleDate DateTime? // Next scheduled date for sending
+  status       NewsletterStatus @default(active)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("newsletters")
+}
+
+enum RecurrenceType {
+  once
+  daily
+  weekly
+  monthly
+}
+
+enum NewsletterStatus {
+  active
+  paused
+  unsubscribed
 }
 
 enum UserRole {
