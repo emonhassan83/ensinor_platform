@@ -1,7 +1,10 @@
 import {
   BusinessInstructor,
+  CompanyAdmin,
   Employee,
+  Instructor,
   Prisma,
+  Student,
   SuperAdmin,
   UserRole,
   UserStatus,
@@ -9,7 +12,7 @@ import {
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import { hashedPassword } from './user.utils';
-import { IUser, IUserFilterRequest } from './user.interface';
+import { IUser, IUserFilterRequest, IUserResponse } from './user.interface';
 import { userSearchableFields } from './user.constant';
 import { Request } from 'express';
 import ApiError from '../../errors/ApiError';
@@ -17,89 +20,119 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 
-const createAdmin = async (req: Request): Promise<SuperAdmin> => {
-  const hashPassword = await hashedPassword(req.body.password);
+const createCompanyAdmin = async (payload: any): Promise<CompanyAdmin> => {
+  const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     await transactionClient.user.create({
       data: {
-        email: req.body.admin.email,
-        password: hashPassword,
-        role: UserRole.super_admin,
-      },
-    });
-
-    const newAdmin = await transactionClient.superAdmin.create({
-      data: req.body.admin,
-    });
-
-    return newAdmin;
-  });
-
-  return result;
-};
-
-const createDoctor = async (req: Request) => {
-  const hashPassword = await hashedPassword(req.body.password);
-
-  const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
-      data: {
-        email: req.body.doctor.email,
+        name: payload.companyAdmin.name,
+        email: payload.companyAdmin.email,
         password: hashPassword,
         role: UserRole.company_admin,
       },
     });
 
-    const newDoctor = await transactionClient.companyAdmin.create({
-      data: req.body.doctor,
+    const newCompanyAdmin = await transactionClient.companyAdmin.create({
+      data: payload.companyAdmin,
     });
 
-    return newDoctor;
+    return newCompanyAdmin;
   });
 
   return result;
 };
 
-const createReceptionist = async (req: Request): Promise<BusinessInstructor> => {
-  const hashPassword = await hashedPassword(req.body.password);
+const createBusinessInstructor = async (
+  payload: any,
+): Promise<BusinessInstructor> => {
+  const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     await transactionClient.user.create({
       data: {
-        email: req.body.receptionist.email,
+        name: payload.businessInstructor.name,
+        email: payload.businessInstructor.email,
         password: hashPassword,
         role: UserRole.business_instructors,
       },
     });
 
-    const newReceptionist = await transactionClient.businessInstructor.create({
-      data: req.body.receptionist,
-    });
+    const newBusinessInstructor =
+      await transactionClient.businessInstructor.create({
+        data: payload.businessInstructor,
+      });
 
-    return newReceptionist;
+    return newBusinessInstructor;
   });
 
   return result;
 };
 
-const createPatient = async (req: Request): Promise<Employee> => {
-  const hashPassword = await hashedPassword(req.body.password);
+const createEmployee = async (payload: any): Promise<Employee> => {
+  const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     await transactionClient.user.create({
       data: {
-        email: req.body.patient.email,
+        name: payload.employee.name,
+        email: payload.employee.email,
         password: hashPassword,
-        role: UserRole.employee,
+        role: UserRole.business_instructors,
       },
     });
 
-    const newPatient = await transactionClient.employee.create({
-      data: req.body.patient,
+    const newEmployee = await transactionClient.businessInstructor.create({
+      data: payload.employee,
     });
 
-    return newPatient;
+    return newEmployee;
+  });
+
+  return result;
+};
+
+const createInstructor = async (payload: any): Promise<Instructor> => {
+  const hashPassword = await hashedPassword(payload.password);
+
+  const result = await prisma.$transaction(async transactionClient => {
+    await transactionClient.user.create({
+      data: {
+        name: payload.instructor.name,
+        email: payload.instructor.email,
+        password: hashPassword,
+        role: UserRole.instructor,
+      },
+    });
+
+    const newInstructor = await transactionClient.instructor.create({
+      data: payload.instructor,
+    });
+
+    return newInstructor;
+  });
+
+  return result;
+};
+
+const createStudent = async (payload: any): Promise<Student> => {
+  const hashPassword = await hashedPassword(payload.password);
+
+  const result = await prisma.$transaction(async transactionClient => {
+    await transactionClient.user.create({
+      data: {
+        name: payload.student.name,
+        email: payload.student.email,
+        password: hashPassword,
+        role: UserRole.student,
+      },
+    });
+
+    const newStudent = await transactionClient.student.create({
+      data: payload.student,
+    });
+
+    return newStudent;
   });
 
   return result;
@@ -128,11 +161,11 @@ const changeProfileStatus = async (userId: string, status: UserStatus) => {
 const getAllUser = async (
   filters: IUserFilterRequest,
   options: IPaginationOptions,
-): Promise<IGenericResponse<IUser[]>> => {
+): Promise<IGenericResponse<IUserResponse[]>> => {
   const { limit, page, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = filters;
 
-  const andConditions = [];
+  const andConditions: Prisma.UserWhereInput[] = [{ isDeleted: false }];
 
   if (searchTerm) {
     andConditions.push({
@@ -170,9 +203,18 @@ const getAllUser = async (
           },
     select: {
       id: true,
+      name: true,
       email: true,
+      photoUrl: true,
+      bio: true,
+      dateOfBirth: true,
+      contactNo: true,
+      city: true,
+      country: true,
       role: true,
       status: true,
+      lastActive: true,
+      isDeleted: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -198,9 +240,21 @@ const getMyProfile = async (authUser: any) => {
       status: UserStatus.active,
     },
     select: {
+      id: true,
+      name: true,
       email: true,
+      photoUrl: true,
+      bio: true,
+      dateOfBirth: true,
+      contactNo: true,
+      city: true,
+      country: true,
       role: true,
       status: true,
+      lastActive: true,
+      isDeleted: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
@@ -208,25 +262,31 @@ const getMyProfile = async (authUser: any) => {
   if (userData?.role === UserRole.super_admin) {
     profileData = await prisma.superAdmin.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
     });
   } else if (userData?.role === UserRole.company_admin) {
     profileData = await prisma.companyAdmin.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
     });
   } else if (userData?.role === UserRole.business_instructors) {
     profileData = await prisma.businessInstructor.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
     });
   } else if (userData?.role === UserRole.employee) {
     profileData = await prisma.employee.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
+      },
+    });
+  } else if (userData?.role === UserRole.student) {
+    profileData = await prisma.student.findUnique({
+      where: {
+        userId: userData.id,
       },
     });
   }
@@ -247,41 +307,45 @@ const updateMyProfile = async (authUser: any, req: Request) => {
 
   let profileData;
   if (userData?.role === UserRole.super_admin) {
-    profileData = await prisma.superAdmin.update({
+    profileData = await prisma.superAdmin.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
-      data: req.body,
     });
   } else if (userData?.role === UserRole.company_admin) {
     profileData = await prisma.companyAdmin.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
     });
   } else if (userData?.role === UserRole.business_instructors) {
-    profileData = await prisma.businessInstructor.update({
+    profileData = await prisma.businessInstructor.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
-      data: req.body,
     });
   } else if (userData?.role === UserRole.employee) {
-    profileData = await prisma.employee.update({
+    profileData = await prisma.employee.findUnique({
       where: {
-        email: userData.email,
+        userId: userData.id,
       },
-      data: req.body,
+    });
+  } else if (userData?.role === UserRole.student) {
+    profileData = await prisma.student.findUnique({
+      where: {
+        userId: userData.id,
+      },
     });
   }
   return { ...profileData, ...userData };
 };
 
 export const UserServices = {
-  createDoctor,
-  createAdmin,
-  createPatient,
-  createReceptionist,
+  createCompanyAdmin,
+  createBusinessInstructor,
+  createEmployee,
+  createInstructor,
+  createStudent,
   changeProfileStatus,
   getAllUser,
   getMyProfile,

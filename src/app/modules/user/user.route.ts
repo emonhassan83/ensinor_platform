@@ -12,31 +12,37 @@ router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
 router.get('/me', auth(UserRole.super_admin), UserController.getMyProfile);
 
 router.post(
-  '/create-admin',
+  '/create-company-admin',
   auth(UserRole.super_admin),
-  validateRequest(UserValidation.createAdmin),
-  UserController.createAdmin,
+  validateRequest(UserValidation.createCompanyAdmin),
+  UserController.createCompanyAdmin,
 );
 
 router.post(
-  '/create-receptionist',
+  '/create-business-instructor',
   auth(UserRole.super_admin),
-  validateRequest(UserValidation.createReceptionist),
-  UserController.createReceptionist,
+  validateRequest(UserValidation.createBusinessInstructor),
+  UserController.createBusinessInstructor,
 );
 
 router.post(
-  '/create-doctor',
-  validateRequest(UserValidation.createDoctor),
+  '/create-employee',
+  validateRequest(UserValidation.createEmployee),
   auth(UserRole.super_admin),
-  UserController.createDoctor,
+  UserController.createEmployee,
 );
 
 router.post(
-  '/create-patient',
-  // auth(UserRole.super_admin),
-  validateRequest(UserValidation.createPatient),
-  UserController.createPatient,
+  '/create-instructor',
+  auth(UserRole.super_admin),
+  validateRequest(UserValidation.createInstructor),
+  UserController.createInstructor,
+);
+
+router.post(
+  '/create-student',
+  validateRequest(UserValidation.createStudent),
+  UserController.createStudent,
 );
 
 router.patch(
@@ -48,7 +54,7 @@ router.patch(
 
 router.patch(
   '/update-my-profile',
-auth(UserRole.super_admin),
+  auth(UserRole.super_admin),
   UserController.updateMyProfile,
 );
 

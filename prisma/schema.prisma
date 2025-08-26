@@ -27,6 +27,7 @@ model User {
   country     String?
   role        UserRole
   lastActive  DateTime @default(now())
+  status      UserStatus @default(pending)
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

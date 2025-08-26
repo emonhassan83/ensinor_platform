@@ -2,46 +2,56 @@ import { NextFunction, Request, Response } from 'express';
 import httpStatus from 'http-status';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
-import { UserServices } from './user.services';
+import { UserServices } from './user.service';
 import { userFilterableFields } from './user.constant';
 import pick from '../../utils/pick';
 
-const createDoctor = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const result = await UserServices.createDoctor(req);
+const createCompanyAdmin = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const result = await UserServices.createCompanyAdmin(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Doctor created successfully!',
+    message: 'Company admin profile created successfully!',
     data: result,
   });
 });
 
-const createAdmin = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.createAdmin(req);
+const createBusinessInstructor = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserServices.createBusinessInstructor(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Admin created successfully!',
+    message: 'Business instructor profile created successfully!',
     data: result,
   });
 });
 
-const createPatient = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.createPatient(req);
+const createEmployee = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserServices.createEmployee(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Patient created successfully!',
+    message: 'Employee profile created successfully!',
     data: result,
   });
 });
 
-const createReceptionist = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.createReceptionist(req);
+const createInstructor = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserServices.createInstructor(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Receptionist created successfully!',
+    message: 'Instructor profile created successfully!',
+    data: result,
+  });
+});
+
+const createStudent = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserServices.createStudent(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Student profile created successfully!',
     data: result,
   });
 });
@@ -93,10 +103,11 @@ const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const UserController = {
-  createDoctor,
-  createAdmin,
-  createPatient,
-  createReceptionist,
+  createCompanyAdmin,
+  createBusinessInstructor,
+  createEmployee,
+  createInstructor,
+  createStudent,
   changeProfileStatus,
   getAllUser,
   getMyProfile,
