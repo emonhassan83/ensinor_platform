@@ -9,8 +9,8 @@ const upload = multer({ storage });
 router.post(
   '/multiple',
   upload.fields([
-    { name: 'images', maxCount: 5 },
-    { name: 'videos', maxCount: 5 },
+    { name: 'images', maxCount: 12 },
+    { name: 'videos', maxCount: 6 },
   ]),
   uploadController.multiple,
 );
