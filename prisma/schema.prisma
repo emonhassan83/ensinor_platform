@@ -13,16 +13,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model: Core authentication and common profile info for all roles
 model User {
-  id         String     @id @default(uuid())
-  email      String     @unique
-  password   String
-  role       UserRole
-  lastActive DateTime   @default(now())
-  status     UserStatus @default(active)
-  isDeleted  Boolean    @default(false)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  photoUrl    String?
+  bio         String?
+  dateOfBirth String?
+  contactNo   String?
+  city        String?
+  country     String?
+  role        UserRole
+  lastActive  DateTime @default(now())
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   superAdmin         SuperAdmin?
   companyAdmin       CompanyAdmin?
@@ -41,7 +48,6 @@ model User {
   book               Book[]
   order              Order[]
   course             Course[]
-  courseBundle       CourseBundle[]
   event              Event[]
   eventBooking       EventBooking[]
   article            Article[]
@@ -59,24 +65,19 @@ model User {
   wishlist           Wishlist[]
   withdrawRequest    WithdrawRequest[]
   gradingSystem      GradingSystem[]
+  bundlesAuthored    CourseBundle[]       @relation("BundleAuthor")
+  bundlesPurchased   CourseBundle[]       @relation("BundleUser")
 
   @@map("users")
 }
 
 model SuperAdmin {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  dateOfBirth String
-  contactNo   String
-  city        String?
-  country     String?
-  status      UserStatus @default(active)
-  isDeleted   Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @unique @default(uuid())
+  userId    String     @unique
+  status    UserStatus @default(active)
+  isDeleted Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
@@ -84,19 +85,12 @@ model SuperAdmin {
 }
 
 model CompanyAdmin {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  dateOfBirth String
-  contactNo   String
-  city        String?
-  country     String?
-  status      UserStatus @default(active)
-  isDeleted   Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @unique @default(uuid())
+  userId    String     @unique
+  status    UserStatus @default(active)
+  isDeleted Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user               User                @relation(references: [id], fields: [userId])
   businessInstructor BusinessInstructor?
@@ -107,7 +101,7 @@ model CompanyAdmin {
 }
 
 model Department {
-  id        String   @id @default(uuid()) // PK
+  id        String   @id @default(uuid())
   authorId  String
   image     String
   name      String
@@ -121,11 +115,10 @@ model Department {
 }
 
 model Invitation {
-  id           String   @id @default(uuid()) // You can keep this OR remove if only composite PK needed
-  userId       String // FK to User
-  departmentId String // FK to Department
-  firstName    String
-  lastName     String
+  id           String   @id @default(uuid())
+  userId       String
+  departmentId String
+  name         String
   groupName    String?
   email        String
   createdAt    DateTime @default(now())
@@ -140,20 +133,13 @@ model Invitation {
 }
 
 model BusinessInstructor {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
-  companyId   String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  dateOfBirth String
-  contactNo   String
-  city        String?
-  country     String?
-  status      UserStatus @default(active)
-  isDeleted   Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @unique @default(uuid())
+  userId    String     @unique
+  companyId String     @unique
+  status    UserStatus @default(active)
+  isDeleted Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user    User         @relation(references: [id], fields: [userId])
   company CompanyAdmin @relation(references: [id], fields: [companyId])
@@ -162,20 +148,13 @@ model BusinessInstructor {
 }
 
 model Employee {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
-  companyId   String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  dateOfBirth String
-  contactNo   String
-  city        String?
-  country     String?
-  status      UserStatus @default(active)
-  isDeleted   Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id        String     @id @unique @default(uuid())
+  userId    String     @unique
+  companyId String     @unique
+  status    UserStatus @default(active)
+  isDeleted Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   user    User         @relation(references: [id], fields: [userId])
   company CompanyAdmin @relation(references: [id], fields: [companyId])
@@ -186,14 +165,7 @@ model Employee {
 model Instructor {
   id          String     @id @unique @default(uuid())
   userId      String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  contactNo   String
   designation String
-  bio         String?
-  city        String?
-  country     String?
   university  String?
   session     String?
   subjects    String
@@ -215,24 +187,16 @@ model Instructor {
 }
 
 model Student {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
-  name        String
-  email       String     @unique
-  photoUrl    String
-  bio         String?
-  interests   String[]
-  dateOfBirth String
-  contactNo   String
-  city        String?
-  country     String?
-  university  String?
-  session     String?
-  subjects    String
-  status      UserStatus @default(active)
-  isDeleted   Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String     @id @unique @default(uuid())
+  userId     String     @unique
+  interests  String[]
+  university String?
+  session    String?
+  subjects   String
+  status     UserStatus @default(active)
+  isDeleted  Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
@@ -261,7 +225,7 @@ model Company {
 
 model CompanyRequest {
   id                    String   @id @default(uuid())
-  fullName              String
+  name                  String
   organizationEmail     String
   companyType           String
   phoneNumber           String
@@ -276,7 +240,6 @@ model CompanyRequest {
 }
 
 // Book Related Models
-
 model Book {
   id            String     @id @default(uuid())
   authorId      String
@@ -301,9 +264,9 @@ model Book {
 }
 
 model Order {
-  id            String        @id @default(uuid()) // Primary Key
-  userId        String // FK to User table (customer)
-  bookId        String // FK to Author/User table
+  id            String        @id @default(uuid())
+  userId        String
+  bookId        String
   amount        Float
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
@@ -320,10 +283,9 @@ model Order {
 }
 
 // Course Related Models
-
 model Course {
-  id               String      @id @default(uuid()) // Primary Key
-  authorId         String // FK to User (Instructor)
+  id               String      @id @default(uuid())
+  authorId         String
   title            String
   shortDescription String
   category         String
@@ -346,8 +308,12 @@ model Course {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  author             User                 @relation(fields: [authorId], references: [id])
-  bundles            CourseBundle[]       @relation("BundleCourses") // Many-to-Many relation with CourseBundle
+  author User @relation(fields: [authorId], references: [id])
+
+  // Many-to-many with CourseBundle via join table
+  courseBundleCourses CourseBundleCourses[]
+  bundles             CourseBundle[]        @relation("BundleCourses")
+
   courseContent      CourseContent[]
   quiz               Quiz[]
   certificateRequest CertificateRequest[]
@@ -374,23 +340,47 @@ model CourseContent {
 }
 
 model CourseBundle {
-  id          String   @id @default(uuid()) // Primary Key
-  authorId    String // FK to User (Instructor)
-  description String
-  price       Float
-  discount    Float    @default(0.0)
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String     @id @default(uuid())
+  authorId       String
+  userId         String
+  title          String
+  category       String
+  price          Int
+  thumbnail      String?
+  discount       Float      @default(0.0)
+  popularity     Int        @default(0)
+  totalCompleted Int        @default(0)
+  status         UserStatus @default(active)
+  avgRating      Float      @default(0.0)
+  ratingCount    Int        @default(0)
+  isDeleted      Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  author  User     @relation(fields: [authorId], references: [id])
-  courses Course[] @relation("BundleCourses")
+  // Relations
+  author User @relation("BundleAuthor", fields: [authorId], references: [id])
+  user   User @relation("BundleUser", fields: [userId], references: [id])
+
+  // Many-to-many handled through join table
+  courseBundleCourses CourseBundleCourses[]
+  courses             Course[]              @relation("BundleCourses")
 
   @@map("course_bundles")
 }
 
+model CourseBundleCourses {
+  bundleId String
+  courseId String
+
+  bundle CourseBundle @relation(fields: [bundleId], references: [id])
+  course Course       @relation(fields: [courseId], references: [id])
+
+  @@id([bundleId, courseId])
+  @@map("course_bundle_courses")
+}
+
 model Quiz {
-  id           String   @id @default(uuid()) // PK
+  id           String   @id @default(uuid())
   courseId     String
   deadline     String?
   time         String? // e.g. "30m" or "01:00:00"
@@ -408,7 +398,7 @@ model Quiz {
 }
 
 model Question {
-  id        String   @id @default(uuid()) // PK
+  id        String   @id @default(uuid())
   quizId    String
   name      String
   createdAt DateTime @default(now())
@@ -422,7 +412,7 @@ model Question {
 }
 
 model Options {
-  id          String   @id @default(uuid()) // PK
+  id          String   @id @default(uuid())
   questionId  String
   optionLevel String // e.g. A, B, C, D
   optionText  String
@@ -437,7 +427,7 @@ model Options {
 }
 
 model QuizAttempt {
-  id            String   @id @default(uuid()) // PK
+  id            String   @id @default(uuid())
   quizId        String
   userId        String
   timeTaken     String? // e.g. "15m", "00:12:45"
@@ -462,7 +452,6 @@ model EnrolledCourse {
   completedRate Int         @default(0)
   courseMark    String?
   grade         CourseGrade
-  avgGradeId    String? // Could reference a grading summary if needed
   learningTime  Int         @default(0) // in minutes
   isComplete    Boolean     @default(false)
   createdAt     DateTime    @default(now())
@@ -477,12 +466,11 @@ model EnrolledCourse {
 model AssignCourse {
   id            String      @id @default(uuid())
   authorId      String // FK to User (instructor/admin assigning course)
-  courseId      String // FK to Course
+  courseId      String
   completedRate Float       @default(0.0)
-  courseMark    Json? // Storing marks per module or quiz
+  courseMark    Int?        // Storing marks per module or quiz
   grade         CourseGrade
-  avgGradeId    String? // Could reference a grading summary if needed
-  learningTime  Float       @default(0.0) // in hours
+  learningTime  Int       @default(0) // in minutes
   isComplete    Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -502,7 +490,7 @@ enum CourseGrade {
 }
 
 model CertificateRequest {
-  id         String     @id @default(uuid()) // PK
+  id         String     @id @default(uuid())
   authorId   String // FK to User (student requesting)
   courseId   String // FK to Course
   status     UserStatus @default(pending)
@@ -548,8 +536,8 @@ enum CertificateStatus {
 
 //* Event Related Models
 model Event {
-  id             String     @id @default(uuid()) // Primary Key
-  authorId       String // FK to User
+  id             String     @id @default(uuid())
+  authorId       String
   title          String
   slogan         String
   type           String
@@ -621,7 +609,7 @@ model EventScheduleSpeaker {
 }
 
 model EventBooking {
-  id            String        @id @default(uuid()) // Primary Key
+  id            String        @id @default(uuid())
   eventId       String
   userId        String
   name          String
@@ -647,7 +635,7 @@ model EventBooking {
 }
 
 model Coupon {
-  id       String @id @default(uuid()) // Primary Key
+  id       String @id @default(uuid())
   authorId String // FK → User (who created the coupon)
 
   modelType   CouponModel // Enum to represent reference type (Course, Event, etc.)
@@ -680,6 +668,7 @@ model Package {
   isDeleted    Boolean             @default(false)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
+
   subscription Subscription?
 
   @@map("packages")
@@ -728,7 +717,7 @@ model Payment {
 }
 
 model Batch {
-  id       String @id @default(uuid()) // Primary Key
+  id       String @id @default(uuid())
   authorId String // FK → User (Instructor / Creator)
 
   title       String
@@ -812,17 +801,19 @@ model CV {
   location     String
   aboutMe      String
   skills       String[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
   educations   Education[]
   experiences  Experience[]
   certificates CVCertificate[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+
+  @@map("cvs")
 }
 
 model Education {
   id          String   @id @default(uuid())
   cvId        String
-  cv          CV       @relation(fields: [cvId], references: [id])
   institution String
   degree      String
   location    String
@@ -832,12 +823,15 @@ model Education {
   type        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  cv          CV       @relation(fields: [cvId], references: [id])
+
+  @@map("educations")
 }
 
 model Experience {
   id          String   @id @default(uuid())
   cvId        String
-  cv          CV       @relation(fields: [cvId], references: [id])
   companyName String
   designation String
   jobType     String
@@ -847,18 +841,25 @@ model Experience {
   skills      String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  cv          CV       @relation(fields: [cvId], references: [id])
+
+  @@map("experiences")
 }
 
 model CVCertificate {
   id            String   @id @default(uuid())
   cvId          String
-  cv            CV       @relation(fields: [cvId], references: [id])
   instituteName String
   degree        String
   credentialId  String
   file          String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  cv            CV       @relation(fields: [cvId], references: [id])
+
+  @@map("cv_certificates")
 }
 
 model Notification {
@@ -881,17 +882,22 @@ model Notification {
 
 model Chat {
   id           String            @id @default(uuid())
-  participants ChatParticipant[]
-  type         String // e.g., "private", "group"
+  type         ChatType
   groupName    String? // Optional, for group chats
   groupImage   String? // Optional, for group chats
   status       ChatStatus        @default(accepted)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  messages Message[]
+  participants ChatParticipant[]
+  messages     Message[]
 
   @@map("chats")
+}
+
+enum ChatType {
+  private
+  group
 }
 
 model ChatParticipant {
@@ -930,7 +936,7 @@ model Message {
 model Wishlist {
   id        String   @id @default(uuid())
   userId    String
-  modelType String //! Can use enum if you define ModelType enum
+  modelType WishListModelType
   reference String // Reference ID to the related model
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -940,10 +946,15 @@ model Wishlist {
   @@map("wishlists")
 }
 
+enum WishListModelType {
+  course
+  book
+}
+
 model Resource {
   id        String   @id @default(uuid())
   name      String
-  modelType String //! Can use enum if you define ModelType enum
+  modelType ResourceModelType
   reference String // Reference ID to the related model
   file      String
   createdAt DateTime @default(now())
@@ -952,17 +963,24 @@ model Resource {
   @@map("resources")
 }
 
+enum ResourceModelType {
+  course
+  event
+  article
+  book
+}
+
 model GradingSystem {
   id        String   @id @default(uuid())
-  courseId  String
-  authorId  String
-  name      String // e.g., "Final Exam Grading"
+  courseId  String?
+  authorId  String?
+  isDefault       Boolean     @default(false) // true = SuperAdmin template
   grades    Grade[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  author User   @relation(fields: [authorId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
+  author User?   @relation(fields: [authorId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
 
   @@map("grading_systems")
 }
@@ -982,8 +1000,8 @@ model Grade {
 }
 
 model Article {
-  id          String   @id @default(uuid()) // Primary Key
-  authorId    String // FK to User
+  id          String   @id @default(uuid())
+  authorId    String // FK to Admin
   title       String
   category    String
   thumbnail   String?
@@ -999,7 +1017,7 @@ model Article {
 }
 
 model Content {
-  id          String @id @default(uuid()) // Primary Key
+  id          String @id @default(uuid())
   createdById String // FK to User (admin/editor)
 
   aboutUs            String?
@@ -1032,7 +1050,7 @@ model Content {
 }
 
 model FAQ {
-  id        String @id @default(uuid()) // Primary Key
+  id        String @id @default(uuid())
   contentId String // FK → Content
 
   question String
@@ -1051,6 +1069,7 @@ model Support {
   name      String
   email     String
   message   String
+  isResponse Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
