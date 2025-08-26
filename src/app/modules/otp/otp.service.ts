@@ -1,114 +1,123 @@
-import httpStatus from 'http-status'
-import jwt, { JwtPayload, Secret } from 'jsonwebtoken'
-import moment from 'moment'
-import config from '../../config'
-import ApiError from '../../errors/ApiError'
-import { generateOtp } from '../../utils/generateOtp'
-import emailSender from '../../utils/emailSender'
-import { createToken, TExpiresIn } from '../Auth/auth.utils'
+import httpStatus from 'http-status';
+import jwt, { JwtPayload, Secret } from 'jsonwebtoken';
+import moment from 'moment';
+import config from '../../config';
+import ApiError from '../../errors/ApiError';
+import { generateOtp } from '../../utils/generateOtp';
+import emailSender from '../../utils/emailSender';
+import { createToken, TExpiresIn } from '../Auth/auth.utils';
+import prisma from '../../utils/prisma';
 
 const verifyOtp = async (token: string, otp: string | number) => {
   if (!token) {
-    throw new ApiError(httpStatus.UNAUTHORIZED, 'You are not authorized')
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'You are not authorized');
   }
 
-  let decode
+  let decode: JwtPayload;
   try {
-    decode = jwt.verify(token, config.jwt_access_secret as Secret) as JwtPayload
+    decode = jwt.verify(
+      token,
+      config.jwt_access_secret as Secret,
+    ) as JwtPayload;
   } catch (err) {
-    console.error(err)
+    console.error(err);
     throw new ApiError(
       httpStatus.FORBIDDEN,
       'Session has expired. Please try to submit OTP within 5 minute',
-    )
+    );
   }
 
-  // console.log(decode)
-
-  const user = await User.findOne({ email: decode?.email }).select(
-    'verification status ',
-  )
+  const user = await prisma.user.findUnique({
+    where: { email: decode?.email },
+    include: { verification: true },
+  });
   if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'User not found')
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User not found');
   }
-  if (new Date() > user!.verification!.expiresAt!) {
+  if (!user.verification) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'OTP not generated for this user',
+    );
+  }
+
+  if (new Date() > user.verification.expiresAt) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
       'OTP has expired. Please resend it',
-    )
-  }
-  if (Number(otp) !== Number(user?.verification?.otp)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'OTP did not match')
+    );
   }
 
-  const updateUser = await User.findByIdAndUpdate(
-    user?._id,
-    {
-      $set: {
-        verification: {
-          otp: 0,
-          expiresAt: moment().add(5, 'minute'),
-          status: true,
-        },
-        expireAt: null // set null to prevent verify user deletion data
-      },
+  if (Number(otp) !== Number(user.verification.otp)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'OTP did not match');
+  }
+
+  const updateVerification = await prisma.verification.update({
+    where: { userId: user.id },
+    data: {
+      otp: '',
+      expiresAt: moment().add(5, 'minute').toDate(),
+      status: true,
     },
-    { new: true },
-  ).select('email _id username role')
+  });
 
   const jwtPayload = {
-    _id: updateUser?._id as Types.ObjectId,
-    email: updateUser?.email as string,
-    role: updateUser?.role as 'admin' | 'trainer' | 'user',
-  }
+    _id: user.id,
+    email: user.email,
+    role: user.role,
+  };
 
   const accessToken = createToken(
     jwtPayload,
     config.jwt_access_secret as string,
     config.jwt_access_expires_in as TExpiresIn,
-  )
+  );
 
-  return { token: accessToken }
-}
+  return { token: accessToken };
+};
 
 const resendOtp = async (email: string) => {
-  const user = await User.findOne({ email })
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
 
   if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'User not found')
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User not found');
   }
 
-  const otp = generateOtp()
-  const expiresAt = moment().add(5, 'minute')
+  const otp = generateOtp();
+  const expiresAt = moment().add(5, 'minute').toDate();
 
-  const updateOtp = await User.findByIdAndUpdate(
-    user?._id,
-    {
-      $set: {
-        verification: {
-          otp,
-          expiresAt,
-          status: false,
-        },
-      },
+  // Upsert ensures either update existing or create new verification record
+  const updateOtp = await prisma.verification.upsert({
+    where: { userId: user.id },
+    update: {
+      otp,
+      expiresAt,
+      status: false,
     },
-    { new: true },
-  )
+    create: {
+      userId: user.id,
+      otp,
+      expiresAt,
+      status: false,
+    },
+  });
 
   if (!updateOtp) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Failed to resend OTP. Please try again later',
-    )
+    );
   }
 
   const jwtPayload = {
     email: user?.email,
-    userId: user?._id,
-  }
+    userId: user?.id,
+  };
   const token = jwt.sign(jwtPayload, config.jwt_access_secret as Secret, {
     expiresIn: '5m',
-  })
+  });
 
   await emailSender(
     user?.email,
@@ -133,12 +142,12 @@ const resendOtp = async (email: string) => {
         </div>
       </div>
     `,
-  )
+  );
 
-  return { token }
-}
+  return { token };
+};
 
 export const otpServices = {
   verifyOtp,
   resendOtp,
-}
+};

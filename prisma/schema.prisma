@@ -13,24 +13,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Verification {
+  id        String   @id @default(uuid())
+  otp       String
+  expiresAt DateTime
+  status    Boolean  @default(false)
+
+  // One-to-One relation
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("verifications")
+}
+
 // User model: Core authentication and common profile info for all roles
 model User {
-  id          String   @id @default(uuid())
-  name        String
-  email       String   @unique
-  password    String
-  photoUrl    String?
-  bio         String?
-  dateOfBirth String?
-  contactNo   String?
-  city        String?
-  country     String?
-  role        UserRole
-  lastActive  DateTime @default(now())
-  status      UserStatus @default(pending)
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String     @id @default(uuid())
+  name          String
+  email         String     @unique
+  password      String
+  photoUrl      String?
+  bio           String?
+  dateOfBirth   String?
+  contactNo     String?
+  city          String?
+  country       String?
+  role          UserRole
+  packageExpiry DateTime?
+  points        Int        @default(0)
+  lastActive    DateTime   @default(now())
+  status        UserStatus @default(pending)
+  isDeleted     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   superAdmin         SuperAdmin?
   companyAdmin       CompanyAdmin?
@@ -68,6 +86,7 @@ model User {
   gradingSystem      GradingSystem[]
   bundlesAuthored    CourseBundle[]       @relation("BundleAuthor")
   bundlesPurchased   CourseBundle[]       @relation("BundleUser")
+  verification       Verification?
 
   @@map("users")
 }
@@ -469,9 +488,9 @@ model AssignCourse {
   authorId      String // FK to User (instructor/admin assigning course)
   courseId      String
   completedRate Float       @default(0.0)
-  courseMark    Int?        // Storing marks per module or quiz
+  courseMark    Int? // Storing marks per module or quiz
   grade         CourseGrade
-  learningTime  Int       @default(0) // in minutes
+  learningTime  Int         @default(0) // in minutes
   isComplete    Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -790,20 +809,20 @@ enum PaymentMethod {
 }
 
 model CV {
-  id           String          @id @default(uuid())
-  author       String
-  name         String
-  designation  String
-  photo        String
-  phone        String
-  email        String
-  linkedin     String
-  website      String
-  location     String
-  aboutMe      String
-  skills       String[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id          String   @id @default(uuid())
+  author      String
+  name        String
+  designation String
+  photo       String
+  phone       String
+  email       String
+  linkedin    String
+  website     String
+  location    String
+  aboutMe     String
+  skills      String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   educations   Education[]
   experiences  Experience[]
@@ -825,7 +844,7 @@ model Education {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  cv          CV       @relation(fields: [cvId], references: [id])
+  cv CV @relation(fields: [cvId], references: [id])
 
   @@map("educations")
 }
@@ -843,7 +862,7 @@ model Experience {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  cv          CV       @relation(fields: [cvId], references: [id])
+  cv CV @relation(fields: [cvId], references: [id])
 
   @@map("experiences")
 }
@@ -858,7 +877,7 @@ model CVCertificate {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  cv            CV       @relation(fields: [cvId], references: [id])
+  cv CV @relation(fields: [cvId], references: [id])
 
   @@map("cv_certificates")
 }
@@ -882,13 +901,13 @@ model Notification {
 }
 
 model Chat {
-  id           String            @id @default(uuid())
-  type         ChatType
-  groupName    String? // Optional, for group chats
-  groupImage   String? // Optional, for group chats
-  status       ChatStatus        @default(accepted)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id         String     @id @default(uuid())
+  type       ChatType
+  groupName  String? // Optional, for group chats
+  groupImage String? // Optional, for group chats
+  status     ChatStatus @default(accepted)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   participants ChatParticipant[]
   messages     Message[]
@@ -935,12 +954,12 @@ model Message {
 }
 
 model Wishlist {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   userId    String
   modelType WishListModelType
   reference String // Reference ID to the related model
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
@@ -953,13 +972,13 @@ enum WishListModelType {
 }
 
 model Resource {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   name      String
   modelType ResourceModelType
   reference String // Reference ID to the related model
   file      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@map("resources")
 }
@@ -975,7 +994,7 @@ model GradingSystem {
   id        String   @id @default(uuid())
   courseId  String?
   authorId  String?
-  isDefault       Boolean     @default(false) // true = SuperAdmin template
+  isDefault Boolean  @default(false) // true = SuperAdmin template
   grades    Grade[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1066,13 +1085,13 @@ model FAQ {
 }
 
 model Support {
-  id        String   @id @default(uuid())
-  name      String
-  email     String
-  message   String
-  isResponse Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String
+  email      String
+  message    String
+  isResponse Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@map("supports")
 }
