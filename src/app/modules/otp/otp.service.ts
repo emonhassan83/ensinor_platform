@@ -5,7 +5,7 @@ import config from '../../config';
 import ApiError from '../../errors/ApiError';
 import { generateOtp } from '../../utils/generateOtp';
 import emailSender from '../../utils/emailSender';
-import { createToken, TExpiresIn } from '../Auth/auth.utils';
+import { createToken, TExpiresIn } from '../auth/auth.utils';
 import prisma from '../../utils/prisma';
 
 const verifyOtp = async (token: string, otp: string | number) => {
@@ -62,7 +62,7 @@ const verifyOtp = async (token: string, otp: string | number) => {
   });
 
   const jwtPayload = {
-    _id: user.id,
+    userId: user.id,
     email: user.email,
     role: user.role,
   };

@@ -29,26 +29,38 @@ model Verification {
   @@map("verifications")
 }
 
+enum RegisterWith {
+  google
+  apple
+  facebook
+  credentials
+}
+
 // User model: Core authentication and common profile info for all roles
 model User {
-  id            String     @id @default(uuid())
-  name          String
-  email         String     @unique
-  password      String
-  photoUrl      String?
-  bio           String?
-  dateOfBirth   String?
-  contactNo     String?
-  city          String?
-  country       String?
-  role          UserRole
-  packageExpiry DateTime?
-  points        Int        @default(0)
-  lastActive    DateTime   @default(now())
-  status        UserStatus @default(pending)
-  isDeleted     Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                  String       @id @default(uuid())
+  name                String
+  email               String       @unique
+  password            String
+  photoUrl            String?
+  bio                 String?
+  dateOfBirth         String?
+  contactNo           String?
+  city                String?
+  country             String?
+  role                UserRole
+  packageExpiry       DateTime?
+  fcmToken            String?
+  points              Int          @default(0)
+  registerWith        RegisterWith
+  lastActive          DateTime     @default(now())
+  needsPasswordChange Boolean      @default(true)
+  passwordChangedAt   DateTime     @default(now())
+  expireAt            DateTime?
+  status              UserStatus   @default(pending)
+  isDeleted           Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   superAdmin         SuperAdmin?
   companyAdmin       CompanyAdmin?
