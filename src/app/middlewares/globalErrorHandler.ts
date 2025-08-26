@@ -14,7 +14,7 @@ const globalErrorHandler: ErrorRequestHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  config.env === 'development'
+  config.node_env === 'development'
     ? console.log(`🐱‍🏍 globalErrorHandler ~~`, { error })
     : console.error(`🐱‍🏍 globalErrorHandler ~~`, error);
 
@@ -64,7 +64,7 @@ const globalErrorHandler: ErrorRequestHandler = (
     success: false,
     message,
     errorMessages,
-    stack: config.env !== 'production' ? error?.stack : undefined,
+    stack: config.node_env !== 'production' ? error?.stack : undefined,
   });
 };
 

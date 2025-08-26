@@ -17,9 +17,9 @@ const verifyToken = (token: string, secret: Secret): JwtPayload => {
 };
 
 const createPasswordResetToken = (payload: object) => {
-  return jwt.sign(payload, config.jwt.secret as Secret, {
+  return jwt.sign(payload, config.jwt_access_secret as Secret, {
     algorithm: 'HS256',
-    expiresIn: config.jwt.passwordResetTokenExpirationTime
+    expiresIn: config.jwt_access_expires_in
   });
 };
 

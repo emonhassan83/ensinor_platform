@@ -9,28 +9,34 @@ const envPath =
 dotenv.config({ path: envPath });
 
 export default {
-  env: process.env.NODE_ENV,
+  node_env: process.env.NODE_ENV,
   port: process.env.PORT,
-  database_url: process.env.DATABASE_URL,
+  ip: process.env.IP,
+  socket_port: process.env.SOCKET_PORT,
   client_url: process.env.CLIENT_URL,
-  jwt: {
-    secret: process.env.JWT_SECRET,
-    expires_in: process.env.EXPIRES_IN,
-    refresh_secret: process.env.REFRESH_SECRET,
-    refresh_expires_in: process.env.REFRESH_EXPIRES_IN,
-    passwordResetTokenExpirationTime: process.env.PASS_RESET_EXPIRATION_TIME,
+  server_url: process.env.SERVER_URL,
+  database_url: process.env.DATABASE_URL,
+  bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
+  jwt_access_secret: process.env.JWT_ACCESS_SECRET,
+  jwt_refresh_secret: process.env.JWT_REFRESH_SECRET,
+  jwt_access_expires_in: process.env.JWT_ACCESS_EXPIRE_IN,
+  jwt_refresh_expires_in: process.env.JWT_REFRESH_EXPIRE_IN,
+  reset_pass_link: process.env.RESET_PASS_LINK,
+  emailSender: {
+    email: process.env.EMAIL,
+    app_pass: process.env.APP_PASS,
   },
-  reset_link: process.env.RESET_LINK,
-  email: process.env.EMAIL,
-  app_pass: process.env.APP_PASS,
-  bycrypt_salt_rounds: process.env.SALT_ROUND,
-  ssl: {
-    store_id: process.env.STORE_ID,
-    store_passwd: process.env.STORE_PASSWD,
-    success_url: process.env.SUCCESS_URL,
-    cancel_url: process.env.CANCEL_URL,
-    fail_url: process.env.FAIL_URL,
-    ssl_payment_api: process.env.SSL_PAYMENT_API,
-    ssl_validation_api: process.env.SSL_VALIDATION_API,
+  admin_pass: process.env.ADMIN_PASS,
+  stripe: {
+    stripe_api_key: process.env.STRIPE_API_KEY,
+    stripe_api_secret: process.env.STRIPE_API_SECRET,
   },
-};
+  payment_success_url: process.env.PAYMENT_SUCCESS_URL,
+  payment_cancel_url: process.env.PAYMENT_CANCEL_URL,
+  aws: {
+    accessKeyId: process.env.S3_BUCKET_ACCESS_KEY,
+    secretAccessKey: process.env.S3_BUCKET_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+    bucket: process.env.AWS_BUCKET_NAME,
+  },
+}
