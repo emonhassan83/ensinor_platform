@@ -4,6 +4,7 @@ import {
   Employee,
   Instructor,
   Prisma,
+  RegisterWith,
   Student,
   SuperAdmin,
   UserRole,
@@ -30,6 +31,7 @@ const createCompanyAdmin = async (payload: any): Promise<CompanyAdmin> => {
         email: payload.companyAdmin.email,
         password: hashPassword,
         role: UserRole.company_admin,
+        registerWith: RegisterWith.credentials
       },
     });
 
@@ -55,6 +57,7 @@ const createBusinessInstructor = async (
         email: payload.businessInstructor.email,
         password: hashPassword,
         role: UserRole.business_instructors,
+        registerWith: RegisterWith.credentials
       },
     });
 
@@ -79,6 +82,7 @@ const createEmployee = async (payload: any): Promise<Employee> => {
         email: payload.employee.email,
         password: hashPassword,
         role: UserRole.business_instructors,
+        registerWith: RegisterWith.credentials
       },
     });
 
@@ -102,6 +106,7 @@ const createInstructor = async (payload: any): Promise<Instructor> => {
         email: payload.instructor.email,
         password: hashPassword,
         role: UserRole.instructor,
+        registerWith: RegisterWith.credentials
       },
     });
 
@@ -125,6 +130,7 @@ const createStudent = async (payload: any): Promise<Student> => {
         email: payload.student.email,
         password: hashPassword,
         role: UserRole.student,
+        registerWith: RegisterWith.credentials
       },
     });
 
