@@ -1,12 +1,13 @@
-import { RegisterWith, UserRole } from '@prisma/client'
-import config from '../config'
-import prisma from '../utils/prisma'
+import { RegisterWith, UserRole } from '@prisma/client';
+import config from '../config';
+import prisma from '../utils/prisma';
+import { findAdmin } from '../utils/findAdmin';
 
 const seedAdmin = async () => {
   // check if super_admin already exists
   const isAdminExists = await prisma.user.findFirst({
     where: { role: UserRole.super_admin },
-  })
+  });
 
   if (!isAdminExists) {
     await prisma.user.create({
@@ -26,35 +27,50 @@ const seedAdmin = async () => {
         },
         expireAt: null, // since super admin doesn’t expire
       },
-    })
+    });
 
-    console.log('\n✅ Super admin User Seeded Successfully!')
-  } else {
-    console.log('\nℹ️ Super admin already exists, skipping seeding.')
+    console.log('\n✅ Super admin User Seeded Successfully!');
   }
-}
+};
 
+const seedContents = async () => {
+  const admin = await findAdmin();
+  if (!admin) {
+    console.log('\n❌ No admin found. Cannot seed contents.');
+    return;
+  }
 
-// // Function to seed Contents
-// const seedContents = async () => {
-//   const admin = await findAdmin()
-//   const existingContents = await Contents.countDocuments()
+  // Check if content already exists
+  const existingContents = await prisma.content.count();
 
-//   if (existingContents === 0) {
-//     await Contents.create({
-//       aboutUs: '',
-//       termsAndConditions: '',
-//       privacyPolicy: '',
-//       supports: '',
-//       faq: '',
-//       createdBy: admin?._id,
-//     })
+  if (existingContents === 0) {
+    await prisma.content.create({
+      data: {
+        createdById: admin.id,
+        aboutUs: '',
+        termsAndConditions: '',
+        privacyPolicy: '',
+        supports: '',
+        customerLocation: '',
+        customerNumber: '',
+        customerEmail: '',
+        contractLocation: '',
+        contractNumber: '',
+        contractEmail: '',
+        officeLocation: '',
+        officeNumber: '',
+        officeEmail: '',
+        faq: {
+          create: [],
+        },
+      },
+    });
 
-//     console.log(('\n✅Default Contents seeded successfully!'))
-//   }
-// }
+    console.log('\n✅ Default Contents seeded successfully!');
+  }
+};
 
 export const seeder = {
   seedAdmin,
-  // seedContents,
-}
+  seedContents,
+};

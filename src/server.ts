@@ -1,35 +1,53 @@
-import { Server } from 'http';
+import { createServer, Server } from 'http';
 import app from './app';
 import config from './app/config';
+import initializeSocketIO from './socket';
+import { seeder } from './app/seeder/seed';
+let server: Server;
+export const io = initializeSocketIO(createServer(app));
 
-async function bootstrap() {
-  const server: Server = app.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
-  });
-
-  const exitHandler = () => {
-    if (server) {
-      server.close(() => {
-      console.log('Server closed');
-      });
-    }
-    process.exit(1);
-  };
-
-  const unexpectedErrorHandler = (error: unknown) => {
-   console.error(error);
-    exitHandler();
-  };
-
-  process.on('uncaughtException', unexpectedErrorHandler);
-  process.on('unhandledRejection', unexpectedErrorHandler);
-
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received');
-    if (server) {
-      server.close();
-    }
-  });
+declare global {
+  // Add socketio property to NodeJS.Global
+  var socketio: typeof io;
 }
 
-bootstrap();
+const main = async () => {
+  try {
+    // default task added
+    seeder.seedAdmin();
+    seeder.seedContents()
+
+    server = app.listen(Number(config.port), config.ip as string, () => {
+      console.log(
+        `⚡️[server]: Server is running at http://${config.ip}:${config.port}`,
+      );
+    });
+
+    io.listen(Number(config.socket_port));
+    console.log(
+      `⚡️[socket]: Socket is running at http://${config.ip}:${config.socket_port}`,
+    );
+    global.socketio = io;
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+main();
+
+process.on('unhandledRejection', error => {
+  console.log(error);
+  console.log('unhandledRejection detected server shutting down 😈');
+
+  if (server) {
+    server.close(() => process.exit(1));
+  }
+  process.exit(1);
+});
+
+process.on('uncaughtException', error => {
+  console.log(error);
+  console.log('uncaughtException detected server shutting down 😈');
+  process.exit(1);
+});
+

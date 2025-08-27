@@ -1045,7 +1045,7 @@ model Content {
   privacyPolicy      String?
 
   // Support / Contacts
-  supports         Int     @default(0)
+  supports        String?
   customerLocation String?
   customerNumber   String?
   customerEmail    String?
