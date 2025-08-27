@@ -6,11 +6,6 @@ import { seeder } from './app/seeder/seed';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
 
-declare global {
-  // Add socketio property to NodeJS.Global
-  var socketio: typeof io;
-}
-
 const main = async () => {
   try {
     // default task added
@@ -27,6 +22,7 @@ const main = async () => {
     console.log(
       `⚡️[socket]: Socket is running at http://${config.ip}:${config.socket_port}`,
     );
+    // @ts-ignore
     global.socketio = io;
   } catch (error) {
     console.log(error);

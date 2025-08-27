@@ -2,19 +2,21 @@ import { RegisterWith, UserRole } from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
 import { findAdmin } from '../utils/findAdmin';
+import { hashedPassword } from '../helpers/hashPasswordHelper';
 
 const seedAdmin = async () => {
   // check if super_admin already exists
   const isAdminExists = await prisma.user.findFirst({
     where: { role: UserRole.super_admin },
   });
+  const hashPassword = await hashedPassword(config.admin_pass!);
 
   if (!isAdminExists) {
     await prisma.user.create({
       data: {
         name: 'Ensinor',
         email: 'ensinor@example.gmail.com',
-        password: config.admin_pass,
+        password: hashPassword,
         role: UserRole.super_admin,
         contactNo: '87623456778',
         registerWith: RegisterWith.credentials,
