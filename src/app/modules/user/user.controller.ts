@@ -156,6 +156,13 @@ const getMyProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
+  if (req?.file) {
+    req.body.photoUrl = await uploadToS3({
+      file: req.file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    })
+  }
+
   const result = await UserServices.updateAProfile(req.user!.userId, req.body);
 
   sendResponse(res, {
@@ -167,6 +174,12 @@ const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateAProfile = catchAsync(async (req: Request, res: Response) => {
+  if (req?.file) {
+    req.body.photoUrl = await uploadToS3({
+      file: req.file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    })
+  }
   const result = await UserServices.updateAProfile(req.params.id, req.body);
 
   sendResponse(res, {

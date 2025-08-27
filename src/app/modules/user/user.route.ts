@@ -4,8 +4,12 @@ import validateRequest from '../../middlewares/validateRequest';
 import { UserValidation } from './user.validations';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
+import multer, { memoryStorage } from 'multer';
+import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
+const storage = memoryStorage();
+const upload = multer({ storage });
 
 router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
 
@@ -25,6 +29,8 @@ router.get(
 router.post(
   '/company-admin',
   auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
   validateRequest(UserValidation.createCompanyAdmin),
   UserController.createCompanyAdmin,
 );
@@ -32,26 +38,34 @@ router.post(
 router.post(
   '/business-instructor',
   auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
   validateRequest(UserValidation.createBusinessInstructor),
   UserController.createBusinessInstructor,
 );
 
 router.post(
   '/employee',
-  validateRequest(UserValidation.createEmployee),
   auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
+  validateRequest(UserValidation.createEmployee),
   UserController.createEmployee,
 );
 
 router.post(
   '/instructor',
   auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
   validateRequest(UserValidation.createInstructor),
   UserController.createInstructor,
 );
 
 router.post(
   '/student',
+  upload.single('image'),
+  parseData(),
   validateRequest(UserValidation.createStudent),
   UserController.createStudent,
 );
@@ -66,12 +80,14 @@ router.patch(
 router.put(
   '/:id',
   auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
   UserController.updateAProfile,
 );
 
 router.patch(
   '/my-profile',
-    auth(
+  auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
@@ -79,18 +95,16 @@ router.patch(
     UserRole.instructor,
     UserRole.student,
   ),
+  upload.single('image'),
+  parseData(),
   UserController.updateMyProfile,
 );
 
-router.delete(
-  '/:id',
-  auth(UserRole.super_admin),
-  UserController.deleteAUser,
-);
+router.delete('/:id', auth(UserRole.super_admin), UserController.deleteAUser);
 
 router.delete(
   '/my-profile',
-    auth(
+  auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
