@@ -9,53 +9,95 @@ const router = express.Router();
 
 router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
 
-router.get('/me', auth(UserRole.super_admin), UserController.getMyProfile);
+router.get(
+  '/my-profile',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
+  UserController.getMyProfile,
+);
 
 router.post(
-  '/create-company-admin',
+  '/company-admin',
   auth(UserRole.super_admin),
   validateRequest(UserValidation.createCompanyAdmin),
   UserController.createCompanyAdmin,
 );
 
 router.post(
-  '/create-business-instructor',
+  '/business-instructor',
   auth(UserRole.super_admin),
   validateRequest(UserValidation.createBusinessInstructor),
   UserController.createBusinessInstructor,
 );
 
 router.post(
-  '/create-employee',
+  '/employee',
   validateRequest(UserValidation.createEmployee),
   auth(UserRole.super_admin),
   UserController.createEmployee,
 );
 
 router.post(
-  '/create-instructor',
+  '/instructor',
   auth(UserRole.super_admin),
   validateRequest(UserValidation.createInstructor),
   UserController.createInstructor,
 );
 
 router.post(
-  '/create-student',
+  '/student',
   validateRequest(UserValidation.createStudent),
   UserController.createStudent,
 );
 
 router.patch(
-  '/:id/status',
+  '/:id',
   auth(UserRole.super_admin),
-  validateRequest(UserValidation.updateStatus),
+  validateRequest(UserValidation.changeProfileStatus),
   UserController.changeProfileStatus,
 );
 
-router.patch(
-  '/update-my-profile',
+router.put(
+  '/:id',
   auth(UserRole.super_admin),
+  UserController.updateAProfile,
+);
+
+router.patch(
+  '/my-profile',
+    auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
   UserController.updateMyProfile,
 );
 
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin),
+  UserController.deleteAUser,
+);
+
+router.delete(
+  '/my-profile',
+    auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
+  UserController.deleteMyProfile,
+);
 export const userRoutes = router;

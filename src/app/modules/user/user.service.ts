@@ -1,14 +1,4 @@
-import {
-  BusinessInstructor,
-  CompanyAdmin,
-  Employee,
-  Instructor,
-  Prisma,
-  RegisterWith,
-  Student,
-  UserRole,
-  UserStatus,
-} from '@prisma/client';
+import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import { hashedPassword } from './user.utils';
@@ -22,25 +12,25 @@ import { paginationHelpers } from '../../helpers/paginationHelper';
 
 const expireAfter30Min = new Date(Date.now() + 30 * 60 * 1000);
 
-const createCompanyAdmin = async (payload: any): Promise<CompanyAdmin> => {
+const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
+    const user = await transactionClient.user.create({
       data: {
         name: payload.companyAdmin.name,
         email: payload.companyAdmin.email,
         password: hashPassword,
         role: UserRole.company_admin,
-        registerWith: RegisterWith.credentials
+        registerWith: RegisterWith.credentials,
       },
     });
 
-    const newCompanyAdmin = await transactionClient.companyAdmin.create({
+    await transactionClient.companyAdmin.create({
       data: payload.companyAdmin,
     });
 
-    return newCompanyAdmin;
+    return user;
   });
 
   return result;
@@ -48,98 +38,97 @@ const createCompanyAdmin = async (payload: any): Promise<CompanyAdmin> => {
 
 const createBusinessInstructor = async (
   payload: any,
-): Promise<BusinessInstructor> => {
+): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
+    const user = await transactionClient.user.create({
       data: {
         name: payload.businessInstructor.name,
         email: payload.businessInstructor.email,
         password: hashPassword,
         role: UserRole.business_instructors,
-        registerWith: RegisterWith.credentials
+        registerWith: RegisterWith.credentials,
       },
     });
 
-    const newBusinessInstructor =
-      await transactionClient.businessInstructor.create({
-        data: payload.businessInstructor,
-      });
+    await transactionClient.businessInstructor.create({
+      data: payload.businessInstructor,
+    });
 
-    return newBusinessInstructor;
+    return user;
   });
 
   return result;
 };
 
-const createEmployee = async (payload: any): Promise<Employee> => {
+const createEmployee = async (payload: any): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
+    const user = await transactionClient.user.create({
       data: {
         name: payload.employee.name,
         email: payload.employee.email,
         password: hashPassword,
         role: UserRole.business_instructors,
-        registerWith: RegisterWith.credentials
+        registerWith: RegisterWith.credentials,
       },
     });
 
-    const newEmployee = await transactionClient.businessInstructor.create({
+    await transactionClient.businessInstructor.create({
       data: payload.employee,
     });
 
-    return newEmployee;
+    return user;
   });
 
   return result;
 };
 
-const createInstructor = async (payload: any): Promise<Instructor> => {
+const createInstructor = async (payload: any): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
+    const user = await transactionClient.user.create({
       data: {
         name: payload.instructor.name,
         email: payload.instructor.email,
         password: hashPassword,
         role: UserRole.instructor,
-        registerWith: RegisterWith.credentials
+        registerWith: RegisterWith.credentials,
       },
     });
 
-    const newInstructor = await transactionClient.instructor.create({
+    await transactionClient.instructor.create({
       data: payload.instructor,
     });
 
-    return newInstructor;
+    return user;
   });
 
   return result;
 };
 
-const createStudent = async (payload: any): Promise<Student> => {
+const createStudent = async (payload: any): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
-    await transactionClient.user.create({
+    const user = await transactionClient.user.create({
       data: {
         name: payload.student.name,
         email: payload.student.email,
         password: hashPassword,
         role: UserRole.student,
-        registerWith: RegisterWith.credentials
+        registerWith: RegisterWith.credentials,
       },
     });
 
-    const newStudent = await transactionClient.student.create({
+    await transactionClient.student.create({
       data: payload.student,
     });
 
-    return newStudent;
+    return user;
   });
 
   return result;
@@ -240,10 +229,10 @@ const getAllUser = async (
   };
 };
 
-const getMyProfile = async (authUser: any) => {
+const geUserById = async (userId: string) => {
   const userData = await prisma.user.findUnique({
     where: {
-      id: authUser.userId,
+      id: userId,
       status: UserStatus.active,
     },
     select: {
@@ -300,51 +289,83 @@ const getMyProfile = async (authUser: any) => {
   return { ...profileData, ...userData };
 };
 
-const updateMyProfile = async (authUser: any, req: Request) => {
-  const userData = await prisma.user.findUnique({
+const updateAProfile = async (userId: any, payload: any) => {
+  const user = await prisma.user.findUnique({
     where: {
-      id: authUser.userId,
+      id: userId,
       status: UserStatus.active,
     },
   });
-
-  if (!userData) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
   }
 
+  const updateUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: payload.user,
+  });
+
   let profileData;
-  if (userData?.role === UserRole.super_admin) {
-    profileData = await prisma.superAdmin.findUnique({
+  if (user?.role === UserRole.super_admin) {
+    profileData = await prisma.superAdmin.update({
       where: {
-        userId: userData.id,
+        userId: user.id,
       },
+      data: payload.superAdmin,
     });
-  } else if (userData?.role === UserRole.company_admin) {
-    profileData = await prisma.companyAdmin.findUnique({
+  } else if (user?.role === UserRole.company_admin) {
+    profileData = await prisma.companyAdmin.update({
       where: {
-        userId: userData.id,
+        userId: user.id,
       },
+      data: payload.companyAdmin,
     });
-  } else if (userData?.role === UserRole.business_instructors) {
-    profileData = await prisma.businessInstructor.findUnique({
+  } else if (user?.role === UserRole.business_instructors) {
+    profileData = await prisma.businessInstructor.update({
       where: {
-        userId: userData.id,
+        userId: user.id,
       },
+      data: payload.businessInstructor,
     });
-  } else if (userData?.role === UserRole.employee) {
-    profileData = await prisma.employee.findUnique({
+  } else if (user?.role === UserRole.employee) {
+    profileData = await prisma.employee.update({
       where: {
-        userId: userData.id,
+        userId: user.id,
       },
+      data: payload.employee,
     });
-  } else if (userData?.role === UserRole.student) {
-    profileData = await prisma.student.findUnique({
+  } else if (user?.role === UserRole.student) {
+    profileData = await prisma.student.update({
       where: {
-        userId: userData.id,
+        userId: user.id,
       },
+      data: payload.student,
     });
   }
-  return { ...profileData, ...userData };
+  return { ...profileData, ...updateUser };
+};
+
+const deleteAProfile = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+
+  if (!user || user?.isDeleted) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
+  }
+
+  const updateUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: { isDeleted: true, status: UserStatus.deleted },
+  });
+
+  return updateUser;
 };
 
 export const UserServices = {
@@ -355,6 +376,7 @@ export const UserServices = {
   createStudent,
   changeProfileStatus,
   getAllUser,
-  getMyProfile,
-  updateMyProfile,
+  geUserById,
+  updateAProfile,
+  deleteAProfile,
 };

@@ -112,7 +112,7 @@ const createStudent = z.object({
 // ----------------------
 // Status Update
 // ----------------------
-const updateStatus = z.object({
+const changeProfileStatus= z.object({
   body: z.object({
     status: z.nativeEnum(UserStatus),
   }),
@@ -124,5 +124,5 @@ export const UserValidation = {
   createEmployee,
   createInstructor,
   createStudent,
-  updateStatus,
+  changeProfileStatus
 };

@@ -52,12 +52,20 @@ const verifyOtp = async (token: string, otp: string | number) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'OTP did not match');
   }
 
- await prisma.verification.update({
+  await prisma.verification.update({
     where: { userId: user.id },
     data: {
       otp: '',
       expiresAt: moment().add(5, 'minute').toDate(),
       status: true,
+    },
+  });
+
+  // set null to prevent verify user deletion data
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      expireAt: null,
     },
   });
 
