@@ -41,7 +41,7 @@ const verifyOtp = async (token: string, otp: string | number) => {
     );
   }
 
-  if (new Date() > user.verification.expiresAt) {
+  if (new Date() > user.verification.expiresAt!) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
       'OTP has expired. Please resend it',

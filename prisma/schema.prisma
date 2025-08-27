@@ -16,7 +16,7 @@ datasource db {
 model Verification {
   id        String   @id @default(uuid())
   otp       String
-  expiresAt DateTime
+  expiresAt DateTime?
   status    Boolean  @default(false)
 
   // One-to-One relation
@@ -128,6 +128,26 @@ model CompanyAdmin {
   @@map("company_admins")
 }
 
+model Company {
+  id           String     @id @default(uuid())
+  userId       String     @unique
+  name         String
+  industryType String
+  logo         String?
+  color        String?
+  employee     Int        @default(0)
+  instructor   Int        @default(0)
+  size         Int        @default(0)
+  isDeleted    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  author CompanyAdmin @relation(references: [id], fields: [userId])
+
+  @@map("companies")
+}
+
+
 model Department {
   id        String   @id @default(uuid())
   authorId  String
@@ -221,25 +241,6 @@ model Student {
   user User @relation(references: [id], fields: [userId])
 
   @@map("students")
-}
-
-model Company {
-  id           String     @id @default(uuid())
-  userId       String     @unique
-  name         String
-  industryType String
-  logo         String?
-  color        String?
-  employee     Int        @default(0)
-  instructor   Int        @default(0)
-  size         Int        @default(0)
-  isDeleted    Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  author CompanyAdmin @relation(references: [id], fields: [userId])
-
-  @@map("companies")
 }
 
 model CompanyRequest {

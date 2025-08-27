@@ -1,14 +1,11 @@
 import express from 'express';
 import { AuthControllers } from './auth.controller';
 import { AuthValidation } from './auth.validation';
-import multer, { memoryStorage } from 'multer';
 import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 
 const router = express.Router();
-const storage = memoryStorage();
-const upload = multer({ storage });
 
 router.post(
   '/login',
@@ -50,7 +47,6 @@ router.post(
 
 router.post(
   '/refresh-token',
-  // validateRequest(AuthValidation.refreshTokenValidationSchema),
   AuthControllers.refreshToken,
 );
 

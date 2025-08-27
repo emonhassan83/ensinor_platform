@@ -1,21 +1,27 @@
-import { z } from "zod";
-import { UserStatus } from "@prisma/client";
+import { z } from 'zod';
+import { UserStatus } from '@prisma/client';
 
 // ----------------------
 // Company Admin Creation
 // ----------------------
 const createCompanyAdmin = z.object({
   body: z.object({
-    password: z.string({ required_error: "Password is required!" }),
-    companyAdmin: z.object({
-      name: z.string({ required_error: "Name is required!" }),
-      email: z.string().email("Invalid email address"),
-      contactNo: z.string({ required_error: "Contact number is required!" }),
+    password: z.string({ required_error: 'Password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address'),
+      contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string().optional(),
       dateOfBirth: z.string().optional(),
       city: z.string().optional(),
       country: z.string().optional(),
       photoUrl: z.string().optional(),
+    }),
+    company: z.object({
+      name: z.string({ required_error: 'Company name is required!' }),
+      industryType: z.string().email('Industry type is required!'),
+      logo: z.string().optional(),
+      color: z.string().optional(),
     }),
   }),
 });
@@ -25,17 +31,20 @@ const createCompanyAdmin = z.object({
 // ----------------------
 const createBusinessInstructor = z.object({
   body: z.object({
-    password: z.string({ required_error: "Password is required!" }),
-    businessInstructor: z.object({
-     name: z.string({ required_error: "Name is required!" }),
-      email: z.string().email("Invalid email address"),
-      contactNo: z.string({ required_error: "Contact number is required!" }),
+    password: z.string({ required_error: 'Password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address'),
+      contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string().optional(),
       dateOfBirth: z.string().optional(),
       city: z.string().optional(),
       country: z.string().optional(),
       photoUrl: z.string().optional(),
     }),
+    businessInstructor: z.object({
+      company: z.string({ required_error: 'Company id is required!' }),
+    })
   }),
 });
 
@@ -44,16 +53,19 @@ const createBusinessInstructor = z.object({
 // ----------------------
 const createEmployee = z.object({
   body: z.object({
-    password: z.string({ required_error: "Password is required!" }),
-    employee: z.object({
-      name: z.string({ required_error: "Name is required!" }),
-      email: z.string().email("Invalid email address"),
-      contactNo: z.string({ required_error: "Contact number is required!" }),
+    password: z.string({ required_error: 'Password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address'),
+      contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string().optional(),
       dateOfBirth: z.string().optional(),
       city: z.string().optional(),
       country: z.string().optional(),
       photoUrl: z.string().optional(),
+    }),
+    employee: z.object({
+      company: z.string({ required_error: 'Company id is required!' })
     }),
   }),
 });
@@ -63,20 +75,22 @@ const createEmployee = z.object({
 // ----------------------
 const createInstructor = z.object({
   body: z.object({
-    password: z.string({ required_error: "Password is required!" }),
-    instructor: z.object({
-      name: z.string({ required_error: "Name is required!" }),
-      email: z.string().email("Invalid email address"),
-      contactNo: z.string({ required_error: "Contact number is required!" }),
+    password: z.string({ required_error: 'Password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address'),
+      contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string().optional(),
       dateOfBirth: z.string().optional(),
       city: z.string().optional(),
       country: z.string().optional(),
       photoUrl: z.string().optional(),
-      designation: z.string({ required_error: "Designation is required!" }),
+    }),
+    instructor: z.object({
+      designation: z.string({ required_error: 'Designation is required!' }),
       university: z.string().optional(),
       session: z.string().optional(),
-      subjects: z.string({ required_error: "Subjects are required!" }),
+      subjects: z.string({ required_error: 'Subjects are required!' }),
       linkedIn: z.string().url().optional(),
       facebook: z.string().url().optional(),
       twitter: z.string().url().optional(),
@@ -91,20 +105,24 @@ const createInstructor = z.object({
 // ----------------------
 const createStudent = z.object({
   body: z.object({
-    password: z.string({ required_error: "Password is required!" }),
-    student: z.object({
-      name: z.string({ required_error: "Name is required!" }),
-      email: z.string().email("Invalid email address"),
-      contactNo: z.string({ required_error: "Contact number is required!" }),
+    password: z.string({ required_error: 'Password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address'),
+      contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string().optional(),
       dateOfBirth: z.string().optional(),
       city: z.string().optional(),
       country: z.string().optional(),
       photoUrl: z.string().optional(),
-      interests: z.array(z.string()).nonempty("At least one interest is required."),
+    }),
+    student: z.object({
+      interests: z
+        .array(z.string())
+        .nonempty('At least one interest is required.'),
       university: z.string().optional(),
       session: z.string().optional(),
-      subjects: z.string({ required_error: "Subjects are required!" }),
+      subjects: z.string({ required_error: 'Subjects are required!' }),
     }),
   }),
 });
@@ -112,7 +130,7 @@ const createStudent = z.object({
 // ----------------------
 // Status Update
 // ----------------------
-const changeProfileStatus= z.object({
+const changeProfileStatus = z.object({
   body: z.object({
     status: z.nativeEnum(UserStatus),
   }),
@@ -124,5 +142,5 @@ export const UserValidation = {
   createEmployee,
   createInstructor,
   createStudent,
-  changeProfileStatus
+  changeProfileStatus,
 };

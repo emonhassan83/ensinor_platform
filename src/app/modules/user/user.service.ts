@@ -2,15 +2,12 @@ import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import { hashedPassword } from './user.utils';
-import { IUser, IUserFilterRequest, IUserResponse } from './user.interface';
+import { IUserFilterRequest, IUserResponse } from './user.interface';
 import { userSearchableFields } from './user.constant';
-import { Request } from 'express';
 import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
-
-const expireAfter30Min = new Date(Date.now() + 30 * 60 * 1000);
 
 const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
@@ -23,11 +20,21 @@ const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
         password: hashPassword,
         role: UserRole.company_admin,
         registerWith: RegisterWith.credentials,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
+            status: false,
+          },
+        },
       },
     });
 
     await transactionClient.companyAdmin.create({
-      data: payload.companyAdmin,
+      data: {
+        userId: user.id,
+      },
     });
 
     return user;
@@ -49,11 +56,22 @@ const createBusinessInstructor = async (
         password: hashPassword,
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
+            status: false,
+          },
+        },
       },
     });
 
     await transactionClient.businessInstructor.create({
-      data: payload.businessInstructor,
+      data: {
+        userId: user.id,
+        companyId: payload.businessInstructor.company,
+      },
     });
 
     return user;
@@ -73,11 +91,22 @@ const createEmployee = async (payload: any): Promise<IUserResponse> => {
         password: hashPassword,
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
+            status: false,
+          },
+        },
       },
     });
 
     await transactionClient.businessInstructor.create({
-      data: payload.employee,
+      data: {
+        userId: user.id,
+        companyId: payload.employee.company,
+      },
     });
 
     return user;
@@ -97,11 +126,30 @@ const createInstructor = async (payload: any): Promise<IUserResponse> => {
         password: hashPassword,
         role: UserRole.instructor,
         registerWith: RegisterWith.credentials,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
+            status: false,
+          },
+        },
       },
     });
 
     await transactionClient.instructor.create({
-      data: payload.instructor,
+      data: {
+        userId: user.id,
+        designation: payload.instructor.designation ?? null,
+        subjects: payload.instructor.subjects ?? null,
+        university: payload.instructor.university ?? null,
+        session: payload.instructor.session ?? null,
+        linkedIn: payload.instructor.linkedIn ?? null,
+        facebook: payload.instructor.facebook ?? null,
+        twitter: payload.instructor.twitter ?? null,
+        instagram: payload.instructor.instagram ?? null,
+        website: payload.instructor.website ?? null,
+      },
     });
 
     return user;
@@ -125,7 +173,13 @@ const createStudent = async (payload: any): Promise<IUserResponse> => {
     });
 
     await transactionClient.student.create({
-      data: payload.student,
+      data: {
+        userId: user.id,
+        interests: payload.student.interests ?? null,
+        university: payload.student.university ?? null,
+        session: payload.student.session ?? null,
+        subjects: payload.student.subjects ?? null,
+      },
     });
 
     return user;
@@ -307,44 +361,61 @@ const updateAProfile = async (userId: any, payload: any) => {
     data: payload.user,
   });
 
-  let profileData;
-  if (user?.role === UserRole.super_admin) {
-    profileData = await prisma.superAdmin.update({
-      where: {
-        userId: user.id,
-      },
-      data: payload.superAdmin,
-    });
-  } else if (user?.role === UserRole.company_admin) {
-    profileData = await prisma.companyAdmin.update({
-      where: {
-        userId: user.id,
-      },
-      data: payload.companyAdmin,
-    });
-  } else if (user?.role === UserRole.business_instructors) {
-    profileData = await prisma.businessInstructor.update({
-      where: {
-        userId: user.id,
-      },
-      data: payload.businessInstructor,
-    });
-  } else if (user?.role === UserRole.employee) {
-    profileData = await prisma.employee.update({
-      where: {
-        userId: user.id,
-      },
-      data: payload.employee,
-    });
-  } else if (user?.role === UserRole.student) {
-    profileData = await prisma.student.update({
-      where: {
-        userId: user.id,
-      },
-      data: payload.student,
-    });
+  // Update role-specific profile
+  let profileData: any;
+
+  switch (user.role) {
+    case UserRole.super_admin:
+      profileData = await prisma.superAdmin.update({
+        where: { userId: user.id },
+        data: payload.superAdmin ?? {},
+      });
+      break;
+
+    case UserRole.company_admin:
+      profileData = await prisma.companyAdmin.update({
+        where: { userId: user.id },
+        data: payload.companyAdmin ?? {},
+      });
+      break;
+
+    case UserRole.business_instructors:
+      profileData = await prisma.businessInstructor.update({
+        where: { userId: user.id },
+        data: payload.businessInstructor ?? {},
+      });
+      break;
+
+    case UserRole.employee:
+      profileData = await prisma.employee.update({
+        where: { userId: user.id },
+        data: payload.employee ?? {},
+      });
+      break;
+
+    case UserRole.student:
+      // Handle optional array and string fields
+      profileData = await prisma.student.update({
+        where: { userId: user.id },
+        data: payload.student ?? {},
+      });
+      break;
+
+    case UserRole.instructor:
+      profileData = await prisma.instructor.update({
+        where: { userId: user.id },
+        data: payload.instructor ?? {},
+      });
+      break;
+
+    default:
+      profileData = null;
   }
-  return { ...profileData, ...updateUser };
+
+  return {
+    ...updateUser,
+    ...profileData,
+  };
 };
 
 const deleteAProfile = async (userId: string) => {
@@ -353,7 +424,6 @@ const deleteAProfile = async (userId: string) => {
       id: userId,
     },
   });
-
   if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
   }
@@ -362,7 +432,10 @@ const deleteAProfile = async (userId: string) => {
     where: {
       id: userId,
     },
-    data: { isDeleted: true, status: UserStatus.deleted },
+    data: {
+      isDeleted: true,
+      status: UserStatus.deleted,
+    },
   });
 
   return updateUser;

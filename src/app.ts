@@ -1,12 +1,19 @@
 import cors from 'cors';
-import express, { Application, NextFunction, Request, Response } from 'express';
-import httpStatus from "http-status";
+import express, { Application, Request, Response } from 'express';
 import globalErrorHandler from './app/middlewares/globalErrorHandler';
 import routes from './app/routes';
 import cookieParser from 'cookie-parser';
+import notFound from './app/middlewares/notfound';
 
 const app: Application = express();
+app.use(express.static('public'));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
+// parsers
+app.use(express.json());
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: true,
@@ -15,36 +22,20 @@ app.use(
   }),
 );
 
-app.use(cookieParser());
-
-//parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
+// application routes
 app.use('/api/v1', routes);
-
-app.get('/up', async (req: Request, res: Response) => {
-  res.status(200).json({
-    message: 'Ensinor Server working....!',
+app.get('/', async (req: Request, res: Response) => {
+  res.json({
+    message: 'Ensinor server is running!',
+    status: 'success',
+    timestamp: new Date().toISOString(),
   });
 });
 
 //global error handler
 app.use(globalErrorHandler);
 
-//handle not found
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(httpStatus.NOT_FOUND).json({
-    success: false,
-    message: 'Not Found',
-    errorMessages: [
-      {
-        path: req.originalUrl,
-        message: 'API Not Found',
-      },
-    ],
-  });
-  next();
-});
+//@ts-ignore
+app.use(notFound);
 
 export default app;
