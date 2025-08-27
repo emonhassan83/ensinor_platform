@@ -19,7 +19,6 @@ import prisma from '../../utils/prisma';
 
 // ---------------------- LOGIN ----------------------
 const loginUser = async (payload: TLoginUser) => {
-  //* checking if the user is exist
   const user = await prisma.user.findUnique({
     where: { email: payload.email },
     include: { verification: true },
@@ -30,7 +29,7 @@ const loginUser = async (payload: TLoginUser) => {
 
   const isPasswordMatched = await bcrypt.compare(
     payload.password,
-    user.password,
+    user.password!,
   );
   if (!isPasswordMatched) {
     throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !');
@@ -112,7 +111,8 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
               expiresAt: new Date(),
               status: true,
             },
-          }
+          },
+          expireAt: null,
         },
         include: { verification: true },
       });
@@ -225,7 +225,7 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
   };
 };
 
-const registerWithApple = async (payload: Partial<IUser>) => {
+const registerWithLinkedIn = async (payload: Partial<IUser>) => {
   // 🚫 Prevent admin role assignment by user
   if (payload.role === UserRole.super_admin) {
     throw new ApiError(
@@ -240,9 +240,9 @@ const registerWithApple = async (payload: Partial<IUser>) => {
     include: { verification: true },
   });
 
-  // if login APPLE with existing user
+  // if login Linkedin with existing user
   if (user) {
-    if (user?.registerWith !== RegisterWith.apple) {
+    if (user?.registerWith !== RegisterWith.linkedIn) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         `This account is registered with ${user.registerWith}, so you should try logging in using that method.`,
@@ -259,7 +259,7 @@ const registerWithApple = async (payload: Partial<IUser>) => {
           isDeleted: false,
           verification: {
             update: {
-              otp: 0,
+              otp: '',
               expiresAt: new Date(),
               status: true,
             },
@@ -330,7 +330,7 @@ const registerWithApple = async (payload: Partial<IUser>) => {
       name: payload.name!,
       email: payload.email!,
       photoUrl: payload.photoUrl,
-      registerWith: RegisterWith.apple,
+      registerWith: RegisterWith.linkedIn,
       verification: {
         create: {
           otp: '',
@@ -338,6 +338,7 @@ const registerWithApple = async (payload: Partial<IUser>) => {
           status: true,
         },
       },
+      expireAt: null,
     },
     include: { verification: true },
   });
@@ -374,7 +375,7 @@ const registerWithApple = async (payload: Partial<IUser>) => {
   };
 };
 
-const registerWithFacebook = async (payload: Partial<TUser>) => {
+const registerWithFacebook = async (payload: Partial<IUser>) => {
   // 🚫 Prevent admin role assignment by user
   if (payload.role === UserRole.super_admin) {
     throw new ApiError(
@@ -412,6 +413,7 @@ const registerWithFacebook = async (payload: Partial<TUser>) => {
               status: true,
             },
           },
+          expireAt: null,
         },
         include: { verification: true },
       });
@@ -474,8 +476,8 @@ const registerWithFacebook = async (payload: Partial<TUser>) => {
 
   const newUser = await prisma.user.create({
     data: {
-      name: payload.name,
-      email: payload.email,
+      name: payload.name!,
+      email: payload.email!,
       photoUrl: payload.photoUrl,
       registerWith: RegisterWith.facebook,
       verification: {
@@ -485,6 +487,7 @@ const registerWithFacebook = async (payload: Partial<TUser>) => {
           status: true,
         },
       },
+      expireAt: null,
     },
     include: { verification: true },
   });
@@ -529,15 +532,12 @@ const changePassword = async (
   const user = await prisma.user.findUnique({
     where: { email: userData.email },
   });
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
-  }
-  if (user?.isDeleted) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'This user is deleted !');
   }
 
   //* checking if the password is correct
-  const isPasswordMatched = await bcrypt.compare(payload.oldPassword, user.password)
+  const isPasswordMatched = await bcrypt.compare(payload.oldPassword, user.password!)
   if (!isPasswordMatched) throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !')
 
   //* hash new password
@@ -565,8 +565,6 @@ const changePassword = async (
 
   // Send a notification to the admin informing them about the successful password change
   // user?.role === UserRole.super_admin  && (await authNotifyAdmin('PASSWORD_CHANGE'))
-
-  // return null;
 };
 
 const refreshToken = async (token: string) => {
@@ -575,11 +573,8 @@ const refreshToken = async (token: string) => {
 
   //* checking if the user is exist
   const user = await prisma.user.findUnique({ where: { email: decoded.email } })
-  if (!user) {
+  if (!user|| user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
-  }
-  if (user?.isDeleted) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'This user is deleted !');
   }
 
   const jwtPayload = {
@@ -605,11 +600,8 @@ const forgetPassword = async (payload: { email: string }) => {
     where: { email: payload.email },
     include: { verification: true },
   })
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
-  }
-  if (user?.isDeleted) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'This user is deleted !');
   }
 
   //* create token and sent to the  client
@@ -676,11 +668,8 @@ const resetPassword = async (
     where: { email: payload.email },
     include: { verification: true },
   })
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
-  }
-  if (user?.isDeleted) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'This user is deleted !');
   }
 
   // if session is expired
@@ -739,7 +728,7 @@ const resetPassword = async (
 export const AuthServices = {
   loginUser,
   registerWithGoogle,
-  registerWithApple,
+  registerWithLinkedIn,
   registerWithFacebook,
   changePassword,
   refreshToken,

@@ -6,7 +6,6 @@ import {
   Prisma,
   RegisterWith,
   Student,
-  SuperAdmin,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -20,6 +19,8 @@ import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
+
+const expireAfter30Min = new Date(Date.now() + 30 * 60 * 1000);
 
 const createCompanyAdmin = async (payload: any): Promise<CompanyAdmin> => {
   const hashPassword = await hashedPassword(payload.password);

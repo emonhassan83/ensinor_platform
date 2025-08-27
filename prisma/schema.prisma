@@ -31,7 +31,7 @@ model Verification {
 
 enum RegisterWith {
   google
-  apple
+  linkedIn
   facebook
   credentials
 }
@@ -41,14 +41,14 @@ model User {
   id                  String       @id @default(uuid())
   name                String
   email               String       @unique
-  password            String
+  password            String?
   photoUrl            String?
   bio                 String?
   dateOfBirth         String?
   contactNo           String?
   city                String?
   country             String?
-  role                UserRole
+  role                UserRole @default(student)
   packageExpiry       DateTime?
   fcmToken            String?
   points              Int          @default(0)

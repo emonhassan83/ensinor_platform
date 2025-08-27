@@ -2,10 +2,9 @@ import httpStatus from 'http-status'
 import catchAsync from '../../utils/catchAsync'
 import sendResponse from '../../utils/sendResponse'
 import { AuthServices } from './auth.service'
-import { RequestHandler } from 'express'
 import config from '../../config'
 
-const loginUser: RequestHandler = catchAsync(async (req, res) => {
+const loginUser = catchAsync(async (req, res) => {
   const result = await AuthServices.loginUser(req.body)
   const { refreshToken, accessToken } = result
 
@@ -49,8 +48,8 @@ const registerWithGoogle = catchAsync(async (req, res) => {
   })
 })
 
-const registerWithApple = catchAsync(async (req, res) => {
-  const result = await AuthServices.registerWithApple(req.body)
+const registerWithLinkedIn = catchAsync(async (req, res) => {
+  const result = await AuthServices.registerWithLinkedIn(req.body)
   const { refreshToken, accessToken } = result
 
   const cookieOptions: any = {
@@ -144,7 +143,7 @@ const resetPassword = catchAsync(async (req, res) => {
 export const AuthControllers = {
   loginUser,
   registerWithGoogle,
-  registerWithApple,
+  registerWithLinkedIn,
   registerWithFacebook,
   changePassword,
   refreshToken,
