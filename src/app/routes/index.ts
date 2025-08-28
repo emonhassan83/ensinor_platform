@@ -8,6 +8,7 @@ import { CompanyAdminRoutes } from '../modules/companyAdmin/companyAdmin.routes'
 import { BusinessInstructorRoutes } from '../modules/businessInstructor/businessInstructor.routes';
 import { EmployeeRoutes } from '../modules/employee/employee.routes';
 import { InstructorRoutes } from '../modules/instructors/instructors.routes';
+import { StudentRoutes } from '../modules/student/student.routes';
 
 const router = express.Router();
 
@@ -39,6 +40,10 @@ const moduleRoutes = [
   {
     path: '/instructors',
     route: InstructorRoutes,
+  },
+  {
+    path: '/students',
+    route: StudentRoutes,
   },
   {
     path: '/contents',
