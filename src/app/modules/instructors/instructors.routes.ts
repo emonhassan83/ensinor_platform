@@ -1,0 +1,31 @@
+import express from 'express';
+import { InstructorController } from './instructors.controller';
+import validateRequest from '../../middlewares/validateRequest';
+import auth from '../../middlewares/auth';
+import { UserRole } from '@prisma/client';
+import { InstructorValidation } from './instructors.validation';
+
+const router = express.Router();
+
+router.get('/', InstructorController.getAllFromDB);
+
+router.get(
+  '/:id',
+  auth(UserRole.super_admin),
+  InstructorController.getByIdFromDB,
+);
+
+router.patch(
+  '/:id',
+  auth(UserRole.super_admin, UserRole.company_admin),
+  validateRequest(InstructorValidation.updateValidationSchema),
+  InstructorController.updateIntoDB,
+);
+
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin, UserRole.company_admin),
+  InstructorController.deleteFromDB,
+);
+
+export const InstructorRoutes = router;

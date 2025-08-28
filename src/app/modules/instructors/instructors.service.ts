@@ -1,0 +1,137 @@
+import { Employee, Instructor, Prisma, User, UserStatus } from '@prisma/client';
+import { paginationHelpers } from '../../helpers/paginationHelper';
+import { IPaginationOptions } from '../../interfaces/pagination';
+import { IInstructorFilterRequest } from './instructors.interface';
+import { instructorsSearchAbleFields } from './instructors.constant';
+import prisma from '../../utils/prisma';
+
+const getAllFromDB = async (
+  params: IInstructorFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  const andConditions: Prisma.InstructorWhereInput[] = [];
+
+  // Search across Employee and nested User fields
+  if (searchTerm) {
+    andConditions.push({
+      OR: [
+        ...instructorsSearchAbleFields.map(field => ({
+          [field]: { contains: searchTerm, mode: 'insensitive' },
+        })),
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  // Filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  const whereConditions: Prisma.InstructorWhereInput = { AND: andConditions };
+
+  const result = await prisma.instructor.findMany({
+    where: whereConditions,
+    include: { user: true },
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? {
+            [options.sortBy]: options.sortOrder,
+          }
+        : {
+            createdAt: 'desc',
+          },
+  });
+
+  const total = await prisma.instructor.count({
+    where: whereConditions,
+  });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
+};
+
+const getByIdFromDB = async (id: string): Promise<Instructor | null> => {
+  const result = await prisma.instructor.findUnique({
+    where: { id },
+    include: { user: true },
+  });
+
+  return result;
+};
+
+const updateIntoDB = async (
+  id: string,
+  data: {
+    instructor?: Partial<Instructor>;
+    user?: Partial<User>;
+  },
+): Promise<Instructor> => {
+  const instructor = await prisma.instructor.findUniqueOrThrow({
+    where: { id },
+  });
+
+  const updated = await prisma.$transaction(async tx => {
+    // Update Instructor fields
+    const updatedInstructor = data.instructor
+      ? await tx.instructor.update({
+          where: { id },
+          data: data.instructor,
+        })
+      : instructor;
+
+    // Update nested User fields
+    if (data.user) {
+      await tx.user.update({
+        where: { id: instructor.userId },
+        data: data.user,
+      });
+    }
+
+    return updatedInstructor;
+  });
+
+  return updated;
+};
+
+const deleteFromDB = async (id: string): Promise<User> => {
+  const instructor = await prisma.instructor.findUniqueOrThrow({
+    where: { id },
+  });
+
+  const result = await prisma.$transaction(async tx => {
+    const deletedUser = await tx.user.update({
+      where: { id: instructor.userId },
+      data: { status: UserStatus.deleted, isDeleted: true },
+    });
+
+    return deletedUser;
+  });
+
+  return result;
+};
+
+export const InstructorService = {
+  getAllFromDB,
+  getByIdFromDB,
+  updateIntoDB,
+  deleteFromDB,
+};
