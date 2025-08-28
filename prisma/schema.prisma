@@ -153,6 +153,7 @@ model Department {
   authorId  String
   image     String
   name      String
+  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

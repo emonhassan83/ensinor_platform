@@ -25,6 +25,10 @@ router.get('/:id', contentsController.getContentsById);
 
 router.get('/', contentsController.getAllContents);
 
-router.delete('/:id', contentsController.deleteContents);
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin),
+  contentsController.deleteContents,
+);
 
 export const ContentsRoutes = router;
