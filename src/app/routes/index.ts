@@ -5,6 +5,7 @@ import { otpRoutes } from '../modules/otp/otp.route';
 import { ContentsRoutes } from '../modules/contents/contents.route';
 import { NotificationRoutes } from '../modules/notification/notification.route';
 import { CompanyAdminRoutes } from '../modules/companyAdmin/companyAdmin.routes';
+import { BusinessInstructorRoutes } from '../modules/businessInstructor/businessInstructor.routes';
 
 const router = express.Router();
 
@@ -24,6 +25,10 @@ const moduleRoutes = [
   {
     path: '/company-admins',
     route: CompanyAdminRoutes,
+  },
+  {
+    path: '/business-instructors',
+    route: BusinessInstructorRoutes,
   },
   {
     path: '/contents',
