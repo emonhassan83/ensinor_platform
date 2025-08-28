@@ -14,10 +14,10 @@ datasource db {
 }
 
 model Verification {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   otp       String
   expiresAt DateTime?
-  status    Boolean  @default(false)
+  status    Boolean   @default(false)
 
   // One-to-One relation
   userId String @unique
@@ -48,7 +48,7 @@ model User {
   contactNo           String?
   city                String?
   country             String?
-  role                UserRole @default(student)
+  role                UserRole     @default(student)
   packageExpiry       DateTime?
   fcmToken            String?
   points              Int          @default(0)
@@ -99,15 +99,16 @@ model User {
   bundlesAuthored    CourseBundle[]       @relation("BundleAuthor")
   bundlesPurchased   CourseBundle[]       @relation("BundleUser")
   verification       Verification?
+  companyRequest     CompanyRequest?
 
   @@map("users")
 }
 
 model SuperAdmin {
-  id        String     @id @unique @default(uuid())
-  userId    String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @unique @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
@@ -115,10 +116,10 @@ model SuperAdmin {
 }
 
 model CompanyAdmin {
-  id        String     @id @unique @default(uuid())
-  userId    String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @unique @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user               User                @relation(references: [id], fields: [userId])
   businessInstructor BusinessInstructor?
@@ -129,24 +130,44 @@ model CompanyAdmin {
 }
 
 model Company {
-  id           String     @id @default(uuid())
-  userId       String     @unique
+  id           String   @id @default(uuid())
+  userId       String   @unique
   name         String
   industryType String
   logo         String?
   color        String?
-  employee     Int        @default(0)
-  instructor   Int        @default(0)
-  size         Int        @default(0)
-  isDeleted    Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  employee     Int      @default(0)
+  instructor   Int      @default(0)
+  size         Int      @default(0)
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   author CompanyAdmin @relation(references: [id], fields: [userId])
 
   @@map("companies")
 }
 
+model CompanyRequest {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  name                  String
+  organizationEmail     String
+  companyType           String
+  phoneNumber           String
+  role                  String
+  companySize           String
+  numberOfPeopleToTrain String
+  trainingNeeds         String
+  description           String
+  isDeleted             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(references: [id], fields: [userId])
+
+  @@map("company_requests")
+}
 
 model Department {
   id        String   @id @default(uuid())
@@ -182,11 +203,11 @@ model Invitation {
 }
 
 model BusinessInstructor {
-  id        String     @id @unique @default(uuid())
-  userId    String     @unique
-  companyId String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @unique @default(uuid())
+  userId    String   @unique
+  companyId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user    User         @relation(references: [id], fields: [userId])
   company CompanyAdmin @relation(references: [id], fields: [companyId])
@@ -195,11 +216,11 @@ model BusinessInstructor {
 }
 
 model Employee {
-  id        String     @id @unique @default(uuid())
-  userId    String     @unique
-  companyId String     @unique
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id        String   @id @unique @default(uuid())
+  userId    String   @unique
+  companyId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user    User         @relation(references: [id], fields: [userId])
   company CompanyAdmin @relation(references: [id], fields: [companyId])
@@ -208,8 +229,8 @@ model Employee {
 }
 
 model Instructor {
-  id          String     @id @unique @default(uuid())
-  userId      String     @unique
+  id          String   @id @unique @default(uuid())
+  userId      String   @unique
   designation String
   university  String?
   session     String?
@@ -219,10 +240,10 @@ model Instructor {
   twitter     String?
   instagram   String?
   website     String?
-  avgRating   Float      @default(0.0)
-  ratingCount Int        @default(0)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  avgRating   Float    @default(0.0)
+  ratingCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
@@ -230,34 +251,18 @@ model Instructor {
 }
 
 model Student {
-  id         String     @id @unique @default(uuid())
-  userId     String     @unique
+  id         String   @id @unique @default(uuid())
+  userId     String   @unique
   interests  String[]
   university String?
   session    String?
   subjects   String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
   @@map("students")
-}
-
-model CompanyRequest {
-  id                    String   @id @default(uuid())
-  name                  String
-  organizationEmail     String
-  companyType           String
-  phoneNumber           String
-  role                  String
-  companySize           String
-  numberOfPeopleToTrain String
-  trainingNeeds         String
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@map("company_requests")
 }
 
 // Book Related Models
@@ -1046,7 +1051,7 @@ model Content {
   privacyPolicy      String?
 
   // Support / Contacts
-  supports        String?
+  supports         String?
   customerLocation String?
   customerNumber   String?
   customerEmail    String?
