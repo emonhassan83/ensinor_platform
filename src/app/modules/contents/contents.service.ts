@@ -7,9 +7,10 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { Content, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { contentSearchableFields } from './contents.constants';
+import { IContent } from './contents.interface';
 
 // Create a new content
-const createContents = async (payload: any) => {
+const createContents = async (payload: IContent) => {
   const admin = await findAdmin();
   if (admin) payload.createdById = admin.id;
 
@@ -107,7 +108,7 @@ const getContentsById = async (id: string) => {
 };
 
 // Update content
-const updateContents = async (id: string,payload: Partial<Content>) => {
+const updateContents = async (id: string,payload: Partial<IContent>) => {
   const existingContent = await prisma.content.findUnique({
     where: { id },
   })

@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { packageFilterableFields } from './package.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await PackageService.insertIntoDB(req.body);
+  const result = await PackageService.insertIntoDB(req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -15,22 +15,20 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getAllFromDB = catchAsync(
-  async (req, res) => {
-    const filters = pick(req.query, packageFilterableFields);
-    const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+const getAllFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, packageFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-    const result = await PackageService.getAllFromDB(filters, options);
+  const result = await PackageService.getAllFromDB(filters, options);
 
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: 'Package data fetched!',
-      meta: result.meta,
-      data: result.data,
-    });
-  },
-);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Package data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
 
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await PackageService.getByIdFromDB(req.params.id);
@@ -43,7 +41,11 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await PackageService.updateIntoDB(req.params.id, req.body);
+  const result = await PackageService.updateIntoDB(
+    req.params.id,
+    req.body,
+    req.file,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -67,5 +69,5 @@ export const PackageController = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
-  deleteFromDB
+  deleteFromDB,
 };

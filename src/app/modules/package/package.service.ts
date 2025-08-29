@@ -9,12 +9,21 @@ import {
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IPackageFilterRequest } from './package.interface';
+import { IPackage, IPackageFilterRequest } from './package.interface';
 import { packageSearchAbleFields } from './package.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: any) => {
+const insertIntoDB = async (payload: IPackage, file: any) => {
+  // upload to image
+    if (file) {
+      payload.logo = (await uploadToS3({
+        file,
+        fileName: `images/package_logo/${Math.floor(100000 + Math.random() * 900000)}`,
+      })) as string;
+    }
+
   const result = await prisma.package.create({
     data: payload
   });
@@ -106,7 +115,8 @@ const getByIdFromDB = async (id: string): Promise<Package | null> => {
 
 const updateIntoDB = async (
   id: string,
-  data: Partial<Package>,
+  payload: Partial<Package>,
+  file: any,
 ): Promise<Package> => {
   const pkg = await prisma.package.findUnique({
     where: { id },
@@ -115,9 +125,18 @@ const updateIntoDB = async (
   if (!pkg || pkg?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not found!');
   }
+
+  // upload to image
+  if (file) {
+    payload.logo = (await uploadToS3({
+      file,
+      fileName: `images/package_logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
   const result = await prisma.package.update({
     where: { id },
-    data
+    data: payload
   });
 
   if (!result) {
