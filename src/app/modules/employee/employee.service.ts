@@ -80,26 +80,26 @@ const getByIdFromDB = async (id: string): Promise<Employee | null> => {
 
 const updateIntoDB = async (
   id: string,
-data: { employee?: Partial<Employee>; user?: Partial<any> }
+  payload: { employee?: Partial<Employee>; user?: Partial<any> },
 ): Promise<Employee> => {
-    const employee = await prisma.employee.findUniqueOrThrow({
+  const employee = await prisma.employee.findUniqueOrThrow({
     where: { id },
   });
 
-    const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async tx => {
     // Update Employee fields
-    const updatedEmployee = data.employee
+    const updatedEmployee = payload.employee
       ? await tx.employee.update({
           where: { id },
-          data: data.employee,
+          data: payload.employee,
         })
       : employee;
 
     // Update nested user fields
-    if (data.user) {
+    if (payload.user) {
       await tx.user.update({
         where: { id: employee.userId },
-        data: data.user,
+        data: payload.user,
       });
     }
 
@@ -114,7 +114,7 @@ const deleteFromDB = async (id: string): Promise<User> => {
     where: { id },
   });
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async tx => {
     const deletedUser = await tx.user.update({
       where: { id: employee.userId },
       data: { status: UserStatus.deleted, isDeleted: true },

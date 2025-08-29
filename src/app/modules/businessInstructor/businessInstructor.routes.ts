@@ -7,20 +7,36 @@ import { BusinessInstructorValidation } from './businessInstructor.validation';
 
 const router = express.Router();
 
-router.get('/', BusinessInstructorController.getAllFromDB);
+router.get(
+  '/',
+  auth(UserRole.super_admin, UserRole.company_admin),
+  BusinessInstructorController.getAllFromDB,
+);
 
-router.get('/:id', auth(UserRole.super_admin), BusinessInstructorController.getByIdFromDB);
-
-router.patch(
+router.get(
   '/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
+  BusinessInstructorController.getByIdFromDB,
+);
+
+router.put(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+  ),
   validateRequest(BusinessInstructorValidation.updateValidationSchema),
   BusinessInstructorController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+  ),
   BusinessInstructorController.deleteFromDB,
 );
 

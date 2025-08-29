@@ -7,11 +7,19 @@ import { CompanyAdminValidation } from './companyAdmin.validation';
 
 const router = express.Router();
 
-router.get('/', CompanyAdminController.getAllFromDB);
+router.get(
+  '/',
+  auth(UserRole.super_admin),
+  CompanyAdminController.getAllFromDB,
+);
 
-router.get('/:id', auth(UserRole.super_admin), CompanyAdminController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.super_admin),
+  CompanyAdminController.getByIdFromDB,
+);
 
-router.patch(
+router.put(
   '/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(CompanyAdminValidation.updateValidationSchema),

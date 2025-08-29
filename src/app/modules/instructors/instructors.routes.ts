@@ -11,20 +11,19 @@ router.get('/', InstructorController.getAllFromDB);
 
 router.get(
   '/:id',
-  auth(UserRole.super_admin),
   InstructorController.getByIdFromDB,
 );
 
-router.patch(
+router.put(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin, UserRole.instructor),
   validateRequest(InstructorValidation.updateValidationSchema),
   InstructorController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin, UserRole.instructor),
   InstructorController.deleteFromDB,
 );
 

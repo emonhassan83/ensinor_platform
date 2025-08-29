@@ -13,11 +13,6 @@ const updateValidationSchema = z.object({
           required_error: 'Contact Number is required!',
         })
         .optional(),
-      photoUrl: z
-        .string({
-          required_error: 'Profile Photo URL is required!',
-        })
-        .optional(),
       city: z
         .string({
           required_error: 'City is required!',

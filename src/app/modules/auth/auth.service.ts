@@ -79,7 +79,7 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
   if (payload.role === UserRole.super_admin) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
-      'You cannot directly assign admin role',
+      'You cannot directly assign super admin role',
     );
   }
 
@@ -104,6 +104,7 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
           name: payload.name,
           email: payload.email,
           photoUrl: payload.photoUrl,
+          registerWith: RegisterWith.google,
           isDeleted: false,
           verification: {
             update: {
@@ -230,7 +231,7 @@ const registerWithLinkedIn = async (payload: Partial<IUser>) => {
   if (payload.role === UserRole.super_admin) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
-      'You cannot directly assign admin role',
+      'You cannot directly assign super admin role',
     );
   }
 
@@ -256,6 +257,7 @@ const registerWithLinkedIn = async (payload: Partial<IUser>) => {
           name: payload.name,
           email: payload.email,
           photoUrl: payload.photoUrl,
+          registerWith: RegisterWith.linkedIn,
           isDeleted: false,
           verification: {
             update: {
@@ -405,6 +407,7 @@ const registerWithFacebook = async (payload: Partial<IUser>) => {
           name: payload.name,
           email: payload.email,
           photoUrl: payload.photoUrl,
+          registerWith: RegisterWith.facebook,
           isDeleted: false,
           verification: {
             update: {
@@ -537,8 +540,12 @@ const changePassword = async (
   }
 
   //* checking if the password is correct
-  const isPasswordMatched = await bcrypt.compare(payload.oldPassword, user.password!)
-  if (!isPasswordMatched) throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !')
+  const isPasswordMatched = await bcrypt.compare(
+    payload.oldPassword,
+    user.password!,
+  );
+  if (!isPasswordMatched)
+    throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !');
 
   //* hash new password
   const newHashedPassword = await bcrypt.hash(
@@ -553,7 +560,7 @@ const changePassword = async (
       needsPasswordChange: false,
       passwordChangedAt: new Date(),
     },
-  })
+  });
 
   //if password is not updated throw error
   if (!updateUserPassword) {
@@ -572,8 +579,10 @@ const refreshToken = async (token: string) => {
   const decoded = verifyToken(token, config.jwt_refresh_secret as string);
 
   //* checking if the user is exist
-  const user = await prisma.user.findUnique({ where: { email: decoded.email } })
-  if (!user|| user?.isDeleted) {
+  const user = await prisma.user.findUnique({
+    where: { email: decoded.email },
+  });
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -596,10 +605,10 @@ const refreshToken = async (token: string) => {
 
 const forgetPassword = async (payload: { email: string }) => {
   //* checking if the user is exist
-   const user = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email: payload.email },
     include: { verification: true },
-  })
+  });
   if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
@@ -624,7 +633,7 @@ const forgetPassword = async (payload: { email: string }) => {
   await prisma.verification.update({
     where: { userId: user.id },
     data: { otp, expiresAt, status: false },
-  })
+  });
 
   // const resetUILink = `${config.reset_pass_link}?id=${user._id}&token=${resetToken} `
 
@@ -638,7 +647,7 @@ const forgetPassword = async (payload: { email: string }) => {
           <p style="color: #555; margin-top: 10px;">Dear ${user?.name},</p>
           <p style="color: #555;">Use the following One-Time Password (OTP) to proceed with your request. This OTP is valid for a limited time.</p>
           <div style="text-align: center; margin: 20px 0;">
-            <span style="background-color: #9C6498; color: white; padding: 10px 20px; font-size: 18px; font-weight: bold; border-radius: 5px; display: inline-block;">
+            <span style="padding: 10px 20px; font-size: 18px; font-weight: bold; border-radius: 5px; display: inline-block;">
               ${otp}
             </span>
           </div>
@@ -664,10 +673,10 @@ const resetPassword = async (
   token: string,
 ) => {
   //* checking if the user is exist
-   const user = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email: payload.email },
     include: { verification: true },
-  })
+  });
   if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
@@ -701,17 +710,17 @@ const resetPassword = async (
     Number(config.bcrypt_salt_rounds),
   );
 
-  const passwordResetUser =  await prisma.user.update({
+  const passwordResetUser = await prisma.user.update({
     where: { id: user.id },
     data: {
       password: newHashedPassword,
       needsPasswordChange: false,
       passwordChangedAt: new Date(),
       verification: {
-        update: { otp: '', status: true, expiresAt: new Date()},
+        update: { otp: '', status: true, expiresAt: new Date() },
       },
     },
-  })
+  });
 
   //if password is not updated throw error
   if (!passwordResetUser) {

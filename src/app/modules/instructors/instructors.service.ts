@@ -80,7 +80,7 @@ const getByIdFromDB = async (id: string): Promise<Instructor | null> => {
 
 const updateIntoDB = async (
   id: string,
-  data: {
+  payload: {
     instructor?: Partial<Instructor>;
     user?: Partial<User>;
   },
@@ -91,18 +91,18 @@ const updateIntoDB = async (
 
   const updated = await prisma.$transaction(async tx => {
     // Update Instructor fields
-    const updatedInstructor = data.instructor
+    const updatedInstructor = payload.instructor
       ? await tx.instructor.update({
           where: { id },
-          data: data.instructor,
+          data: payload.instructor,
         })
       : instructor;
 
     // Update nested User fields
-    if (data.user) {
+    if (payload.user) {
       await tx.user.update({
         where: { id: instructor.userId },
-        data: data.user,
+        data: payload.user,
       });
     }
 

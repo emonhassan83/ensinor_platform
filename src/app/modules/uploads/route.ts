@@ -17,5 +17,4 @@ router.post(
 
 router.post('/single', upload.single('file'), uploadController.single);
 
-const uploadRouter = router;
-export default uploadRouter;
+export const uploadRouter = router;

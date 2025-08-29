@@ -2,21 +2,21 @@ import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import { hashedPassword } from './user.utils';
-import { IUserFilterRequest, IUserResponse } from './user.interface';
+import { IBusinessInstructor, ICompanyAdmin, IEmployee, IInstructor, IStudent, IUserFilterRequest, IUserResponse } from './user.interface';
 import { userSearchableFields } from './user.constant';
 import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 
-const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
+const createCompanyAdmin = async (payload: ICompanyAdmin): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.companyAdmin.name,
-        email: payload.companyAdmin.email,
+        name: payload.user.name,
+        email: payload.user.email,
         password: hashPassword,
         role: UserRole.company_admin,
         registerWith: RegisterWith.credentials,
@@ -34,6 +34,7 @@ const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
     await transactionClient.companyAdmin.create({
       data: {
         userId: user.id,
+        ...payload.companyAdmin
       },
     });
 
@@ -44,15 +45,15 @@ const createCompanyAdmin = async (payload: any): Promise<IUserResponse> => {
 };
 
 const createBusinessInstructor = async (
-  payload: any,
+  payload: IBusinessInstructor,
 ): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.businessInstructor.name,
-        email: payload.businessInstructor.email,
+        name: payload.user.name,
+        email: payload.user.email,
         password: hashPassword,
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
@@ -80,16 +81,16 @@ const createBusinessInstructor = async (
   return result;
 };
 
-const createEmployee = async (payload: any): Promise<IUserResponse> => {
+const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.employee.name,
-        email: payload.employee.email,
+        name: payload.user.name,
+        email: payload.user.email,
         password: hashPassword,
-        role: UserRole.business_instructors,
+        role: UserRole.employee,
         registerWith: RegisterWith.credentials,
         // Create verification record at the same time
         verification: {
@@ -115,14 +116,14 @@ const createEmployee = async (payload: any): Promise<IUserResponse> => {
   return result;
 };
 
-const createInstructor = async (payload: any): Promise<IUserResponse> => {
+const createInstructor = async (payload: IInstructor): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.instructor.name,
-        email: payload.instructor.email,
+        name: payload.user.name,
+        email: payload.user.email,
         password: hashPassword,
         role: UserRole.instructor,
         registerWith: RegisterWith.credentials,
@@ -140,15 +141,7 @@ const createInstructor = async (payload: any): Promise<IUserResponse> => {
     await transactionClient.instructor.create({
       data: {
         userId: user.id,
-        designation: payload.instructor.designation ?? null,
-        subjects: payload.instructor.subjects ?? null,
-        university: payload.instructor.university ?? null,
-        session: payload.instructor.session ?? null,
-        linkedIn: payload.instructor.linkedIn ?? null,
-        facebook: payload.instructor.facebook ?? null,
-        twitter: payload.instructor.twitter ?? null,
-        instagram: payload.instructor.instagram ?? null,
-        website: payload.instructor.website ?? null,
+        ...payload.instructor
       },
     });
 
@@ -158,14 +151,14 @@ const createInstructor = async (payload: any): Promise<IUserResponse> => {
   return result;
 };
 
-const createStudent = async (payload: any): Promise<IUserResponse> => {
+const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.student.name,
-        email: payload.student.email,
+        name: payload.user.name,
+        email: payload.user.email,
         password: hashPassword,
         role: UserRole.student,
         registerWith: RegisterWith.credentials,
@@ -175,10 +168,7 @@ const createStudent = async (payload: any): Promise<IUserResponse> => {
     await transactionClient.student.create({
       data: {
         userId: user.id,
-        interests: payload.student.interests ?? null,
-        university: payload.student.university ?? null,
-        session: payload.student.session ?? null,
-        subjects: payload.student.subjects ?? null,
+        ...payload.student
       },
     });
 
@@ -343,7 +333,7 @@ const geUserById = async (userId: string) => {
   return { ...profileData, ...userData };
 };
 
-const updateAProfile = async (userId: any, payload: any) => {
+const updateAProfile = async (userId: string, payload: any) => {
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
