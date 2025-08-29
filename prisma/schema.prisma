@@ -149,8 +149,8 @@ model Company {
 }
 
 model CompanyRequest {
-  id                    String   @id @default(uuid())
-  userId                String   @unique
+  id                    String     @id @default(uuid())
+  userId                String     @unique
   name                  String
   organizationEmail     String
   companyType           String
@@ -160,9 +160,9 @@ model CompanyRequest {
   numberOfPeopleToTrain String
   trainingNeeds         String
   description           String
-  isDeleted             Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  status                UserStatus @default(pending)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
