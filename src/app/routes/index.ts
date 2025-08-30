@@ -18,6 +18,7 @@ import { ArticleRoutes } from '../modules/article/article.route';
 import { FaqRoutes } from '../modules/faq/faq.route';
 import { SupportRoutes } from '../modules/support/support.route';
 import { NewsletterRoutes } from '../modules/newsletter/newsletter.route';
+import { SubscriptionRoutes } from '../modules/subscription/subscription.route';
 
 const router = express.Router();
 
@@ -69,6 +70,10 @@ const moduleRoutes = [
   {
     path: '/packages',
     route: PackageRoutes,
+  },
+  {
+    path: '/subscriptions',
+    route: SubscriptionRoutes,
   },
   {
     path: '/uploads',

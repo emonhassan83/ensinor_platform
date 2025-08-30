@@ -285,28 +285,33 @@ model Book {
   updatedAt     DateTime   @updatedAt
 
   author User    @relation(fields: [authorId], references: [id]) // FK relation to User table
-  order  Order[]
 
   @@map("books")
 }
 
 model Order {
-  id            String        @id @default(uuid())
+  id            String         @id @default(uuid())
   userId        String
-  bookId        String
+  modelType     OrderModelType
+  reference     String
   amount        Float
-  status        OrderStatus   @default(pending)
-  paymentStatus PaymentStatus @default(unpaid)
+  status        OrderStatus    @default(pending)
+  paymentStatus PaymentStatus  @default(unpaid)
   transactionId String?
   documents     String[] // Array of document URLs or file paths
-  isDeleted     Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  isDeleted     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   user User @relation(fields: [userId], references: [id])
-  book Book @relation(fields: [bookId], references: [id])
 
   @@map("orders")
+}
+
+enum OrderModelType {
+  book
+  course
+  courseBundle
 }
 
 // Course Related Models

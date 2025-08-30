@@ -14,6 +14,7 @@ router.post(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.employee,
+    UserRole.company_admin,
   ),
   validateRequest(CompanyRequestValidation.createValidationSchema),
   CompanyRequestController.insertIntoDB,
@@ -38,6 +39,7 @@ router.put(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.employee,
+    UserRole.company_admin,
   ),
   validateRequest(CompanyRequestValidation.updateValidationSchema),
   CompanyRequestController.updateIntoDB,
@@ -50,6 +52,7 @@ router.delete(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.employee,
+    UserRole.company_admin,
   ),
   CompanyRequestController.deleteFromDB,
 );
