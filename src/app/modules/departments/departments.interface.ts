@@ -1,30 +1,11 @@
-import { UserRole, UserStatus } from "@prisma/client";
-
-export type IUserFilterRequest = {
+export type IDepartmentFilterRequest = {
     searchTerm?: string | undefined;
-    email?: string | undefined;
-    status?: UserStatus | undefined;
+    name?: string | undefined;
 };
 
 // Interface for User, aligned with Prisma User model
-export type IUser = {
-  id: string;
+export type IDepartment = {
   name: string;
-  email: string;
-  password: string;
-  photoUrl?: string | null;
-  bio?:  string | null;
-  dateOfBirth?: string | null;
-  contactNo?: string | null;
-  city?: string | null;
-  country?: string | null;
-  role: UserRole;
-  lastActive?: Date;
-  status: UserStatus;
-  isDeleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  image: string;
+  authorId: string;
 };
-
-// Interface for User response, excluding password for API responses
-export type IUserResponse = Omit<IUser, 'password'>;

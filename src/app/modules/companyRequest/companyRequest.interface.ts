@@ -4,4 +4,18 @@ export type ICompanyRequestFilterRequest = {
   organizationEmail?: string | undefined;
   companyType?: string | undefined;
   role?: string | undefined;
+  status?: string | undefined;
+};
+
+export type ICompanyRequest = {
+  userId: string;
+  name: string;
+  organizationEmail: string;
+  companyType: string;
+  phoneNumber: string;
+  role: string;
+  companySize: number;
+  numberOfPeopleToTrain: number;
+  trainingNeeds: number;
+  description: string;
 };

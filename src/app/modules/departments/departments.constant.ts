@@ -1,3 +1,3 @@
-export const departmentsSearchableFields: string[] = ['name'];
+export const departmentSearchableFields: string[] = ['name'];
 
-export const departmentsFilterableFields: string[] = ['searchTerm'];
+export const departmentFilterableFields: string[] = ['searchTerm', 'name'];

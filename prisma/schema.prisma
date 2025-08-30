@@ -156,9 +156,9 @@ model CompanyRequest {
   companyType           String
   phoneNumber           String
   role                  String
-  companySize           String
-  numberOfPeopleToTrain String
-  trainingNeeds         String
+  companySize           Int
+  numberOfPeopleToTrain Int
+  trainingNeeds         Int
   description           String
   status                UserStatus @default(pending)
   createdAt             DateTime   @default(now())
@@ -172,8 +172,8 @@ model CompanyRequest {
 model Department {
   id        String   @id @default(uuid())
   authorId  String
-  image     String
   name      String
+  image     String
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

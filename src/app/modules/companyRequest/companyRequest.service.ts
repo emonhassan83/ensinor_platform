@@ -1,18 +1,15 @@
 import {
-  CompanyAdmin,
   CompanyRequest,
-  Prisma,
-  User,
-  UserStatus,
+  Prisma
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { ICompanyRequestFilterRequest } from './companyRequest.interface';
+import { ICompanyRequest, ICompanyRequestFilterRequest } from './companyRequest.interface';
 import { companyRequestSearchAbleFields } from './companyRequest.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
-const insertIntoDB = async (payload: any) => {
+const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({
     where: {
       id: payload.userId,
@@ -49,13 +46,12 @@ const getAllFromDB = async (
   // Search across CompanyRequest and nested User fields
   if (searchTerm) {
     andConditions.push({
-      OR: [
-        ...companyRequestSearchAbleFields.map(field => ({
-          [field]: { contains: searchTerm, mode: 'insensitive' },
-        })),
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-      ],
+      OR: companyRequestSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
     });
   }
 
@@ -114,11 +110,11 @@ const getByIdFromDB = async (id: string): Promise<CompanyRequest | null> => {
 
 const updateIntoDB = async (
   id: string,
-  data: { companyAdmin?: Partial<CompanyAdmin>; user?: Partial<any> },
-): Promise<CompanyAdmin> => {
+  payload: Partial<ICompanyRequest>,
+): Promise<CompanyRequest> => {
   const result = await prisma.companyRequest.update({
     where: { id },
-    data,
+    data: payload,
     include: { user: true },
   });
 
@@ -130,18 +126,16 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<CompanyRequest> => {
-  const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
+  const companyReq = await prisma.companyRequest.findUniqueOrThrow({
     where: { id },
   });
-
-  if (!companyAdmin) {
+  if (!companyReq) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
 
   const result = await prisma.companyRequest.delete({
     where: { id },
   });
-
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }

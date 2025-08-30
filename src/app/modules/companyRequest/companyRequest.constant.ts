@@ -1,3 +1,3 @@
 export const companyRequestSearchAbleFields = ['name', 'organizationEmail'];
 
-export const companyRequestFilterableFields = ['searchTerm', 'companyType', 'role'];
+export const companyRequestFilterableFields = ['searchTerm', 'companyType', 'role', 'status'];

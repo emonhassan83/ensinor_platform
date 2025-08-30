@@ -93,8 +93,7 @@ const getContentsById = async (id: string) => {
           id: true,
           name: true,
           email: true,
-          photoUrl: true,
-          status: true,
+          photoUrl: true
         },
       },
     },
@@ -108,7 +107,7 @@ const getContentsById = async (id: string) => {
 };
 
 // Update content
-const updateContents = async (id: string,payload: Partial<IContent>) => {
+const updateContents = async (id: string, payload: Partial<IContent>) => {
   const existingContent = await prisma.content.findUnique({
     where: { id },
   })

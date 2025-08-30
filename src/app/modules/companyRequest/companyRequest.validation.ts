@@ -9,9 +9,9 @@ const createValidationSchema = z.object({
     companyType: z.string({ required_error: "Company type is required!" }),
     phoneNumber: z.string({ required_error: "Phone number is required!" }),
     role: z.string({ required_error: "Role is required!" }),
-    companySize: z.string({ required_error: "Company size is required!" }),
-    numberOfPeopleToTrain: z.string({ required_error: "Number of people to train is required!" }),
-    trainingNeeds: z.string({ required_error: "Training needs is required!" }),
+    companySize: z.number({ required_error: "Company size is required!" }),
+    numberOfPeopleToTrain: z.number({ required_error: "Number of people to train is required!" }),
+    trainingNeeds: z.number({ required_error: "Training needs is required!" }),
     description: z.string({ required_error: "Description is required!" }),
   }),
 });
@@ -24,9 +24,9 @@ const updateValidationSchema = z.object({
     companyType: z.string().optional(),
     phoneNumber: z.string().optional(),
     role: z.string().optional(),
-    companySize: z.string().optional(),
-    numberOfPeopleToTrain: z.string().optional(),
-    trainingNeeds: z.string().optional(),
+    companySize: z.number().optional(),
+    numberOfPeopleToTrain: z.number().optional(),
+    trainingNeeds: z.number().optional(),
     description: z.string().optional()
   }),
 });

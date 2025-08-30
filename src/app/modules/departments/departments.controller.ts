@@ -3,7 +3,7 @@ import httpStatus from 'http-status';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { DepartmentServices } from './departments.service';
-import { departmentsFilterableFields } from './departments.constant';
+import { departmentFilterableFields } from './departments.constant';
 import pick from '../../utils/pick';
 
 const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
@@ -17,7 +17,7 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllFromDB = catchAsync(async (req: Request, res: Response) => {
-  const filters = pick(req.query, departmentsFilterableFields);
+  const filters = pick(req.query, departmentFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
   const result = await DepartmentServices.getAllFromDB(filters, options);

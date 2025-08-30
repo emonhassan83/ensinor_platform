@@ -7,11 +7,21 @@ import { CompanyRequestValidation } from './companyRequest.validation';
 
 const router = express.Router();
 
-router.post('/', auth(UserRole.student), CompanyRequestController.insertIntoDB);
+router.post(
+  '/',
+  auth(
+    UserRole.student,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.employee,
+  ),
+  validateRequest(CompanyRequestValidation.createValidationSchema),
+  CompanyRequestController.insertIntoDB,
+);
 
 router.get(
   '/',
-  auth(UserRole.super_admin, UserRole.student),
+  auth(UserRole.super_admin),
   CompanyRequestController.getAllFromDB,
 );
 
@@ -23,14 +33,24 @@ router.get(
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin, UserRole.student),
+  auth(
+    UserRole.student,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.employee,
+  ),
   validateRequest(CompanyRequestValidation.updateValidationSchema),
   CompanyRequestController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.student),
+  auth(
+    UserRole.student,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.employee,
+  ),
   CompanyRequestController.deleteFromDB,
 );
 
