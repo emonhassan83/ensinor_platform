@@ -14,6 +14,7 @@ import { CompanyRequestRoutes } from '../modules/companyRequest/companyRequest.r
 import { InvitationRoutes } from '../modules/invitation/invitation.routes';
 import { PackageRoutes } from '../modules/package/package.routes';
 import { uploadRouter } from '../modules/uploads/route';
+import { ArticleRoutes } from '../modules/article/article.route';
 
 const router = express.Router();
 
@@ -69,6 +70,10 @@ const moduleRoutes = [
   {
     path: '/uploads',
     route: uploadRouter,
+  },
+  {
+    path: '/articles',
+    route: ArticleRoutes,
   },
   {
     path: '/contents',

@@ -100,6 +100,7 @@ model User {
   bundlesPurchased   CourseBundle[]       @relation("BundleUser")
   verification       Verification?
   companyRequest     CompanyRequest?
+  usersOnArticles    UsersOnArticles[]
 
   @@map("users")
 }
@@ -892,7 +893,7 @@ model Notification {
   id          String               @id @default(uuid())
   receiverId  String?
   referenceId String?
-  modeType  NotificationModeType
+  modeType    NotificationModeType
   message     String
   description String               @default("")
   date        DateTime             @default(now())
@@ -1036,9 +1037,22 @@ model Article {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  author User @relation(fields: [authorId], references: [id])
+  author User              @relation(fields: [authorId], references: [id])
+  seenBy UsersOnArticles[] // ✅ join table for tracking who has seen
 
   @@map("articles")
+}
+
+model UsersOnArticles {
+  userId    String
+  articleId String
+  seenAt    DateTime @default(now()) // ✅ track when they saw it
+
+  user    User    @relation(fields: [userId], references: [id])
+  article Article @relation(fields: [articleId], references: [id])
+
+  @@id([userId, articleId]) // Composite PK
+  @@map("users_on_articles")
 }
 
 model Content {
@@ -1068,13 +1082,13 @@ model Content {
   updatedAt DateTime @updatedAt
 
   // Relations
-  createdBy User  @relation(fields: [createdById], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
 
   @@map("contents")
 }
 
 model FAQ {
-  id        String @id @default(uuid())
+  id       String @id @default(uuid())
   question String
   answer   String
 
