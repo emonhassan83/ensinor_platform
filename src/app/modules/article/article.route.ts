@@ -29,6 +29,19 @@ router.put(
   ArticleController.updateIntoDB,
 );
 
+router.patch(
+  '/seen/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
+  ArticleController.seenArticleIntoDB,
+);
+
 router.get('/:id', ArticleController.getByIdFromDB);
 
 router.get('/', ArticleController.getAllFromDB);

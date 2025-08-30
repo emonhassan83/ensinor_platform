@@ -15,6 +15,7 @@ import { InvitationRoutes } from '../modules/invitation/invitation.routes';
 import { PackageRoutes } from '../modules/package/package.routes';
 import { uploadRouter } from '../modules/uploads/route';
 import { ArticleRoutes } from '../modules/article/article.route';
+import { FaqRoutes } from '../modules/faq/faq.route';
 
 const router = express.Router();
 
@@ -78,6 +79,10 @@ const moduleRoutes = [
   {
     path: '/contents',
     route: ContentsRoutes,
+  },
+  {
+    path: '/faq',
+    route: FaqRoutes,
   },
   {
     path: '/notification',

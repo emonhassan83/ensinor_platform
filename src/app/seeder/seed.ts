@@ -62,9 +62,6 @@ const seedContents = async () => {
         officeLocation: '',
         officeNumber: '',
         officeEmail: '',
-        faq: {
-          create: [],
-        },
       },
     });
 
