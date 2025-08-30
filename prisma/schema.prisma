@@ -892,12 +892,11 @@ model Notification {
   id          String               @id @default(uuid())
   receiverId  String?
   referenceId String?
-  model_type  NotificationModeType
+  modeType  NotificationModeType
   message     String
   description String               @default("")
   date        DateTime             @default(now())
   read        Boolean              @default(false)
-  isDeleted   Boolean              @default(false)
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 
@@ -1070,22 +1069,17 @@ model Content {
 
   // Relations
   createdBy User  @relation(fields: [createdById], references: [id])
-  faq       FAQ[] // one Content can have multiple FAQs
 
   @@map("contents")
 }
 
 model FAQ {
   id        String @id @default(uuid())
-  contentId String // FK → Content
-
   question String
   answer   String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  content Content @relation(fields: [contentId], references: [id])
 
   @@map("faqs")
 }

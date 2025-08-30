@@ -1,11 +1,6 @@
 import {
-  CompanyAdmin,
-  CompanyRequest,
-  Invitation,
   Package,
   Prisma,
-  User,
-  UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
@@ -44,7 +39,7 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.PackageWhereInput[] = [];
+  const andConditions: Prisma.PackageWhereInput[] = [{ isDeleted: false }];
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -121,7 +116,6 @@ const updateIntoDB = async (
   const pkg = await prisma.package.findUnique({
     where: { id },
   });
-
   if (!pkg || pkg?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not found!');
   }
@@ -138,7 +132,6 @@ const updateIntoDB = async (
     where: { id },
     data: payload
   });
-
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not updated!');
   }
@@ -150,7 +143,6 @@ const deleteFromDB = async (id: string): Promise<Package> => {
   const pkg = await prisma.package.findUniqueOrThrow({
     where: { id },
   });
-
   if (!pkg || pkg?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not found!');
   }
@@ -161,7 +153,6 @@ const deleteFromDB = async (id: string): Promise<Package> => {
       isDeleted: true,
     },
   });
-
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not found!');
   }

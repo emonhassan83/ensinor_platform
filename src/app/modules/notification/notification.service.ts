@@ -7,10 +7,17 @@ import { paginationHelpers } from '../../helpers/paginationHelper';
 import { Prisma, UserRole } from '@prisma/client';
 import { notificationSearchableFields } from './notification.constant';
 import prisma from '../../utils/prisma';
+import { INotification } from './notification.interface';
 
-const createNotificationIntoDB = async (payload: any) => {
+const createNotificationIntoDB = async (payload: INotification) => {
   const notification = await prisma.notification.create({
-    data: payload,
+     data: {
+      receiverId: payload.receiver,
+      referenceId: payload.reference,
+      modeType: payload.modeType,
+      message: payload.message,
+      description: payload?.description ?? '',
+    },
   });
   if (!notification) {
     throw new ApiError(httpStatus.CONFLICT, 'Notification not created!');
@@ -61,7 +68,7 @@ const getAllNotificationFromDB = async (
   const { searchTerm, ...filterData } = filters;
 
   const andConditions: Prisma.NotificationWhereInput[] = [
-    { receiverId: userId, isDeleted: false },
+    { receiverId: userId},
   ];
 
   if (searchTerm) {
@@ -126,7 +133,7 @@ const getANotificationFromDB = async (id: string) => {
 
 const markAsDoneFromDB = async (id: string) => {
   const result = await prisma.notification.updateMany({
-    where: { receiverId: id, isDeleted: false, read: false },
+    where: { receiverId: id, read: false },
     data: { read: true },
   });
   return result;

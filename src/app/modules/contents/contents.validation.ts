@@ -5,25 +5,17 @@ const createValidationSchema = z.object({
     createdById: z
       .string({ required_error: 'createdById is required' })
       .uuid('createdById must be a valid UUID'),
-
     aboutUs: z
       .string({ required_error: 'aboutUs is required' })
-
       .optional(),
-
     termsAndConditions: z
       .string({ required_error: 'termsAndConditions is required' })
-
       .optional(),
-
     privacyPolicy: z
       .string({ required_error: 'privacyPolicy is required' })
-
       .optional(),
-
     supports: z
       .string({ required_error: 'supports is required' })
-
       .optional(),
 
     customerLocation: z
@@ -70,7 +62,6 @@ const updateValidationSchema = z.object({
       .string({ required_error: 'createdById is required' })
       .uuid('createdById must be a valid UUID')
       .optional(),
-
     aboutUs: z.string().min(1, 'aboutUs cannot be empty').optional(),
     termsAndConditions: z
       .string()

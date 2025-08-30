@@ -10,7 +10,17 @@ const insertIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Invitation insert successfully!',
+    message: 'Invitation sent successfully!',
+    data: result,
+  });
+});
+
+const bulkInsertIntoDB = catchAsync(async (req, res) => {
+  const result = await InvitationService.bulkInsertIntoDB(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Group invitation sent successfully!',
     data: result,
   });
 });
@@ -64,6 +74,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const InvitationController = {
   insertIntoDB,
+  bulkInsertIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

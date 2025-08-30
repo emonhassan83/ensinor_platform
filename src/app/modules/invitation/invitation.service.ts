@@ -8,12 +8,12 @@ import {
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IInvitationFilterRequest } from './invitation.interface';
+import { IGroupInvitation, IInvitation, IInvitationFilterRequest } from './invitation.interface';
 import { invitationSearchAbleFields } from './invitation.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
-const insertIntoDB = async (payload: any) => {
+const insertIntoDB = async (payload: IInvitation) => {
   const result = await prisma.invitation.create({
     data: payload,
     include: { user: true },
@@ -26,6 +26,42 @@ const insertIntoDB = async (payload: any) => {
     );
   }
   return result;
+};
+
+const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
+  // Transform emails into multiple rows
+  const invitations = payload.email.map(email => ({
+    userId: payload.userId,
+    departmentId: payload.departmentId,
+    name: payload?.name ?? '',
+    groupName: payload.groupName,
+    email,
+  }));
+
+  try {
+    // Insert multiple invitations
+   await prisma.invitation.createMany({
+      data: invitations,
+      skipDuplicates: true, // important to avoid unique constraint errors
+    });
+
+    // If you also need the inserted rows with relations:
+    const insertedInvitations = await prisma.invitation.findMany({
+      where: {
+        userId: payload.userId,
+        departmentId: payload.departmentId,
+        email: { in: payload.email },
+      },
+      include: { user: true, department: true },
+    });
+
+    return insertedInvitations;
+  } catch (error: any) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      error.message || 'Invitation creation failed!',
+    );
+  }
 };
 
 const getAllFromDB = async (
@@ -103,11 +139,18 @@ const getByIdFromDB = async (id: string): Promise<Invitation | null> => {
 
 const updateIntoDB = async (
   id: string,
-  data: Partial<Invitation>,
+  payload: Partial<IInvitation>,
 ): Promise<Invitation> => {
+    const invitation = await prisma.invitation.findUniqueOrThrow({
+    where: { id },
+  });
+  if (!invitation) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Invitation not found!');
+  }
+
   const result = await prisma.invitation.update({
     where: { id },
-    data,
+    data: payload,
     include: { user: true, department: true },
   });
 
@@ -122,7 +165,6 @@ const deleteFromDB = async (id: string): Promise<Invitation> => {
   const invitation = await prisma.invitation.findUniqueOrThrow({
     where: { id },
   });
-
   if (!invitation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Invitation not found!');
   }
@@ -140,6 +182,7 @@ const deleteFromDB = async (id: string): Promise<Invitation> => {
 
 export const InvitationService = {
   insertIntoDB,
+  bulkInsertIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

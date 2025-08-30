@@ -13,6 +13,23 @@ const createValidationSchema = z.object({
   }),
 });
 
+// Bulk create validation
+const bulkCreateValidationSchema = z.object({
+  body: z.object({
+    userId: z.string({ required_error: 'User ID is required!' }),
+    departmentId: z.string({ required_error: 'Department ID is required!' }),
+    name: z.string().optional(),
+    groupName: z.string({
+      required_error: 'Group name is required for invitations!',
+    }),
+    email: z.array(
+      z
+        .string({ required_error: 'Email is required!' })
+        .email('Invalid email format'),
+    ),
+  }),
+});
+
 // Update validation
 const updateValidationSchema = z.object({
   body: z.object({
@@ -24,5 +41,6 @@ const updateValidationSchema = z.object({
 
 export const InvitationValidation = {
   createValidationSchema,
+  bulkCreateValidationSchema,
   updateValidationSchema,
 };

@@ -10,7 +10,15 @@ const router = express.Router();
 router.post(
   '/',
   auth(UserRole.company_admin),
+  validateRequest(InvitationValidation.createValidationSchema),
   InvitationController.insertIntoDB,
+);
+
+router.post(
+  '/bulk-insert',
+  auth(UserRole.company_admin),
+  validateRequest(InvitationValidation.bulkCreateValidationSchema),
+  InvitationController.bulkInsertIntoDB,
 );
 
 router.get(

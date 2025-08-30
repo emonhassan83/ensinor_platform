@@ -7,8 +7,6 @@ export type IPackageFilterRequest = {
   billingCycle?: string | undefined;
 };
 
-// types/package.types.ts
-
 export type IPackage = {
   title: string;
   logo: string;
