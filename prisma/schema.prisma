@@ -1114,7 +1114,7 @@ model Newsletter {
   id           String           @id @default(uuid())
   email        String           @unique // Subscriber email
   recurrence   RecurrenceType   @default(once) // How often to send newsletter
-  scheduleDate DateTime? // Next scheduled date for sending
+  scheduleDate DateTime         @default(now()) // Next scheduled date for sending
   status       NewsletterStatus @default(active)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
