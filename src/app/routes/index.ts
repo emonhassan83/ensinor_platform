@@ -16,6 +16,7 @@ import { PackageRoutes } from '../modules/package/package.routes';
 import { uploadRouter } from '../modules/uploads/route';
 import { ArticleRoutes } from '../modules/article/article.route';
 import { FaqRoutes } from '../modules/faq/faq.route';
+import { SupportRoutes } from '../modules/support/support.route';
 
 const router = express.Router();
 
@@ -83,6 +84,10 @@ const moduleRoutes = [
   {
     path: '/faq',
     route: FaqRoutes,
+  },
+  {
+    path: '/supports',
+    route: SupportRoutes,
   },
   {
     path: '/notification',
