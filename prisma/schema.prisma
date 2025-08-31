@@ -417,6 +417,7 @@ model Quiz {
   time         String? // e.g. "30m" or "01:00:00"
   questions    Int      @default(0)
   totalAttempt Int      @default(0)
+  isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

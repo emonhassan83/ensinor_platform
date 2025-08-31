@@ -24,6 +24,7 @@ import { OrdersRoutes } from '../modules/orders/orders.route';
 import { CourseRoutes } from '../modules/course/course.routes';
 import { CourseContentRoutes } from '../modules/courseContent/courseContent.routes';
 import { CourseBundleRoutes } from '../modules/courseBundle/courseBundle.routes';
+import { QuizRoutes } from '../modules/quiz/quiz.routes';
 
 const router = express.Router();
 
@@ -87,6 +88,10 @@ const moduleRoutes = [
   {
     path: '/course-bundle',
     route: CourseBundleRoutes,
+  },
+  {
+    path: '/quiz',
+    route: QuizRoutes,
   },
   {
     path: '/orders',
