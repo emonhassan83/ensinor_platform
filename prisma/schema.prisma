@@ -330,7 +330,7 @@ model Course {
   description      String
   thumbnail        String?
   lectures         Int         @default(0)
-  duration         String?
+  duration         Int         @default(0)
   hasCertificate   Boolean     @default(false)
   isFreeCourse     Boolean     @default(false)
   popularity       Int         @default(0)
