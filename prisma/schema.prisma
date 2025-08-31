@@ -97,7 +97,6 @@ model User {
   withdrawRequest    WithdrawRequest[]
   gradingSystem      GradingSystem[]
   bundlesAuthored    CourseBundle[]       @relation("BundleAuthor")
-  bundlesPurchased   CourseBundle[]       @relation("BundleUser")
   verification       Verification?
   companyRequest     CompanyRequest?
   usersOnArticles    UsersOnArticles[]
@@ -376,12 +375,11 @@ model CourseContent {
 model CourseBundle {
   id             String     @id @default(uuid())
   authorId       String
-  userId         String
   title          String
   category       String
   price          Int
   thumbnail      String?
-  discount       Float      @default(0.0)
+  discount       Int        @default(0)
   popularity     Int        @default(0)
   totalCompleted Int        @default(0)
   status         UserStatus @default(active)
@@ -393,7 +391,6 @@ model CourseBundle {
 
   // Relations
   author User @relation("BundleAuthor", fields: [authorId], references: [id])
-  user   User @relation("BundleUser", fields: [userId], references: [id])
 
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
