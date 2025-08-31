@@ -284,7 +284,7 @@ model Book {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  author User    @relation(fields: [authorId], references: [id]) // FK relation to User table
+  author User @relation(fields: [authorId], references: [id]) // FK relation to User table
 
   @@map("books")
 }
@@ -707,23 +707,40 @@ model Package {
 }
 
 model Subscription {
-  id            String        @id @default(uuid())
-  packageId     String        @unique
-  userId        String        @unique
+  id            String            @id @default(uuid())
+  packageId     String            @unique
+  userId        String            @unique
+  type          SubscriptionType
   transactionId String?
   amount        Float
   paymentStatus PaymentStatus
-  status        PaymentStatus
-  expiredAt     DateTime      @default(now())
-  isExpired     Boolean       @default(false)
-  isDeleted     Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  status        SubscriptionStatus
+  expiredAt     DateTime          @default(now())
+  isExpired     Boolean           @default(false)
+  isDeleted     Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   package Package @relation(references: [id], fields: [packageId])
   user    User    @relation(references: [id], fields: [userId])
 
   @@map("subscriptions")
+}
+
+enum SubscriptionType {
+  basic
+  standard
+  premium
+  non_profits
+  most_popular
+  full_power
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  cancelled
+  expired
 }
 
 model Payment {

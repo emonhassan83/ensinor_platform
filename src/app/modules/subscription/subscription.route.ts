@@ -38,10 +38,10 @@ router.get(
   subscriptionController.getSubscriptionById,
 )
 
-router.get(
-  '/',
-  auth(UserRole.company_admin, UserRole.student),
-  subscriptionController.getAllSubscription,
-)
+// router.get(
+//   '/',
+//   auth(UserRole.company_admin, UserRole.student),
+//   subscriptionController.getAllSubscription,
+// )
 
 export const SubscriptionRoutes = router

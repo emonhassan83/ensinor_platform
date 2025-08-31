@@ -1,247 +1,315 @@
-import httpStatus from 'http-status'
-import { Package } from '../package/package.model'
+import httpStatus from 'http-status';
+import ApiError from '../../errors/ApiError';
+import cron from 'node-cron';
+import prisma from '../../utils/prisma';
+import { PaymentStatus, Prisma } from '@prisma/client';
+import {
+  ISubscription,
+  ISubscriptionFilterRequest,
+} from './subscription.interface';
+import { IPaginationOptions } from '../../interfaces/pagination';
+import { paginationHelpers } from '../../helpers/paginationHelper';
+import { subscriptionSearchAbleFields } from './subscription.constants';
 
-import { PAYMENT_STATUS } from './subscription.constants'
-import ApiError from '../../errors/ApiError'
+export const startSubscriptionCron = () => {
+  // run at every 12th hour: '0 */12 * * *'
+  cron.schedule('0 */12 * * *', async () => {
+    console.log('⏰ Running subscription check every 12 hours...');
 
-const createSubscription = async (payload: TSubscriptions) => {
-  const session = await mongoose.startSession()
-  session.startTransaction()
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  try {
-    // Check if an unpaid subscription already exists for the user and package
-    const isExist = await Subscription.findOne({
-      user: payload.user,
-      package: payload.package,
-      paymentStatus: PAYMENT_STATUS.unpaid,
+    const tomorrow = new Date();
+    tomorrow.setHours(23, 59, 59, 999);
+
+    try {
+      // 1) Notify about expiring today (paid & not expired)
+      const expiringToday = await prisma.subscription.findMany({
+        where: {
+          expiredAt: { gte: today, lte: tomorrow },
+          isExpired: false,
+          paymentStatus: PaymentStatus.paid,
+        },
+        include: {
+          package: true,
+          user: true,
+        },
+      });
+
+      for (const subscription of expiringToday) {
+        // implement notification function: subscriptionNotifyToUser('WARNING', package, subscription, user)
+        console.log(
+          `⚠️ Subscription expiring soon for user ${subscription.userId} package ${subscription.packageId}`,
+        );
+        // TODO: call your notification util here
+      }
+
+      // 2) Mark as expired (expiredAt < today)
+      const alreadyExpired = await prisma.subscription.findMany({
+        where: {
+          expiredAt: { lt: today },
+          isExpired: false,
+          paymentStatus: PaymentStatus.paid,
+        },
+        include: { user: true },
+      });
+
+      if (alreadyExpired.length > 0) {
+        // update in a transaction
+        const tx = await prisma.$transaction(
+          alreadyExpired.map(s =>
+            prisma.subscription.update({
+              where: { id: s.id },
+              data: { isExpired: true, isDeleted: true, status: 'expired' },
+            }),
+          ),
+        );
+
+        // Optionally clear user.packageExpiry if it equals the expired date
+        for (const s of alreadyExpired) {
+          try {
+            const user = await prisma.user.findUnique({
+              where: { id: s.userId },
+            });
+            if (
+              user &&
+              user.packageExpiry &&
+              user.packageExpiry <= new Date()
+            ) {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { packageExpiry: null },
+              });
+            }
+          } catch (err) {
+            console.warn(
+              'Failed to clear user.packageExpiry for',
+              s.userId,
+              err,
+            );
+          }
+        }
+      }
+
+      console.log(
+        `✅ Subscription cron done: ${expiringToday.length} warnings, ${alreadyExpired.length} marked expired.`,
+      );
+    } catch (error) {
+      console.error('❌ Subscription cron error:', error);
+    }
+  });
+};
+
+/**
+ * Create subscription
+ */
+const createSubscription = async (payload: ISubscription) => {
+  // 1) check existing unpaid subscription for same user & package
+  const existingUnpaid = await prisma.subscription.findFirst({
+    where: {
+      userId: payload.userId,
+      packageId: payload.packageId,
+      paymentStatus: 'unpaid',
       status: 'pending',
-    }).session(session)
+    },
+  });
 
-    if (isExist) {
-      return isExist
-    }
+  if (existingUnpaid) {
+    return existingUnpaid;
+  }
 
-    //  Find the user in the database
-    const user = await User.findById(payload.user).session(session)
-    if (!user) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'User not found!')
-    }
-    if (user.isDeleted) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'Your account is deleted!')
-    }
-    if (user.status === 'blocked') {
-      throw new ApiError(httpStatus.FORBIDDEN, 'Your account is blocked!')
-    }
+  // 2) find user
+  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  if (!user || user.isDeleted)
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  if (user.status === 'blocked')
+    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is blocked!');
 
-    // Find the package in the database
-    const packages = await Package.findById(payload.package).session(session)
-    if (!packages) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Package not found')
-    }
-    if (packages.isDeleted) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Package is already deleted!')
-    }
+  // 3) find package
+  const pkg = await prisma.package.findUnique({
+    where: { id: payload.packageId },
+  });
+  if (!pkg || pkg.isDeleted)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Package not found');
 
-    // Set here subscription type
-    if (packages.type == 'Gold') {
-      payload.type = 'Gold'
-    } else if (packages.type == 'Premium') {
-      payload.type = 'Premium'
-    }
+  // 4) Determine amount & billing cycle expiry
+  const amount = pkg.price;
+  const now = new Date();
+  let expiredAt: Date;
 
-    // set amount here
-    payload.amount = packages.price
+  if (pkg.billingCycle === 'annually') {
+    expiredAt = new Date(now);
+    expiredAt.setFullYear(expiredAt.getFullYear() + 1);
+  } else if (pkg.billingCycle === 'halfYearly') {
+    expiredAt = new Date(now);
+    expiredAt.setMonth(expiredAt.getMonth() + 6);
+  } else if (pkg.billingCycle === 'monthly') {
+    expiredAt = new Date(now);
+    expiredAt.setMonth(expiredAt.getMonth() + 1);
+  } else {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid billing cycle!');
+  }
 
-    // Determine the expiration date based on billing cycle
-    let expiredAt
-    const now = new Date()
+  // 5) Merge payload & create subscription inside transaction, update user's packageExpiry
+  const finalType = payload.type ?? 'basic';
 
-    if (packages.billingCycle === 'yearly') {
-      expiredAt = new Date(now.getTime())
-      expiredAt.setFullYear(expiredAt.getFullYear() + 1) // Adds 1 year
-    } else if (packages.billingCycle === 'monthly') {
-      expiredAt = new Date(now.getTime())
-      expiredAt.setMonth(expiredAt.getMonth() + 1) // Adds 1 month
-    } else {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid billing cycle!')
-    }
+  const result = await prisma.$transaction(async tx => {
+    const created = await tx.subscription.create({
+      data: {
+        userId: payload.userId,
+        packageId: payload.packageId,
+        type: finalType as any,
+        transactionId: payload.transactionId ?? null,
+        amount: amount,
+        paymentStatus: payload.paymentStatus ?? 'unpaid',
+        status: payload.status ?? 'pending',
+        expiredAt: expiredAt,
+      },
+    });
 
-    payload.expiredAt = expiredAt
-
-    // If the user's existing package expiry is still valid, extend it
-    let finalExpiryDate = expiredAt
+    // compute finalExpiryDate if user already had packageExpiry in future
+    let finalExpiryDate = expiredAt;
     if (user.packageExpiry && new Date(user.packageExpiry) > now) {
+      const additionalMs = expiredAt.getTime() - now.getTime();
       finalExpiryDate = new Date(
-        new Date(user.packageExpiry).getTime() +
-          (expiredAt.getTime() - now.getTime()),
-      )
-    } else {
-      finalExpiryDate = expiredAt
+        new Date(user.packageExpiry).getTime() + additionalMs,
+      );
     }
 
-    // Create a new subscription record in the database
-    const result = await Subscription.create([payload], { session })
-    if (!result || result.length === 0) {
-      throw new Error('Failed to create subscription')
-    }
+    await tx.user.update({
+      where: { id: user.id },
+      data: { packageExpiry: finalExpiryDate },
+    });
 
-    // // 📢 Notify the admin about the new subscription
-    // await subscriptionNotifyToAdmin('ADDED', packages, result[0])
+    return created;
+  });
 
-    // // 📩 Notify the user about their subscription purchase
-    // await subscriptionNotifyToUser('ADDED', packages, result[0], user)
+  // optionally notify admin or user here
+  return result;
+};
 
-    // Commit the transaction if everything is successful
-    await session.commitTransaction()
-    session.endSession()
+const getAllSubscription = async (
+  params: ISubscriptionFilterRequest,
+  options: IPaginationOptions,
+  userId: string,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
 
-    return result[0]
-  } catch (error) {
-    await session.abortTransaction()
-    session.endSession()
-    throw error
+  const andConditions: Prisma.SubscriptionWhereInput[] = [
+    { userId, isDeleted: false },
+  ];
+
+  // Search across Subscription and nested User fields
+  if (searchTerm) {
+    andConditions.push({
+      OR: subscriptionSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
   }
-}
 
-const getAllSubscription = async (query: Record<string, any>) => {
-  const subscriptionsModel = new QueryBuilder(
-    Subscription.find().populate([
-      {
-        path: 'package',
-        select: '',
-      },
-      {
-        path: 'user',
-        select: 'firstName lastName email photoUrl occupation',
-      },
-    ]),
-    query,
-  )
-    .search([])
-    .filter()
-    .paginate()
-    .sort()
-    .fields()
+  // Filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
 
-  const data = await subscriptionsModel.modelQuery
-  const meta = await subscriptionsModel.countTotal()
+  const whereConditions: Prisma.SubscriptionWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.subscription.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? {
+            [options.sortBy]: options.sortOrder,
+          }
+        : {
+            createdAt: 'desc',
+          },
+  });
+
+  const total = await prisma.subscription.count({
+    where: whereConditions,
+  });
+
   return {
-    data,
-    meta,
-  }
-}
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
+};
 
 const getSubscriptionById = async (id: string) => {
-  const result = await Subscription.findById(id).populate([
-    {
-      path: 'package',
-      select: '',
+  const result = await prisma.subscription.findUnique({
+    where: { id },
+    include: {
+      package: true,
+      user: { select: { id: true, name: true, email: true, photoUrl: true } },
     },
-    {
-      path: 'user',
-      select: 'firstName lastName email photoUrl occupation',
-    },
-  ])
-  if (!result) {
-    throw new Error('Subscription not found')
+  });
+
+  if (!result || result.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found !');
   }
 
-  // if subscription is already deleted
-  if (result?.isDeleted) {
-    throw new Error('Subscription  already deleted!')
-  }
-
-  return result
-}
+  return result;
+};
 
 const updateSubscription = async (
   id: string,
-  payload: Partial<TSubscriptions>,
+  payload: Partial<ISubscription>,
 ) => {
-  const subscription = await Subscription.findById(id)
-  if (!subscription) {
-    throw new Error('Failed to update subscription')
-  }
+  const subscription = await prisma.subscription.findUnique({ where: { id } });
+  if (!subscription || subscription.isDeleted)
+    throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found');
 
-  // if subscription is already deleted
-  if (subscription?.isDeleted) {
-    throw new Error('Subscription  already deleted!')
-  }
+  const updated = await prisma.subscription.update({
+    where: { id },
+    data: payload,
+  });
 
-  const result = await Subscription.findByIdAndUpdate(id, payload, {
-    new: true,
-  })
-
-  if (!result) {
-    throw new Error('Failed to update subscription')
-  }
-
-  // if subscription is already deleted
-  if (result?.isDeleted) {
-    throw new Error('Subscription  already deleted!')
-  }
-
-  return result
-}
-
-const changeApprovalStatusFromDB = async (id: string, payload: {
-  approveStatus: string
-}) => {
-  const { approveStatus } = payload
-
-  //* if the user is is not exist
-  const subscription = await Subscription.findById(id)
-  if (!subscription) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found!')
-  }
-  if (subscription?.isDeleted) {
-    throw new Error('Subscription  already deleted!')
-  }
-
-  const updateSubscription = await Subscription.findByIdAndUpdate(
-    id,
-    { approveStatus },
-    { new: true },
-  )
-  if (!updateSubscription) {
+  if (!updated)
     throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Subscription not found and failed to update approve status!',
-    )
-  }
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Failed to update subscription',
+    );
 
-  return updateSubscription
-}
+  return updated;
+};
 
 const deleteSubscription = async (id: string) => {
-  const subscription = await Subscription.findById(id)
-  if (!subscription) {
-    throw new Error('Failed to update subscription')
-  }
+  const subscription = await prisma.subscription.findUnique({ where: { id } });
+  if (!subscription || subscription?.isDeleted)
+    throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found');
 
-  // if subscription is already deleted
-  if (subscription?.isDeleted) {
-    throw new Error('Subscription  already deleted!')
-  }
+  const result = await prisma.subscription.update({
+    where: { id },
+    data: { isDeleted: true },
+  });
 
-  const result = await Subscription.findByIdAndUpdate(
-    id,
-    { isDeleted: true },
-    { new: true },
-  )
-
-  if (!result) {
-    throw new Error('Failed to delete subscription')
-  }
-
-  return result
-}
+  return result;
+};
 
 export const subscriptionService = {
   createSubscription,
   getAllSubscription,
   getSubscriptionById,
   updateSubscription,
-  changeApprovalStatusFromDB,
   deleteSubscription,
-}
+};

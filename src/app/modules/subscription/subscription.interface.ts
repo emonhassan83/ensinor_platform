@@ -1,7 +1,19 @@
-import { TSubscriptionType } from './subscription.constants'
+import { PaymentStatus, SubscriptionStatus, SubscriptionType } from "@prisma/client"
 
-export interface ISubscription {
-  user: string
-  type: TSubscriptionType
-  package: string
-}
+export type ISubscriptionFilterRequest = {
+  searchTerm?: string | undefined;
+  type?: string | undefined;
+  paymentStatus?: string | undefined;
+  status?: string | undefined;
+};
+
+export type ISubscription = {
+  userId: string;
+  packageId: string;
+  type?: SubscriptionType;
+  transactionId?: string;
+  amount?: number;
+  paymentStatus?: PaymentStatus;
+  status?: SubscriptionStatus;
+  expiredAt?: Date;
+};
