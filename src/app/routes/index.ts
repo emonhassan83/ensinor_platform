@@ -25,6 +25,7 @@ import { CourseRoutes } from '../modules/course/course.routes';
 import { CourseContentRoutes } from '../modules/courseContent/courseContent.routes';
 import { CourseBundleRoutes } from '../modules/courseBundle/courseBundle.routes';
 import { QuizRoutes } from '../modules/quiz/quiz.routes';
+import { QuestionRoutes } from '../modules/question/question.routes';
 
 const router = express.Router();
 
@@ -92,6 +93,10 @@ const moduleRoutes = [
   {
     path: '/quiz',
     route: QuizRoutes,
+  },
+  {
+    path: '/quiz-questions',
+    route: QuestionRoutes,
   },
   {
     path: '/orders',
