@@ -278,7 +278,7 @@ model Book {
   thumbnails    String
   file          String
   popularity    Int        @default(0)
-  publishedDate DateTime?
+  publishedDate String?
   status        UserStatus @default(pending)
   isDeleted     Boolean    @default(false)
   createdAt     DateTime   @default(now())

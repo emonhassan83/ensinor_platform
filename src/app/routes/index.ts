@@ -19,6 +19,7 @@ import { FaqRoutes } from '../modules/faq/faq.route';
 import { SupportRoutes } from '../modules/support/support.route';
 import { NewsletterRoutes } from '../modules/newsletter/newsletter.route';
 import { SubscriptionRoutes } from '../modules/subscription/subscription.route';
+import { ShopRoutes } from '../modules/shop/shop.routes';
 
 const router = express.Router();
 
@@ -66,6 +67,10 @@ const moduleRoutes = [
   {
     path: '/invitations',
     route: InvitationRoutes,
+  },
+  {
+    path: '/shop',
+    route: ShopRoutes,
   },
   {
     path: '/packages',
