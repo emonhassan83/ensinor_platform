@@ -297,6 +297,7 @@ model Order {
   amount        Float
   status        OrderStatus    @default(pending)
   paymentStatus PaymentStatus  @default(unpaid)
+  paymentMethod PaymentMethod  @default(Stripe)
   transactionId String?
   documents     String[] // Array of document URLs or file paths
   isDeleted     Boolean        @default(false)
