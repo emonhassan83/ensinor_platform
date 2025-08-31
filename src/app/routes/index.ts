@@ -21,6 +21,7 @@ import { NewsletterRoutes } from '../modules/newsletter/newsletter.route';
 import { SubscriptionRoutes } from '../modules/subscription/subscription.route';
 import { ShopRoutes } from '../modules/shop/shop.routes';
 import { OrdersRoutes } from '../modules/orders/orders.route';
+import { CourseRoutes } from '../modules/course/course.routes';
 
 const router = express.Router();
 
@@ -72,6 +73,10 @@ const moduleRoutes = [
   {
     path: '/shop',
     route: ShopRoutes,
+  },
+  {
+    path: '/courses',
+    route: CourseRoutes,
   },
   {
     path: '/orders',
