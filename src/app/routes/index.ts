@@ -32,6 +32,7 @@ import { CertificateRequestRoutes } from '../modules/certificateRequest/certific
 import { CertificateRoutes } from '../modules/certificate/certificate.routes';
 import { EventRoutes } from '../modules/event/event.routes';
 import { EventScheduleRoutes } from '../modules/eventSchedule/eventSchedule.routes';
+import { EventSpeakerRoutes } from '../modules/eventSpeaker/eventSpeaker.routes';
 
 const router = express.Router();
 
@@ -127,6 +128,10 @@ const moduleRoutes = [
   {
     path: '/event-schedules',
     route: EventScheduleRoutes,
+  },
+  {
+    path: '/event-speaker',
+    route: EventSpeakerRoutes,
   },
   {
     path: '/orders',
