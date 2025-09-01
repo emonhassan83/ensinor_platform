@@ -33,6 +33,7 @@ import { CertificateRoutes } from '../modules/certificate/certificate.routes';
 import { EventRoutes } from '../modules/event/event.routes';
 import { EventScheduleRoutes } from '../modules/eventSchedule/eventSchedule.routes';
 import { EventSpeakerRoutes } from '../modules/eventSpeaker/eventSpeaker.routes';
+import { EventBookingRoutes } from '../modules/eventBooking/eventBooking.routes';
 
 const router = express.Router();
 
@@ -132,6 +133,10 @@ const moduleRoutes = [
   {
     path: '/event-speaker',
     route: EventSpeakerRoutes,
+  },
+  {
+    path: '/event-bookings',
+    route: EventBookingRoutes,
   },
   {
     path: '/orders',
