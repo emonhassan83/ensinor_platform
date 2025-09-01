@@ -586,16 +586,15 @@ model Event {
   type           String
   thumbnail      String
   organizedBy    String
-  price          Float
+  price          Int
   location       String
   date           String
   startTime      String
   endTime        String
   description    String
   speakerSlogan  String
-  scheduleSlogan Boolean    @default(false)
+  scheduleSlogan String
   registered     Int        @default(0)
-  status         UserStatus @default(pending)
   isDeleted      Boolean    @default(false)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt

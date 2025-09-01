@@ -30,6 +30,7 @@ import { QuizAttemptRoutes } from '../modules/quizAttempt/quizAttempt.routes';
 import { EnrolledCourseRoutes } from '../modules/enrolledCourse/enrolledCourse.routes';
 import { CertificateRequestRoutes } from '../modules/certificateRequest/certificateRequest.routes';
 import { CertificateRoutes } from '../modules/certificate/certificate.routes';
+import { EventRoutes } from '../modules/event/event.routes';
 
 const router = express.Router();
 
@@ -117,6 +118,10 @@ const moduleRoutes = [
   {
     path: '/certificate',
     route: CertificateRoutes,
+  },
+  {
+    path: '/events',
+    route: EventRoutes,
   },
   {
     path: '/orders',
