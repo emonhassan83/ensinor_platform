@@ -469,7 +469,7 @@ model QuizAttempt {
   totalMarks    Int      @default(0)
   grade         String?
   correctRate   Float    @default(0.0) // % of correct answers
-  isDeleted     Boolean   @default(false)
+  isDeleted     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -481,16 +481,17 @@ model QuizAttempt {
 }
 
 model EnrolledCourse {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   authorId      String
   courseId      String
-  completedRate Int         @default(0)
-  courseMark    String?
-  grade         CourseGrade
-  learningTime  Int         @default(0) // in minutes
-  isComplete    Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  completedRate Int          @default(0)
+  courseMark    Int?         @default(0)
+  grade         CourseGrade?
+  learningTime  Int          @default(0) // in minutes
+  isComplete    Boolean      @default(false)
+  isDeleted     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   author User   @relation(fields: [authorId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
