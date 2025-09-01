@@ -526,13 +526,13 @@ enum CourseGrade {
 }
 
 model CertificateRequest {
-  id         String     @id @default(uuid())
+  id         String                   @id @default(uuid())
   authorId   String // FK to User (student requesting)
   courseId   String // FK to Course
   status     CertificateRequestStatus @default(pending)
-  isComplete Boolean    @default(false)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  isComplete Boolean                  @default(false)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
 
   // Relations
   author User   @relation(fields: [authorId], references: [id])
@@ -579,7 +579,7 @@ enum CertificateStatus {
 
 //* Event Related Models
 model Event {
-  id             String     @id @default(uuid())
+  id             String   @id @default(uuid())
   authorId       String
   title          String
   slogan         String
@@ -594,10 +594,10 @@ model Event {
   description    String
   speakerSlogan  String
   scheduleSlogan String
-  registered     Int        @default(0)
-  isDeleted      Boolean    @default(false)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  registered     Int      @default(0)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   author        User            @relation(fields: [authorId], references: [id])
   eventBooking  EventBooking[]
@@ -612,42 +612,30 @@ model EventSchedule {
   eventId   String
   day       String
   date      String
+  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  event            Event                  @relation(fields: [eventId], references: [id])
-  scheduleSpeakers EventScheduleSpeaker[]
+  event        Event          @relation(fields: [eventId], references: [id])
+  eventSpeaker EventSpeaker[]
 
   @@map("event_schedules")
 }
 
 model EventSpeaker {
-  id         String   @id @default(uuid())
-  eventId    String
-  photo      String?
-  name       String
-  profession String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  event Event @relation(fields: [eventId], references: [id])
-
-  @@map("event_speakers")
-}
-
-model EventScheduleSpeaker {
   id              String   @id @default(uuid())
+  eventId         String
   eventScheduleId String
   name            String
-  profession      String
   photo           String?
-  speaksTime      String
+  profession      String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  event    Event         @relation(fields: [eventId], references: [id])
   schedule EventSchedule @relation(fields: [eventScheduleId], references: [id])
 
-  @@map("event_schedule_speakers")
+  @@map("event_speakers")
 }
 
 model EventBooking {

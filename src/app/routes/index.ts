@@ -31,6 +31,7 @@ import { EnrolledCourseRoutes } from '../modules/enrolledCourse/enrolledCourse.r
 import { CertificateRequestRoutes } from '../modules/certificateRequest/certificateRequest.routes';
 import { CertificateRoutes } from '../modules/certificate/certificate.routes';
 import { EventRoutes } from '../modules/event/event.routes';
+import { EventScheduleRoutes } from '../modules/eventSchedule/eventSchedule.routes';
 
 const router = express.Router();
 
@@ -122,6 +123,10 @@ const moduleRoutes = [
   {
     path: '/events',
     route: EventRoutes,
+  },
+  {
+    path: '/event-schedules',
+    route: EventScheduleRoutes,
   },
   {
     path: '/orders',
