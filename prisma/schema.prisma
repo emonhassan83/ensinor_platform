@@ -415,6 +415,7 @@ model Quiz {
   courseId     String
   deadline     String?
   time         String? // e.g. "30m" or "01:00:00"
+  marks        Int?
   questions    Int      @default(0)
   totalAttempt Int      @default(0)
   isDeleted    Boolean  @default(false)
@@ -465,9 +466,10 @@ model QuizAttempt {
   userId        String
   timeTaken     String? // e.g. "15m", "00:12:45"
   marksObtained Int      @default(0)
-  totalMarks    Int
+  totalMarks    Int      @default(0)
   grade         String?
   correctRate   Float    @default(0.0) // % of correct answers
+  isDeleted     Boolean   @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
