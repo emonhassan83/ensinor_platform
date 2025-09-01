@@ -15,6 +15,16 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const addOptionsToQuestion = catchAsync(async (req, res) => {
+  const result = await QuestionService.addOptionsToQuestion(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Question options insert successfully!',
+    data: result,
+  });
+});
+
 const getByQuizIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, questionFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -40,6 +50,16 @@ const getByIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getOptionsByQuestionId = catchAsync(async (req, res) => {
+  const result = await QuestionService.getOptionsByQuestionId(req.params.questionId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Question options data fetched by id!',
+    data: result,
+  });
+});
+
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await QuestionService.updateIntoDB(
     req.params.id,
@@ -49,6 +69,19 @@ const updateIntoDB = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Question data updated!',
+    data: result,
+  });
+});
+
+const updateOption = catchAsync(async (req, res) => {
+  const result = await QuestionService.updateOption(
+    req.params.optionId,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Question option data updated!',
     data: result,
   });
 });
@@ -63,10 +96,24 @@ const deleteFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const deleteOption = catchAsync(async (req, res) => {
+  const result = await QuestionService.deleteOption(req.params.optionId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Question option data deleted!',
+    data: result,
+  });
+});
+
 export const QuestionController = {
   insertIntoDB,
+  addOptionsToQuestion,
   getByQuizIdFromDB,
   getByIdFromDB,
+  getOptionsByQuestionId,
   updateIntoDB,
+  updateOption,
   deleteFromDB,
+  deleteOption
 };
