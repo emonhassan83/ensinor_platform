@@ -28,6 +28,7 @@ import { QuizRoutes } from '../modules/quiz/quiz.routes';
 import { QuestionRoutes } from '../modules/question/question.routes';
 import { QuizAttemptRoutes } from '../modules/quizAttempt/quizAttempt.routes';
 import { EnrolledCourseRoutes } from '../modules/enrolledCourse/enrolledCourse.routes';
+import { CertificateRequestRoutes } from '../modules/certificateRequest/certificateRequest.routes';
 
 const router = express.Router();
 
@@ -107,6 +108,10 @@ const moduleRoutes = [
   {
     path: '/enrolled-courses',
     route: EnrolledCourseRoutes,
+  },
+  {
+    path: '/certificate-requests',
+    route: CertificateRequestRoutes,
   },
   {
     path: '/orders',

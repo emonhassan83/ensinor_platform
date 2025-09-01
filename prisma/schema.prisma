@@ -529,7 +529,7 @@ model CertificateRequest {
   id         String     @id @default(uuid())
   authorId   String // FK to User (student requesting)
   courseId   String // FK to Course
-  status     UserStatus @default(pending)
+  status     CertificateRequestStatus @default(pending)
   isComplete Boolean    @default(false)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
@@ -539,6 +539,13 @@ model CertificateRequest {
   course Course @relation(fields: [courseId], references: [id])
 
   @@map("certificate_requests")
+}
+
+enum CertificateRequestStatus {
+  pending
+  approved
+  completed
+  denied
 }
 
 model Certificate {
