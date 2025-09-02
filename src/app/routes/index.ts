@@ -41,6 +41,7 @@ import { ReviewRefRoutes } from '../modules/reviewRef/reviewRef.routes';
 import { WithdrawRequestRoutes } from '../modules/withdrawRequest/withdrawRequest.routes';
 import { CVRoutes } from '../modules/cv/cv.routes';
 import { EducationRoutes } from '../modules/education/education.routes';
+import { ExperienceRoutes } from '../modules/experience/experience.routes';
 
 const router = express.Router();
 
@@ -176,6 +177,10 @@ const moduleRoutes = [
   {
     path: '/cv-educations',
     route: EducationRoutes,
+  },
+  {
+    path: '/cv-experiences',
+    route: ExperienceRoutes,
   },
   {
     path: '/packages',
