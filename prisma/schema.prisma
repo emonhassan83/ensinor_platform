@@ -100,6 +100,7 @@ model User {
   verification       Verification?
   companyRequest     CompanyRequest?
   usersOnArticles    UsersOnArticles[]
+  cv                 CV?
 
   @@map("users")
 }
@@ -769,7 +770,7 @@ model Batch {
 
   title       String
   description String
-  logo       String?
+  logo        String?
   category    String
   rarity      String?
   popularity  Int     @default(0)
@@ -791,7 +792,7 @@ model Review {
   modelType   ReviewModelType
   rating      Float
   comment     String
-  isDeleted   Boolean @default(false)
+  isDeleted   Boolean         @default(false)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -816,14 +817,14 @@ model ReviewRef {
 }
 
 model WithdrawRequest {
-  id               String        @id @default(uuid())
+  id               String         @id @default(uuid())
   userId           String
   amount           Float
   stripeTransferId String?
   paymentMethod    PaymentMethod
-  status           WithdrawStatus   @default(pending)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  status           WithdrawStatus @default(pending)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
@@ -838,7 +839,7 @@ enum PaymentMethod {
 
 model CV {
   id          String   @id @default(uuid())
-  author      String
+  userId      String   @unique
   name        String
   designation String
   photo       String
@@ -851,6 +852,8 @@ model CV {
   skills      String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 
   educations   Education[]
   experiences  Experience[]

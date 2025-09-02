@@ -39,6 +39,7 @@ import { BatchRoutes } from '../modules/batch/batch.routes';
 import { ReviewRoutes } from '../modules/review/review.routes';
 import { ReviewRefRoutes } from '../modules/reviewRef/reviewRef.routes';
 import { WithdrawRequestRoutes } from '../modules/withdrawRequest/withdrawRequest.routes';
+import { CVRoutes } from '../modules/cv/cv.routes';
 
 const router = express.Router();
 
@@ -166,6 +167,10 @@ const moduleRoutes = [
   {
     path: '/withdraw-requests',
     route: WithdrawRequestRoutes,
+  },
+  {
+    path: '/cv',
+    route: CVRoutes,
   },
   {
     path: '/packages',
