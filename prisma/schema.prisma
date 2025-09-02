@@ -871,7 +871,7 @@ model Education {
   result      String
   startTime   String
   endTime     String
-  type        String
+  type        String // eg. GPA or CGPA
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
