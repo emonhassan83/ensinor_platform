@@ -37,6 +37,7 @@ import { EventBookingRoutes } from '../modules/eventBooking/eventBooking.routes'
 import { CouponRoutes } from '../modules/coupon/coupon.routes';
 import { BatchRoutes } from '../modules/batch/batch.routes';
 import { ReviewRoutes } from '../modules/review/review.routes';
+import { ReviewRefRoutes } from '../modules/reviewRef/reviewRef.routes';
 
 const router = express.Router();
 
@@ -156,6 +157,10 @@ const moduleRoutes = [
   {
     path: '/reviews',
     route: ReviewRoutes,
+  },
+  {
+    path: '/reviews-ref',
+    route: ReviewRefRoutes,
   },
   {
     path: '/packages',

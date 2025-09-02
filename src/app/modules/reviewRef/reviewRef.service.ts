@@ -3,23 +3,24 @@ import {
   Event,
   Prisma,
   Review,
+  ReviewRef,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IReview, IReviewFilterRequest } from './review.interface';
-import { reviewSearchAbleFields } from './review.constant';
+import { IReviewRef, IReviewRefFilterRequest } from './reviewRef.interface';
+import { reviewRefSearchAbleFields } from './reviewRef.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
-const insertIntoDB = async (payload: IReview) => {
-  const result = await prisma.review.create({
+const insertIntoDB = async (payload: IReviewRef) => {
+  const result = await prisma.reviewRef.create({
     data: payload
   });
 
   if (!result) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Review creation failed!',
+      'Review ref creation failed!',
     );
   }
 
@@ -27,19 +28,19 @@ const insertIntoDB = async (payload: IReview) => {
 };
 
 const getAllFromDB = async (
-  params: IReviewFilterRequest,
+  params: IReviewRefFilterRequest,
   options: IPaginationOptions,
   reference?: string
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.ReviewWhereInput[] = [];
+  const andConditions: Prisma.ReviewRefWhereInput[] = [];
 
   // Search across Package and nested User fields
   if (searchTerm) {
       andConditions.push({
-        OR: reviewSearchAbleFields.map(field => ({
+        OR: reviewRefSearchAbleFields.map(field => ({
           [field]: {
             contains: searchTerm,
             mode: 'insensitive',
@@ -59,11 +60,11 @@ const getAllFromDB = async (
     });
   }
 
-  const whereConditions: Prisma.ReviewWhereInput = {
+  const whereConditions: Prisma.ReviewRefWhereInput = {
     AND: andConditions,
   };
 
-  const result = await prisma.review.findMany({
+  const result = await prisma.reviewRef.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -77,7 +78,7 @@ const getAllFromDB = async (
           },
   });
 
-  const total = await prisma.review.count({
+  const total = await prisma.reviewRef.count({
     where: whereConditions,
   });
 
@@ -91,8 +92,8 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<Review | null> => {
-  const result = await prisma.review.findUnique({
+const getByIdFromDB = async (id: string): Promise<ReviewRef | null> => {
+  const result = await prisma.reviewRef.findUnique({
     where: { id },
     include: {
       author: {
@@ -103,59 +104,57 @@ const getByIdFromDB = async (id: string): Promise<Review | null> => {
           photoUrl: true,
         },
       },
+      review: true,
     },
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Review not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Review ref not found!');
   }
   return result;
 };
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<IReview>
-): Promise<Review> => {
-  const review = await prisma.review.findUnique({
+  payload: Partial<IReviewRef>
+): Promise<ReviewRef> => {
+  const reviewRef = await prisma.reviewRef.findUnique({
     where: { id },
   });
-  if (!review) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Review not found!');
+  if (!reviewRef) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Review ref not found!');
   }
 
-  const result = await prisma.review.update({
+  const result = await prisma.reviewRef.update({
     where: { id },
     data: payload
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Review not updated!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Review ref not updated!');
   }
 
   return result;
 };
 
-const deleteFromDB = async (id: string): Promise<Review> => {
-  const review = await prisma.review.findUniqueOrThrow({
+const deleteFromDB = async (id: string): Promise<ReviewRef> => {
+  const reviewRef = await prisma.reviewRef.findUniqueOrThrow({
     where: { id },
   });
-  if (!review) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Review not found!');
+  if (!reviewRef) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Review ref not found!');
   }
 
-  const result = await prisma.review.update({
+  const result = await prisma.reviewRef.delete({
     where: { id },
-    data: {
-      isDeleted: true,
-    },
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Review not deleted!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Review ref not deleted!');
   }
 
   return result;
 };
 
-export const ReviewService = {
+export const ReviewRefService = {
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,
