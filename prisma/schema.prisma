@@ -791,6 +791,7 @@ model Review {
   modelType   ReviewModelType
   rating      Float
   comment     String
+  isDeleted   Boolean @default(false)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
