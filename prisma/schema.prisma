@@ -769,7 +769,7 @@ model Batch {
 
   title       String
   description String
-  image       String?
+  logo       String?
   category    String
   rarity      String?
   popularity  Int     @default(0)
