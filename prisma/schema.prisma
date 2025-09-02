@@ -819,9 +819,9 @@ model WithdrawRequest {
   id               String        @id @default(uuid())
   userId           String
   amount           Float
-  stripeTransferId String
+  stripeTransferId String?
   paymentMethod    PaymentMethod
-  status           OrderStatus   @default(pending)
+  status           WithdrawStatus   @default(pending)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -1215,6 +1215,12 @@ enum OrderStatus {
   completed
   cancelled
   refunded
+}
+
+enum WithdrawStatus {
+  pending
+  completed
+  cancelled
 }
 
 enum CourseLevel {

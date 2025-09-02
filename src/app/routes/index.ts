@@ -38,6 +38,7 @@ import { CouponRoutes } from '../modules/coupon/coupon.routes';
 import { BatchRoutes } from '../modules/batch/batch.routes';
 import { ReviewRoutes } from '../modules/review/review.routes';
 import { ReviewRefRoutes } from '../modules/reviewRef/reviewRef.routes';
+import { WithdrawRequestRoutes } from '../modules/withdrawRequest/withdrawRequest.routes';
 
 const router = express.Router();
 
@@ -161,6 +162,10 @@ const moduleRoutes = [
   {
     path: '/reviews-ref',
     route: ReviewRefRoutes,
+  },
+  {
+    path: '/withdraw-requests',
+    route: WithdrawRequestRoutes,
   },
   {
     path: '/packages',
