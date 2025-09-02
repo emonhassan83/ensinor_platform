@@ -42,6 +42,7 @@ import { WithdrawRequestRoutes } from '../modules/withdrawRequest/withdrawReques
 import { CVRoutes } from '../modules/cv/cv.routes';
 import { EducationRoutes } from '../modules/education/education.routes';
 import { ExperienceRoutes } from '../modules/experience/experience.routes';
+import { CVCertificateRoutes } from '../modules/cvCertificate/cvCertificate.routes';
 
 const router = express.Router();
 
@@ -181,6 +182,10 @@ const moduleRoutes = [
   {
     path: '/cv-experiences',
     route: ExperienceRoutes,
+  },
+  {
+    path: '/cv-certificate',
+    route: CVCertificateRoutes,
   },
   {
     path: '/packages',
