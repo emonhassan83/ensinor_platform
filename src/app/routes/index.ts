@@ -34,6 +34,7 @@ import { EventRoutes } from '../modules/event/event.routes';
 import { EventScheduleRoutes } from '../modules/eventSchedule/eventSchedule.routes';
 import { EventSpeakerRoutes } from '../modules/eventSpeaker/eventSpeaker.routes';
 import { EventBookingRoutes } from '../modules/eventBooking/eventBooking.routes';
+import { CouponRoutes } from '../modules/coupon/coupon.routes';
 
 const router = express.Router();
 
@@ -141,6 +142,10 @@ const moduleRoutes = [
   {
     path: '/orders',
     route: OrdersRoutes,
+  },
+  {
+    path: '/coupons',
+    route: CouponRoutes,
   },
   {
     path: '/packages',
