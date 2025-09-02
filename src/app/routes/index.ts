@@ -43,6 +43,7 @@ import { CVRoutes } from '../modules/cv/cv.routes';
 import { EducationRoutes } from '../modules/education/education.routes';
 import { ExperienceRoutes } from '../modules/experience/experience.routes';
 import { CVCertificateRoutes } from '../modules/cvCertificate/cvCertificate.routes';
+import { WishlistRoutes } from '../modules/wishlist/wishlist.routes';
 
 const router = express.Router();
 
@@ -222,6 +223,10 @@ const moduleRoutes = [
   {
     path: '/notification',
     route: NotificationRoutes,
+  },
+  {
+    path: '/wishlist',
+    route: WishlistRoutes,
   },
 ];
 
