@@ -47,6 +47,7 @@ import { WishlistRoutes } from '../modules/wishlist/wishlist.routes';
 import { ResourceRoutes } from '../modules/resources/resources.routes';
 import { GradingSystemRoutes } from '../modules/gradingSystem/gradingSystem.routes';
 import { PromoCodeRoutes } from '../modules/promoCode/promoCode.routes';
+import { AffiliateRoutes } from '../modules/affiliates/affiliates.routes';
 
 const router = express.Router();
 
@@ -162,6 +163,10 @@ const moduleRoutes = [
   {
     path: '/promo-code',
     route: PromoCodeRoutes,
+  },
+  {
+    path: '/affiliates',
+    route: AffiliateRoutes,
   },
   {
     path: '/batch',
