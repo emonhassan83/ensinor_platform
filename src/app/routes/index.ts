@@ -49,6 +49,7 @@ import { GradingSystemRoutes } from '../modules/gradingSystem/gradingSystem.rout
 import { PromoCodeRoutes } from '../modules/promoCode/promoCode.routes';
 import { AffiliateRoutes } from '../modules/affiliates/affiliates.routes';
 import { AffiliateSaleRoutes } from '../modules/affiliateSales/affiliateSales.routes';
+import { ChatRoutes } from '../modules/chat/chat.routes';
 
 const router = express.Router();
 
@@ -224,6 +225,10 @@ const moduleRoutes = [
   {
     path: '/articles',
     route: ArticleRoutes,
+  },
+  {
+    path: '/chat',
+    route: ChatRoutes,
   },
   {
     path: '/contents',
