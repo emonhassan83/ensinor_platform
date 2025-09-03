@@ -48,6 +48,7 @@ import { ResourceRoutes } from '../modules/resources/resources.routes';
 import { GradingSystemRoutes } from '../modules/gradingSystem/gradingSystem.routes';
 import { PromoCodeRoutes } from '../modules/promoCode/promoCode.routes';
 import { AffiliateRoutes } from '../modules/affiliates/affiliates.routes';
+import { AffiliateSaleRoutes } from '../modules/affiliateSales/affiliateSales.routes';
 
 const router = express.Router();
 
@@ -167,6 +168,10 @@ const moduleRoutes = [
   {
     path: '/affiliates',
     route: AffiliateRoutes,
+  },
+  {
+    path: '/affiliate-sales',
+    route: AffiliateSaleRoutes,
   },
   {
     path: '/batch',

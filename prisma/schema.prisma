@@ -746,6 +746,8 @@ model Affiliate {
   user           User            @relation(fields: [userId], references: [id])
   affiliateLinks AffiliateLink[]
   affiliateSales AffiliateSale[]
+
+  @@map("affiliates")
 }
 
 model AffiliateLink {
@@ -759,6 +761,8 @@ model AffiliateLink {
 
   affiliate Affiliate @relation(fields: [affiliateId], references: [id])
   course    Course    @relation(fields: [courseId], references: [id])
+
+  @@map("affiliate_links")
 }
 
 model AffiliateSale {
@@ -768,10 +772,13 @@ model AffiliateSale {
   orderId     String
   commission  Float
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   affiliate Affiliate @relation(fields: [affiliateId], references: [id])
   course    Course    @relation(fields: [courseId], references: [id])
   order     Order     @relation(fields: [orderId], references: [id])
+
+  @@map("affiliate_sales")
 }
 
 model Package {
