@@ -45,6 +45,7 @@ import { ExperienceRoutes } from '../modules/experience/experience.routes';
 import { CVCertificateRoutes } from '../modules/cvCertificate/cvCertificate.routes';
 import { WishlistRoutes } from '../modules/wishlist/wishlist.routes';
 import { ResourceRoutes } from '../modules/resources/resources.routes';
+import { GradingSystemRoutes } from '../modules/gradingSystem/gradingSystem.routes';
 
 const router = express.Router();
 
@@ -188,6 +189,10 @@ const moduleRoutes = [
   {
     path: '/cv-certificate',
     route: CVCertificateRoutes,
+  },
+  {
+    path: '/grading-system',
+    route: GradingSystemRoutes,
   },
   {
     path: '/packages',
