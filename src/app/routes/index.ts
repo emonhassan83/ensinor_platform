@@ -46,6 +46,7 @@ import { CVCertificateRoutes } from '../modules/cvCertificate/cvCertificate.rout
 import { WishlistRoutes } from '../modules/wishlist/wishlist.routes';
 import { ResourceRoutes } from '../modules/resources/resources.routes';
 import { GradingSystemRoutes } from '../modules/gradingSystem/gradingSystem.routes';
+import { PromoCodeRoutes } from '../modules/promoCode/promoCode.routes';
 
 const router = express.Router();
 
@@ -157,6 +158,10 @@ const moduleRoutes = [
   {
     path: '/coupons',
     route: CouponRoutes,
+  },
+  {
+    path: '/promo-code',
+    route: PromoCodeRoutes,
   },
   {
     path: '/batch',

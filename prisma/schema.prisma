@@ -396,7 +396,6 @@ model Course {
   enrolledCourse     EnrolledCourse[]
   certificate        Certificate[]
   gradingSystem      GradingSystem[]
-  promoCode          PromoCode[]
   affiliateLink      AffiliateLink[]
   affiliateSale      AffiliateSale[]
 
@@ -716,7 +715,8 @@ model Coupon {
 model PromoCode {
   id        String   @id @default(uuid())
   authorId  String
-  courseId  String
+  modelType   CouponModel
+  referenceId String
   code      String   @unique
   discount  Float
   maxUsage  Int?
@@ -726,7 +726,6 @@ model PromoCode {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  course Course? @relation(fields: [courseId], references: [id])
   author User?   @relation(fields: [authorId], references: [id])
 
   @@map("promo_codes")
