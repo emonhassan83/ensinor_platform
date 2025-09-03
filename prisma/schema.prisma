@@ -128,7 +128,7 @@ model ZoomAccount {
 model ZoomMeeting {
   id            String   @id @default(uuid())
   zoomAccountId String
-  zoomMeetingId String
+   zoomMeetingId String   @unique
   topic         String
   agenda        String
   startUrl      String

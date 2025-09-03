@@ -51,6 +51,7 @@ import { AffiliateRoutes } from '../modules/affiliates/affiliates.routes';
 import { AffiliateSaleRoutes } from '../modules/affiliateSales/affiliateSales.routes';
 import { ChatRoutes } from '../modules/chat/chat.routes';
 import { MessageRoutes } from '../modules/messages/messages.routes';
+import { ZoomRoutes } from '../modules/zoom/zoom.routes';
 
 const router = express.Router();
 
@@ -238,6 +239,10 @@ const moduleRoutes = [
   {
     path: '/contents',
     route: ContentsRoutes,
+  },
+  {
+    path: '/zoom',
+    route: ZoomRoutes,
   },
   {
     path: '/faq',
