@@ -713,20 +713,20 @@ model Coupon {
 }
 
 model PromoCode {
-  id        String   @id @default(uuid())
-  authorId  String
+  id          String      @id @default(uuid())
+  authorId    String
   modelType   CouponModel
   referenceId String
-  code      String   @unique
-  discount  Float
-  maxUsage  Int?
-  usedCount Int      @default(0)
-  expireAt  DateTime
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  code        String      @unique
+  discount    Float
+  maxUsage    Int?
+  usedCount   Int         @default(0)
+  expireAt    DateTime
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  author User?   @relation(fields: [authorId], references: [id])
+  author User? @relation(fields: [authorId], references: [id])
 
   @@map("promo_codes")
 }
@@ -1058,19 +1058,19 @@ enum ChatType {
 }
 
 model Message {
-  id       String   @id @default(uuid())
-  text     String?
-  imageUrl String[]
-  seen     Boolean  @default(false)
-
-  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
-  senderId String
-
-  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  id         String   @id @default(uuid())
+  senderId   String
+  chatId     String
   receiverId String
+  text       String?
+  imageUrl   String[]
+  seen       Boolean  @default(false)
 
-  chat   Chat   @relation(fields: [chatId], references: [id])
-  chatId String @unique
+  sender User @relation("SentMessages", fields: [senderId], references: [id])
+
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  chat Chat @relation(fields: [chatId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1126,7 +1126,7 @@ model GradingSystem {
 
   author User?   @relation(fields: [authorId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
-  grades    Grade[]
+  grades Grade[]
 
   @@map("grading_systems")
 }
