@@ -1061,14 +1061,14 @@ model Message {
   id         String   @id @default(uuid())
   senderId   String
   chatId     String
-  receiverId String
-  text       String?
-  imageUrl   String[]
+  receiverId String?
+  text       String
+  imageUrl   String[] @default([])
   seen       Boolean  @default(false)
 
   sender User @relation("SentMessages", fields: [senderId], references: [id])
 
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiver User? @relation("ReceivedMessages", fields: [receiverId], references: [id])
 
   chat Chat @relation(fields: [chatId], references: [id])
 

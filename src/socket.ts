@@ -1,45 +1,46 @@
-import { Server as HttpServer } from 'http'
-import { Server } from 'socket.io'
-import httpStatus from 'http-status'
-import getUserDetailsFromToken from './app/utils/vaildateUserFromToken'
-import { callbackFn } from './app/utils/CallbackFn'
-import ApiError from './app/errors/ApiError'
-import prisma from './app/utils/prisma'
+import { Server as HttpServer } from 'http';
+import { Server } from 'socket.io';
+import httpStatus from 'http-status';
+import getUserDetailsFromToken from './app/utils/vaildateUserFromToken';
+import { callbackFn } from './app/utils/CallbackFn';
+import ApiError from './app/errors/ApiError';
+import prisma from './app/utils/prisma';
 
+let io: Server;
 const initializeSocketIO = (server: HttpServer) => {
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {
       origin: '*',
     },
-  })
+  });
 
   // Online users
-  const onlineUser = new Set()
+  const onlineUser = new Set();
 
-  io.on('connection', async (socket) => {
-    console.log('connected', socket?.id)
+  io.on('connection', async socket => {
+    console.log('connected', socket?.id);
 
     try {
       // ----------------- get user token -----------------
       const token =
-        socket.handshake.auth?.token || socket.handshake.headers?.token
+        socket.handshake.auth?.token || socket.handshake.headers?.token;
 
-      let user: any
+      let user: any;
       try {
-        user = await getUserDetailsFromToken(token)
+        user = await getUserDetailsFromToken(token);
         if (!user) {
-          throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token')
+          throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token');
         }
       } catch (error) {
-        console.log(error)
-        return
+        console.log(error);
+        return;
       }
 
-      socket.join(user?.id.toString())
-      onlineUser.add(user?.id.toString())
+      socket.join(user?.id.toString());
+      onlineUser.add(user?.id.toString());
 
       // send all online users
-      io.emit('onlineUser', Array.from(onlineUser))
+      io.emit('onlineUser', Array.from(onlineUser));
 
       // ----------------- message-page -----------------
       socket.on('message-page', async (userId, callback) => {
@@ -47,23 +48,23 @@ const initializeSocketIO = (server: HttpServer) => {
           return callbackFn(callback, {
             success: false,
             message: 'userId is required',
-          })
+          });
         }
 
         try {
           const receiverDetails = await prisma.user.findUnique({
             where: { id: userId },
             select: { id: true, email: true, role: true, photoUrl: true },
-          })
+          });
 
           if (!receiverDetails) {
             return callbackFn(callback, {
               success: false,
               message: 'user not found',
-            })
+            });
           }
 
-          socket.emit('user-details', receiverDetails)
+          socket.emit('user-details', receiverDetails);
 
           const getPreMessage = await prisma.message.findMany({
             where: {
@@ -73,13 +74,13 @@ const initializeSocketIO = (server: HttpServer) => {
               ],
             },
             orderBy: { createdAt: 'asc' },
-          })
+          });
 
-          socket.emit('message', getPreMessage || [])
+          socket.emit('message', getPreMessage || []);
         } catch (error: any) {
-          callbackFn(callback, { success: false, message: error.message })
+          callbackFn(callback, { success: false, message: error.message });
         }
-      })
+      });
 
       // ----------------- my chat list -----------------
       socket.on('my-chat-list', async (data, callback) => {
@@ -97,20 +98,20 @@ const initializeSocketIO = (server: HttpServer) => {
                 take: 1,
               },
             },
-          })
+          });
 
-          const myChat = 'chat-list::' + user.id
-          io.emit(myChat, chatList)
+          const myChat = 'chat-list::' + user.id;
+          io.emit(myChat, chatList);
 
-          callbackFn(callback, { success: true, message: chatList })
+          callbackFn(callback, { success: true, message: chatList });
         } catch (error: any) {
-          callbackFn(callback, { success: false, message: error.message })
+          callbackFn(callback, { success: false, message: error.message });
         }
-      })
+      });
 
       // ----------------- send-message -----------------
       socket.on('send-message', async (payload, callback) => {
-        payload.senderId = user.id
+        payload.senderId = user.id;
 
         let chat = await prisma.chat.findFirst({
           where: {
@@ -118,7 +119,7 @@ const initializeSocketIO = (server: HttpServer) => {
               every: { userId: { in: [payload.senderId, payload.receiverId] } },
             },
           },
-        })
+        });
 
         if (!chat) {
           chat = await prisma.chat.create({
@@ -131,7 +132,7 @@ const initializeSocketIO = (server: HttpServer) => {
                 ],
               },
             },
-          })
+          });
         }
 
         const result = await prisma.message.create({
@@ -140,46 +141,54 @@ const initializeSocketIO = (server: HttpServer) => {
             senderId: payload.senderId,
             receiverId: payload.receiverId,
             text: payload.text,
-            imageUrl: payload.imageUrl
+            imageUrl: payload.imageUrl,
           },
-        })
+        });
 
-        const senderMessage = 'new-message::' + chat.id
-        io.emit(senderMessage, result)
+        const senderMessage = 'new-message::' + chat.id;
+        io.emit(senderMessage, result);
 
         callbackFn(callback, {
           statusCode: httpStatus.OK,
           success: true,
           message: 'Message sent successfully!',
           data: result,
-        })
-      })
+        });
+      });
 
       // ----------------- typing -----------------
-      socket.on('typing', (data) => {
-        const chat = 'typing::' + data.chatId.toString()
-        const message = user?.name + ' is typing...'
-        socket.emit(chat, { message })
-      })
+      socket.on('typing', data => {
+        const chat = 'typing::' + data.chatId.toString();
+        const message = user?.name + ' is typing...';
+        socket.emit(chat, { message });
+      });
 
-      socket.on('stopTyping', (data) => {
-        const chat = 'stopTyping::' + data.chatId.toString()
-        const message = user?.name + ' stopped typing...'
-        socket.emit(chat, { message })
-      })
+      socket.on('stopTyping', data => {
+        const chat = 'stopTyping::' + data.chatId.toString();
+        const message = user?.name + ' stopped typing...';
+        socket.emit(chat, { message });
+      });
 
       // ----------------- disconnect -----------------
       socket.on('disconnect', () => {
-        onlineUser.delete(user?.id.toString())
-        io.emit('onlineUser', Array.from(onlineUser))
-        console.log('disconnect user ', socket.id)
-      })
+        onlineUser.delete(user?.id.toString());
+        io.emit('onlineUser', Array.from(onlineUser));
+        console.log('disconnect user ', socket.id);
+      });
     } catch (error) {
-      console.error('-- socket.io connection error --', error)
+      console.error('-- socket.io connection error --', error);
     }
-  })
+  });
 
-  return io
-}
+  return io;
+};
 
-export default initializeSocketIO
+// Getter to use io in service functions
+export const getIO = (): Server => {
+  if (!io) {
+    throw new Error('Socket.io not initialized!');
+  }
+  return io;
+};
+
+export default initializeSocketIO;

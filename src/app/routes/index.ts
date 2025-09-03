@@ -50,6 +50,7 @@ import { PromoCodeRoutes } from '../modules/promoCode/promoCode.routes';
 import { AffiliateRoutes } from '../modules/affiliates/affiliates.routes';
 import { AffiliateSaleRoutes } from '../modules/affiliateSales/affiliateSales.routes';
 import { ChatRoutes } from '../modules/chat/chat.routes';
+import { MessageRoutes } from '../modules/messages/messages.routes';
 
 const router = express.Router();
 
@@ -229,6 +230,10 @@ const moduleRoutes = [
   {
     path: '/chat',
     route: ChatRoutes,
+  },
+  {
+    path: '/messages',
+    route: MessageRoutes,
   },
   {
     path: '/contents',
