@@ -3,6 +3,7 @@ import app from './app';
 import config from './app/config';
 import initializeSocketIO from './socket';
 import { seeder } from './app/seeder/seed';
+import { scheduleExpiredUserCleanup } from './app/utils/cleanupExpiredUsers';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
 
@@ -10,7 +11,8 @@ const main = async () => {
   try {
     // default task added
     seeder.seedAdmin();
-    seeder.seedContents()
+    seeder.seedContents();
+    scheduleExpiredUserCleanup();
 
     server = app.listen(Number(config.port), config.ip as string, () => {
       console.log(
@@ -46,4 +48,3 @@ process.on('uncaughtException', error => {
   console.log('uncaughtException detected server shutting down 😈');
   process.exit(1);
 });
-

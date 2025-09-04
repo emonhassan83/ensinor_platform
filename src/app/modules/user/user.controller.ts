@@ -38,7 +38,6 @@ const createCompanyAdmin = catchAsync(async (req: Request, res: Response) => {
     });
   }
   const result = await UserServices.createCompanyAdmin(req.body);
-  const sendOtp = await otpServices.resendOtp(result?.email);
   const { id, name, email, photoUrl, contactNo, status } = result;
 
   sendResponse(res, {
@@ -46,8 +45,12 @@ const createCompanyAdmin = catchAsync(async (req: Request, res: Response) => {
     success: true,
     message: 'Company admin profile created successfully!',
     data: {
-      user: { id, name, email, photoUrl, contactNo, status },
-      otpInfo: sendOtp,
+      id,
+      name,
+      email,
+      photoUrl,
+      contactNo,
+      status,
     },
   });
 });
@@ -69,9 +72,9 @@ const createBusinessInstructor = catchAsync(
       success: true,
       message: 'Business instructor profile created successfully!',
       data: {
-      user: { id, name, email, photoUrl, contactNo, status },
-      otpInfo: sendOtp,
-    },
+        user: { id, name, email, photoUrl, contactNo, status },
+        otpInfo: sendOtp,
+      },
     });
   },
 );
@@ -91,7 +94,7 @@ const createEmployee = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Employee profile created successfully!',
-     data: {
+    data: {
       user: { id, name, email, photoUrl, contactNo, status },
       otpInfo: sendOtp,
     },
@@ -113,7 +116,7 @@ const createInstructor = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Instructor profile created successfully!',
-     data: {
+    data: {
       user: { id, name, email, photoUrl, contactNo, status },
       otpInfo: sendOtp,
     },
@@ -135,7 +138,7 @@ const createStudent = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Student profile created successfully!',
-     data: {
+    data: {
       user: { id, name, email, photoUrl, contactNo, status },
       otpInfo: sendOtp,
     },
@@ -157,14 +160,14 @@ const getAllUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getUserById = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.geUserById(req.params.id)
+  const result = await UserServices.geUserById(req.params.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'User fetched successfully',
     data: result,
-  })
-})
+  });
+});
 
 const getMyProfile = catchAsync(async (req: Request, res: Response) => {
   const result = await UserServices.geUserById(req.user!.userId);
@@ -182,7 +185,7 @@ const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
     req.body.photoUrl = await uploadToS3({
       file: req.file,
       fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    })
+    });
   }
 
   const result = await UserServices.updateAProfile(req.user!.userId, req.body);
@@ -200,7 +203,7 @@ const updateAProfile = catchAsync(async (req: Request, res: Response) => {
     req.body.photoUrl = await uploadToS3({
       file: req.file,
       fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    })
+    });
   }
   const result = await UserServices.updateAProfile(req.params.id, req.body);
 
@@ -226,26 +229,26 @@ const changeProfileStatus = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deleteAUser = catchAsync(async (req, res) => {
-  const result = await UserServices.deleteAProfile(req.params.id)
+  const result = await UserServices.deleteAProfile(req.params.id);
 
   sendResponse(res, {
     success: true,
     statusCode: 200,
     message: 'User delete successfully!',
     data: result,
-  })
-})
+  });
+});
 
 const deleteMyProfile = catchAsync(async (req, res) => {
-  const result = await UserServices.deleteAProfile(req.user!.userId)
+  const result = await UserServices.deleteAProfile(req.user!.userId);
 
   sendResponse(res, {
     success: true,
     statusCode: 200,
     message: 'My profile delete successfully!',
     data: result,
-  })
-})
+  });
+});
 
 export const UserController = {
   registerAUser,
@@ -261,5 +264,5 @@ export const UserController = {
   updateMyProfile,
   updateAProfile,
   deleteAUser,
-  deleteMyProfile
+  deleteMyProfile,
 };

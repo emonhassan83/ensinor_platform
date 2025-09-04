@@ -137,16 +137,16 @@ const resendOtp = async (email: string) => {
           <p style="color: #555; margin-top: 10px;">Dear ${user?.name},</p>
           <p style="color: #555;">Use the following One-Time Password (OTP) to proceed with your request. This OTP is valid for a limited time.</p>
           <div style="text-align: center; margin: 20px 0;">
-            <span style="background-color: #9C6498; color: white; padding: 10px 20px; font-size: 18px; font-weight: bold; border-radius: 5px; display: inline-block;">
+            <span style="padding: 10px 20px; font-size: 18px; font-weight: bold; border-radius: 5px; display: inline-block;">
               ${otp}
             </span>
           </div>
           <p style="color: #555;">This OTP is valid until: <strong>${expiresAt.toLocaleString()}</strong></p>
           <p style="color: #555;">If you did not request this OTP, please ignore this email.</p>
-          <p style="color: #555;">Thank you,<br/>Dear Henrietta Team</p>
+          <p style="color: #555;">Thank you,<br/>Ensinor Team</p>
         </div>
         <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
-          <p>&copy; ${new Date().getFullYear()} Dear Henrietta. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Ensinor. All rights reserved.</p>
         </div>
       </div>
     `,

@@ -34,6 +34,7 @@ export type IRegisterUser = {
   };
   password: string;
   confirmPassword: string;
+  photoUrl?: string;
 };
 
 // Interface for User response, excluding password for API responses

@@ -21,26 +21,83 @@ import { paginationHelpers } from '../../helpers/paginationHelper';
 const registerAUser = async (
   payload: IRegisterUser,
 ): Promise<IUserResponse> => {
-  const { password, confirmPassword } = payload;
-  if (password != confirmPassword) {
+  console.log(payload);
+
+  const { password, confirmPassword, user } = payload;
+
+  if (password !== confirmPassword) {
     throw new ApiError(
       httpStatus.CONFLICT,
-      'User password and confirm password dose not match!',
+      'User password and confirm password do not match!',
     );
   }
-  const hashPassword = await hashedPassword(password);
 
-  const user = await prisma.user.create({
-    data: {
-      name: payload.user.name,
-      email: payload.user.email,
-      password: hashPassword,
-      role: UserRole.student,
-      registerWith: RegisterWith.credentials,
-    },
+  const existingUser = await prisma.user.findUnique({
+    where: { email: user.email },
+    include: { verification: true },
   });
 
-  return user;
+  if (existingUser) {
+    if (existingUser.isDeleted) {
+      return prisma.user.update({
+        where: { email: user.email },
+        data: {
+          ...user,
+          password: await hashedPassword(password),
+          photoUrl: payload.photoUrl,
+          isDeleted: false,
+          expireAt: new Date(Date.now() + 30 * 60 * 1000), // reset 30 min timer
+          needsPasswordChange: false,
+        },
+      });
+    }
+
+    if (existingUser.verification && !existingUser.verification.status) {
+      return prisma.user.update({
+        where: { email: user.email },
+        data: {
+          ...user,
+          password: await hashedPassword(password),
+          photoUrl: payload.photoUrl,
+          expireAt: new Date(Date.now() + 30 * 60 * 1000), // reset 30 min timer
+          needsPasswordChange: false,
+        },
+      });
+    }
+
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'User already exists with this email',
+    );
+  }
+
+  const hashPassword = await hashedPassword(password);
+
+  // transaction ensures both user + verification created
+  const newUser = await prisma.$transaction(async tx => {
+    const userRecord = await tx.user.create({
+      data: {
+        name: user.name,
+        email: user.email,
+        password: hashPassword,
+        photoUrl: payload.photoUrl,
+        role: UserRole.student,
+        registerWith: RegisterWith.credentials,
+        expireAt: new Date(Date.now() + 30 * 60 * 1000), // auto-delete marker
+        needsPasswordChange: false,
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // OTP expiry 5 min
+            status: false,
+          },
+        },
+      },
+    });
+    return userRecord;
+  });
+
+  return newUser;
 };
 
 const createCompanyAdmin = async (
@@ -60,8 +117,8 @@ const createCompanyAdmin = async (
         verification: {
           create: {
             otp: '',
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
-            status: false,
+            expiresAt: null,
+            status: true,
           },
         },
       },
