@@ -8,6 +8,28 @@ import pick from '../../utils/pick';
 import { otpServices } from '../otp/otp.service';
 import { uploadToS3 } from '../../utils/s3';
 
+const registerAUser = catchAsync(async (req: Request, res: Response) => {
+  if (req?.file) {
+    req.body.photoUrl = await uploadToS3({
+      file: req.file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+  }
+  const result = await UserServices.registerAUser(req.body);
+  const sendOtp = await otpServices.resendOtp(result?.email);
+  const { id, name, email, photoUrl, contactNo, status } = result;
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Company admin profile created successfully!',
+    data: {
+      user: { id, name, email, photoUrl, contactNo, status },
+      otpInfo: sendOtp,
+    },
+  });
+});
+
 const createCompanyAdmin = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
     req.body.photoUrl = await uploadToS3({
@@ -226,6 +248,7 @@ const deleteMyProfile = catchAsync(async (req, res) => {
 })
 
 export const UserController = {
+  registerAUser,
   createCompanyAdmin,
   createBusinessInstructor,
   createEmployee,

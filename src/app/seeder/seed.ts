@@ -1,4 +1,4 @@
-import { RegisterWith, UserRole } from '@prisma/client';
+import { RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
 import { findAdmin } from '../utils/findAdmin';
@@ -20,6 +20,7 @@ const seedAdmin = async () => {
         role: UserRole.super_admin,
         contactNo: '87623456778',
         registerWith: RegisterWith.credentials,
+        status: UserStatus.active,
         verification: {
           create: {
             otp: '0',

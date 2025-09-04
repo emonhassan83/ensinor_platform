@@ -11,6 +11,8 @@ const router = express.Router();
 const storage = memoryStorage();
 const upload = multer({ storage });
 
+router.get('/:id', auth(UserRole.super_admin), UserController.getUserById);
+
 router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
 
 router.get(
@@ -24,6 +26,14 @@ router.get(
     UserRole.student,
   ),
   UserController.getMyProfile,
+);
+
+router.post(
+  '/register',
+  upload.single('image'),
+  parseData(),
+  validateRequest(UserValidation.registerAUser),
+  UserController.registerAUser,
 );
 
 router.post(
@@ -78,14 +88,6 @@ router.patch(
 );
 
 router.put(
-  '/:id',
-  auth(UserRole.super_admin),
-  upload.single('image'),
-  parseData(),
-  UserController.updateAProfile,
-);
-
-router.patch(
   '/my-profile',
   auth(
     UserRole.super_admin,
@@ -98,6 +100,14 @@ router.patch(
   upload.single('image'),
   parseData(),
   UserController.updateMyProfile,
+);
+
+router.put(
+  '/:id',
+  auth(UserRole.super_admin),
+  upload.single('image'),
+  parseData(),
+  UserController.updateAProfile,
 );
 
 router.delete('/:id', auth(UserRole.super_admin), UserController.deleteAUser);

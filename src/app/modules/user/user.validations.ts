@@ -4,6 +4,20 @@ import { UserStatus } from '@prisma/client';
 // ----------------------
 // Company Admin Creation
 // ----------------------
+const registerAUser = z.object({
+  body: z.object({
+    password: z.string({ required_error: 'Password is required!' }),
+    confirmPassword: z.string({ required_error: 'Confirm password is required!' }),
+    user: z.object({
+      name: z.string({ required_error: 'Name is required!' }),
+      email: z.string().email('Invalid email address')
+    })
+  }),
+});
+
+// ----------------------
+// Company Admin Creation
+// ----------------------
 const createCompanyAdmin = z.object({
   body: z.object({
     password: z.string({ required_error: 'Password is required!' }),
@@ -137,6 +151,7 @@ const changeProfileStatus = z.object({
 });
 
 export const UserValidation = {
+  registerAUser,
   createCompanyAdmin,
   createBusinessInstructor,
   createEmployee,

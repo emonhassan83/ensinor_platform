@@ -15,6 +15,7 @@ router.post(
     UserRole.business_instructors,
     UserRole.employee,
     UserRole.company_admin,
+    UserRole.super_admin
   ),
   validateRequest(CompanyRequestValidation.createValidationSchema),
   CompanyRequestController.insertIntoDB,

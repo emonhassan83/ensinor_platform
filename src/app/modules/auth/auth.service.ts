@@ -59,13 +59,14 @@ const loginUser = async (payload: TLoginUser) => {
     config.jwt_refresh_expires_in as TExpiresIn,
   );
 
-  // save FCM token if provided
-  if (payload.fcmToken) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { fcmToken: payload.fcmToken },
-    });
-  }
+// Update lastActive + save FCM token if provided
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastActive: new Date(),
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  });
 
   return {
     accessToken,
@@ -653,10 +654,10 @@ const forgetPassword = async (payload: { email: string }) => {
           </div>
           <p style="color: #555;">This OTP is valid until: <strong>${expiresAt.toLocaleString()}</strong></p>
           <p style="color: #555;">If you did not request this OTP, please ignore this email.</p>
-          <p style="color: #555;">Thank you,<br/>Dear Henrietta Team</p>
+          <p style="color: #555;">Thank you,<br/>Dear Ensinor Team</p>
         </div>
         <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #999;">
-          <p>&copy; ${new Date().getFullYear()} Dear Henrietta. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Dear Ensinor. All rights reserved.</p>
         </div>
       </div>
     `,

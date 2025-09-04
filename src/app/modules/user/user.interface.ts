@@ -26,6 +26,16 @@ export type IUser = {
   updatedAt: Date;
 };
 
+// Interface for User, aligned with Prisma User model
+export type IRegisterUser = {
+  user: {
+    name: string;
+    email: string;
+  };
+  password: string;
+  confirmPassword: string;
+};
+
 // Interface for User response, excluding password for API responses
 export type IUserResponse = Omit<IUser, 'password'>;
 

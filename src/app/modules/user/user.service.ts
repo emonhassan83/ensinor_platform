@@ -2,14 +2,50 @@ import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import { hashedPassword } from './user.utils';
-import { IBusinessInstructor, ICompanyAdmin, IEmployee, IInstructor, IStudent, IUserFilterRequest, IUserResponse } from './user.interface';
+import {
+  IBusinessInstructor,
+  ICompanyAdmin,
+  IEmployee,
+  IInstructor,
+  IRegisterUser,
+  IStudent,
+  IUserFilterRequest,
+  IUserResponse,
+} from './user.interface';
 import { userSearchableFields } from './user.constant';
 import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 
-const createCompanyAdmin = async (payload: ICompanyAdmin): Promise<IUserResponse> => {
+const registerAUser = async (
+  payload: IRegisterUser,
+): Promise<IUserResponse> => {
+  const { password, confirmPassword } = payload;
+  if (password != confirmPassword) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'User password and confirm password dose not match!',
+    );
+  }
+  const hashPassword = await hashedPassword(password);
+
+  const user = await prisma.user.create({
+    data: {
+      name: payload.user.name,
+      email: payload.user.email,
+      password: hashPassword,
+      role: UserRole.student,
+      registerWith: RegisterWith.credentials,
+    },
+  });
+
+  return user;
+};
+
+const createCompanyAdmin = async (
+  payload: ICompanyAdmin,
+): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
@@ -34,7 +70,7 @@ const createCompanyAdmin = async (payload: ICompanyAdmin): Promise<IUserResponse
     await transactionClient.companyAdmin.create({
       data: {
         userId: user.id,
-        ...payload.companyAdmin
+        ...payload.companyAdmin,
       },
     });
 
@@ -116,7 +152,9 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
   return result;
 };
 
-const createInstructor = async (payload: IInstructor): Promise<IUserResponse> => {
+const createInstructor = async (
+  payload: IInstructor,
+): Promise<IUserResponse> => {
   const hashPassword = await hashedPassword(payload.password);
 
   const result = await prisma.$transaction(async transactionClient => {
@@ -141,7 +179,7 @@ const createInstructor = async (payload: IInstructor): Promise<IUserResponse> =>
     await transactionClient.instructor.create({
       data: {
         userId: user.id,
-        ...payload.instructor
+        ...payload.instructor,
       },
     });
 
@@ -168,7 +206,7 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
     await transactionClient.student.create({
       data: {
         userId: user.id,
-        ...payload.student
+        ...payload.student,
       },
     });
 
@@ -277,7 +315,7 @@ const geUserById = async (userId: string) => {
   const userData = await prisma.user.findUnique({
     where: {
       id: userId,
-      status: UserStatus.active,
+      isDeleted: false,
     },
     select: {
       id: true,
@@ -348,7 +386,10 @@ const updateAProfile = async (userId: string, payload: any) => {
     where: {
       id: userId,
     },
-    data: payload.user,
+    data: {
+      ...payload.user,
+      photoUrl: payload.photoUrl,
+    },
   });
 
   // Update role-specific profile
@@ -356,45 +397,68 @@ const updateAProfile = async (userId: string, payload: any) => {
 
   switch (user.role) {
     case UserRole.super_admin:
-      profileData = await prisma.superAdmin.update({
+      profileData = await prisma.superAdmin.upsert({
         where: { userId: user.id },
-        data: payload.superAdmin ?? {},
+        update: payload.superAdmin ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.superAdmin ?? {}),
+        },
       });
       break;
 
     case UserRole.company_admin:
-      profileData = await prisma.companyAdmin.update({
+      profileData = await prisma.companyAdmin.upsert({
         where: { userId: user.id },
-        data: payload.companyAdmin ?? {},
+        update: payload.companyAdmin ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.companyAdmin ?? {}),
+        },
       });
       break;
 
     case UserRole.business_instructors:
-      profileData = await prisma.businessInstructor.update({
+      profileData = await prisma.businessInstructor.upsert({
         where: { userId: user.id },
-        data: payload.businessInstructor ?? {},
+        update: payload.businessInstructor ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.businessInstructor ?? {}),
+        },
       });
       break;
 
     case UserRole.employee:
-      profileData = await prisma.employee.update({
+      profileData = await prisma.employee.upsert({
         where: { userId: user.id },
-        data: payload.employee ?? {},
+        update: payload.employee ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.employee ?? {}),
+        },
       });
       break;
 
     case UserRole.student:
-      // Handle optional array and string fields
-      profileData = await prisma.student.update({
+      profileData = await prisma.student.upsert({
         where: { userId: user.id },
-        data: payload.student ?? {},
+        update: payload.student ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.student ?? {}),
+        },
       });
       break;
 
     case UserRole.instructor:
-      profileData = await prisma.instructor.update({
+      profileData = await prisma.instructor.upsert({
         where: { userId: user.id },
-        data: payload.instructor ?? {},
+        update: payload.instructor ?? {},
+        create: {
+          userId: user.id,
+          ...(payload.instructor ?? {}),
+        },
       });
       break;
 
@@ -432,6 +496,7 @@ const deleteAProfile = async (userId: string) => {
 };
 
 export const UserServices = {
+  registerAUser,
   createCompanyAdmin,
   createBusinessInstructor,
   createEmployee,
