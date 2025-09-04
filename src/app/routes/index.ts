@@ -52,6 +52,7 @@ import { AffiliateSaleRoutes } from '../modules/affiliateSales/affiliateSales.ro
 import { ChatRoutes } from '../modules/chat/chat.routes';
 import { MessageRoutes } from '../modules/messages/messages.routes';
 import { ZoomRoutes } from '../modules/zoom/zoom.routes';
+import { MeetingAssignmentRoutes } from '../modules/meetingAssignment/meetingAssignment.routes';
 
 const router = express.Router();
 
@@ -243,6 +244,10 @@ const moduleRoutes = [
   {
     path: '/zoom',
     route: ZoomRoutes,
+  },
+  {
+    path: '/meeting-assignments',
+    route: MeetingAssignmentRoutes,
   },
   {
     path: '/faq',
