@@ -62,47 +62,51 @@ model User {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  superAdmin         SuperAdmin?
-  companyAdmin       CompanyAdmin?
-  businessInstructor BusinessInstructor?
-  employee           Employee?
-  instructor         Instructor?
-  student            Student?
-  subscription       Subscription?
-  payment            Payment?
-  review             Review?
-  reviewRef          ReviewRef?
-  notification       Notification[]
-  messagesSent       Message[]            @relation("SentMessages")
-  messagesReceived   Message[]            @relation("ReceivedMessages")
-  chatParticipant    ChatParticipant[]
-  book               Book[]
-  order              Order[]
-  course             Course[]
-  event              Event[]
-  eventBooking       EventBooking[]
-  article            Article[]
-  content            Content[]
-  batch              Batch[]
-  createdCoupons     Coupon[]             @relation("CouponCreated")
-  usedCoupons        Coupon[]             @relation("CouponUsedBy")
-  quizAttempt        QuizAttempt[]
-  certificateRequest CertificateRequest[]
-  department         Department[]
-  invitation         Invitation[]
-  enrolledCourse     EnrolledCourse[]
-  certificate        Certificate[]
-  wishlist           Wishlist[]
-  withdrawRequest    WithdrawRequest[]
-  gradingSystem      GradingSystem[]
-  bundlesAuthored    CourseBundle[]       @relation("BundleAuthor")
-  verification       Verification?
-  companyRequest     CompanyRequest?
-  usersOnArticles    UsersOnArticles[]
-  cv                 CV?
-  zoomAccount        ZoomAccount[]
-  promoCode          PromoCode[]
-  affiliate          Affiliate[]
+  superAdmin                 SuperAdmin?
+  companyAdmin               CompanyAdmin?
+  businessInstructor         BusinessInstructor?
+  employee                   Employee?
+  instructor                 Instructor?
+  student                    Student?
+  subscription               Subscription?
+  payment                    Payment?
+  reviewRef                  ReviewRef?
+  notification               Notification[]
+  messagesSent               Message[]            @relation("SentMessages")
+  messagesReceived           Message[]            @relation("ReceivedMessages")
+  chatParticipant            ChatParticipant[]
+  book                       Book[]
+  order                      Order[]
+  course                     Course[]
+  event                      Event[]
+  eventBooking               EventBooking[]
+  article                    Article[]
+  content                    Content[]
+  batch                      Batch[]
+  createdCoupons             Coupon[]             @relation("CouponCreated")
+  usedCoupons                Coupon[]             @relation("CouponUsedBy")
+  quizAttempt                QuizAttempt[]
+  certificateRequest         CertificateRequest[]
+  department                 Department[]
+  invitation                 Invitation[]
+  enrolledCourse             EnrolledCourse[]
+  certificate                Certificate[]
+  wishlist                   Wishlist[]
+  withdrawRequest            WithdrawRequest[]
+  gradingSystem              GradingSystem[]
+  bundlesAuthored            CourseBundle[]       @relation("BundleAuthor")
+  verification               Verification?
+  companyRequest             CompanyRequest?
+  usersOnArticles            UsersOnArticles[]
+  cv                         CV?
+  zoomAccount                ZoomAccount[]
+  promoCode                  PromoCode[]
+  affiliate                  Affiliate[]
+  meetingAssignmentsAuthored MeetingAssignment[]  @relation("MeetingAssignmentsAuthored")
+  meetingAssignmentsJoined   MeetingAssignment[]  @relation("MeetingAssignmentsJoined")
+  reviewId                   String?
+  reviewProfileReview        Review?              @relation("AuthorProfileReviews")
+  userReview                 Review[]             @relation("UserReviews")
 
   @@map("users")
 }
@@ -128,7 +132,7 @@ model ZoomAccount {
 model ZoomMeeting {
   id            String   @id @default(uuid())
   zoomAccountId String
-   zoomMeetingId String   @unique
+  zoomMeetingId String   @unique
   topic         String
   agenda        String
   startUrl      String
@@ -141,9 +145,38 @@ model ZoomMeeting {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  zoomAccount ZoomAccount @relation(fields: [zoomAccountId], references: [id])
+  zoomAccount       ZoomAccount         @relation(fields: [zoomAccountId], references: [id])
+  meetingAssignment MeetingAssignment[]
 
   @@map("zoom_meetings")
+}
+
+model MeetingAssignment {
+  id            String              @id @default(uuid())
+  authorId      String
+  modelType     AssignmentModelType
+  courseId      String?
+  eventId       String?
+  userId        String?
+  zoomMeetingId String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  // Relations
+  zoomMeeting ZoomMeeting @relation(fields: [zoomMeetingId], references: [id])
+  course      Course?     @relation(fields: [courseId], references: [id])
+  event       Event?      @relation(fields: [eventId], references: [id])
+  // User Relations
+  author      User        @relation("MeetingAssignmentsAuthored", fields: [authorId], references: [id])
+  user        User?       @relation("MeetingAssignmentsJoined", fields: [userId], references: [id])
+
+  @@map("meeting_assignments")
+}
+
+enum AssignmentModelType {
+  course
+  event
+  user
 }
 
 model SuperAdmin {
@@ -325,28 +358,40 @@ model Book {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  author User @relation(fields: [authorId], references: [id]) // FK relation to User table
+  author    User        @relation(fields: [authorId], references: [id]) // FK relation to User table
+  order     Order[]
+  coupon    Coupon[]
+  promoCode PromoCode[]
+  wishlist  Wishlist[]
+  resource  Resource[]
 
   @@map("books")
 }
 
 model Order {
-  id            String         @id @default(uuid())
-  userId        String
-  modelType     OrderModelType
-  reference     String
-  amount        Float
-  status        OrderStatus    @default(pending)
-  paymentStatus PaymentStatus  @default(unpaid)
-  paymentMethod PaymentMethod  @default(Stripe)
-  transactionId String?
-  documents     String[] // Array of document URLs or file paths
-  isDeleted     Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  userId         String
+  modelType      OrderModelType
+  bookId         String?
+  courseId       String?
+  courseBundleId String?
+  amount         Float
+  status         OrderStatus    @default(pending)
+  paymentStatus  PaymentStatus  @default(unpaid)
+  paymentMethod  PaymentMethod  @default(Stripe)
+  transactionId  String?
+  documents      String[] // Array of document URLs or file paths
+  isDeleted      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   user          User            @relation(fields: [userId], references: [id])
   affiliateSale AffiliateSale[]
+
+  book         Book?         @relation(fields: [bookId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
+  courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
+  payment      Payment[]
 
   @@map("orders")
 }
@@ -398,6 +443,13 @@ model Course {
   gradingSystem      GradingSystem[]
   affiliateLink      AffiliateLink[]
   affiliateSale      AffiliateSale[]
+  meetingAssignment  MeetingAssignment[]
+  order              Order[]
+  coupon             Coupon[]
+  promoCode          PromoCode[]
+  review             Review[]
+  wishlist           Wishlist[]
+  resource           Resource[]
 
   @@map("courses")
 }
@@ -439,6 +491,7 @@ model CourseBundle {
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
   courses             Course[]              @relation("BundleCourses")
+  order               Order[]
 
   @@map("course_bundles")
 }
@@ -625,10 +678,14 @@ model Event {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  author        User            @relation(fields: [authorId], references: [id])
-  eventBooking  EventBooking[]
-  eventSchedule EventSchedule[]
-  eventSpeaker  EventSpeaker[]
+  author            User                @relation(fields: [authorId], references: [id])
+  eventBooking      EventBooking[]
+  eventSchedule     EventSchedule[]
+  eventSpeaker      EventSpeaker[]
+  MeetingAssignment MeetingAssignment[]
+  coupon            Coupon[]
+  promoCode         PromoCode[]
+  resource          Resource[]
 
   @@map("events")
 }
@@ -694,8 +751,10 @@ model Coupon {
   id       String @id @default(uuid())
   authorId String // FK → User (who created the coupon)
 
-  modelType   CouponModel // Enum to represent reference type (Course, Event, etc.)
-  referenceId String // Generic FK (depending on modelType)
+  modelType CouponModel // Enum to represent reference type (Course, Event, etc.)
+  bookId    String?
+  courseId  String?
+  eventId   String?
 
   name     String
   expireAt DateTime
@@ -706,6 +765,10 @@ model Coupon {
   author User   @relation("CouponCreated", fields: [authorId], references: [id])
   usedBy User[] @relation("CouponUsedBy")
 
+  book   Book?   @relation(fields: [bookId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -713,20 +776,25 @@ model Coupon {
 }
 
 model PromoCode {
-  id          String      @id @default(uuid())
-  authorId    String
-  modelType   CouponModel
-  referenceId String
-  code        String      @unique
-  discount    Float
-  maxUsage    Int?
-  usedCount   Int         @default(0)
-  expireAt    DateTime
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String      @id @default(uuid())
+  authorId  String
+  modelType CouponModel
+  bookId    String?
+  courseId  String?
+  eventId   String?
+  code      String      @unique
+  discount  Float
+  maxUsage  Int?
+  usedCount Int         @default(0)
+  expireAt  DateTime
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  author User? @relation(fields: [authorId], references: [id])
+  author User?   @relation(fields: [authorId], references: [id])
+  book   Book?   @relation(fields: [bookId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
 
   @@map("promo_codes")
 }
@@ -814,8 +882,9 @@ model Subscription {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
-  package Package @relation(references: [id], fields: [packageId])
-  user    User    @relation(references: [id], fields: [userId])
+  package Package   @relation(references: [id], fields: [packageId])
+  user    User      @relation(references: [id], fields: [userId])
+  payment Payment[]
 
   @@map("subscriptions")
 }
@@ -839,7 +908,8 @@ enum SubscriptionStatus {
 model Payment {
   id              String           @id @default(uuid())
   userId          String           @unique
-  referenceId     String
+  orderId         String?
+  subscriptionId  String?
   modelType       PaymentModelType
   transactionId   String           @unique
   amount          Float            @default(0.00)
@@ -853,7 +923,9 @@ model Payment {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  account User @relation(references: [id], fields: [userId])
+  account      User          @relation(references: [id], fields: [userId])
+  order        Order?        @relation(fields: [orderId], references: [id])
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
 
   @@map("payments")
 }
@@ -880,18 +952,21 @@ model Batch {
 }
 
 model Review {
-  id          String          @id @default(uuid())
-  userId      String          @unique
-  referenceId String
-  modelType   ReviewModelType
-  rating      Float
-  comment     String
-  isDeleted   Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id        String          @id @default(uuid())
+  authorId  String          @unique
+  userId    String?
+  courseId  String?
+  modelType ReviewModelType
+  rating    Float
+  comment   String
+  isDeleted Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
-  author    User       @relation(references: [id], fields: [userId])
-  ReviewRef ReviewRef?
+  author    User       @relation("AuthorProfileReviews", fields: [authorId], references: [id])
+  user      User?      @relation("UserReviews", fields: [userId], references: [id])
+  course    Course?    @relation(references: [id], fields: [courseId])
+  reviewRef ReviewRef?
 
   @@map("reviews")
 }
@@ -1082,11 +1157,14 @@ model Wishlist {
   id        String            @id @default(uuid())
   userId    String
   modelType WishListModelType
-  reference String // Reference ID to the related model
+  bookId    String?
+  courseId  String?
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  book   Book?   @relation(fields: [bookId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
 
   @@map("wishlists")
 }
@@ -1100,10 +1178,18 @@ model Resource {
   id        String            @id @default(uuid())
   name      String
   modelType ResourceModelType
-  reference String // Reference ID to the related model
+  bookId    String?
+  courseId  String?
+  eventId   String?
+  articleId String?
   file      String
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
+
+  book    Book?    @relation(fields: [bookId], references: [id])
+  course  Course?  @relation(fields: [courseId], references: [id])
+  event   Event?   @relation(fields: [eventId], references: [id])
+  article Article? @relation(fields: [articleId], references: [id])
 
   @@map("resources")
 }
@@ -1157,8 +1243,9 @@ model Article {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  author User              @relation(fields: [authorId], references: [id])
-  seenBy UsersOnArticles[] // ✅ join table for tracking who has seen
+  author   User              @relation(fields: [authorId], references: [id])
+  seenBy   UsersOnArticles[] // ✅ join table for tracking who has seen
+  resource Resource[]
 
   @@map("articles")
 }
@@ -1278,8 +1365,6 @@ enum PackageBillingCycle {
 enum PaymentModelType {
   order
   subscription
-  eventBooking
-  enrolledCourse
 }
 
 enum ReviewModelType {

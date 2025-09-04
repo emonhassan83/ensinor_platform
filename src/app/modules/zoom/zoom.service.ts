@@ -118,6 +118,7 @@ const getMeeting = async (id: string) => {
 
 // Update Meeting
 const updateMeeting = async (id: string, payload: Partial<IZoomMeeting>) => {
+  const { zoomAccountId, ...updateData } = payload;
   const meeting = await prisma.zoomMeeting.findUnique({ where: { id } });
   if (!meeting) throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not found');
 
@@ -129,7 +130,7 @@ const updateMeeting = async (id: string, payload: Partial<IZoomMeeting>) => {
 
   const result = await prisma.zoomMeeting.update({
     where: { id },
-    data: payload,
+    data: updateData,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Zoom meeting not updated!');
@@ -157,13 +158,14 @@ const deleteMeeting = async (id: string) => {
 
 // Sync Meetings
 const syncMeetings = async (userId: string) => {
-  const account = await prisma.zoomAccount.findFirst({ where: { userId } })
-  if (!account) throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found')
+  const account = await prisma.zoomAccount.findFirst({ where: { userId } });
+  if (!account)
+    throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
 
   const response = await axios.get(
     `https://api.zoom.us/v2/users/${account.zoomUserId}/meetings`,
-    { headers: { Authorization: `Bearer ${account.accessToken}` } }
-  )
+    { headers: { Authorization: `Bearer ${account.accessToken}` } },
+  );
 
   const meetings = response.data.meetings.map((m: any) =>
     prisma.zoomMeeting.upsert({
@@ -184,13 +186,15 @@ const syncMeetings = async (userId: string) => {
         password: m.password,
         duration: m.duration,
         startTime: new Date(m.start_time),
-        endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+        endTime: new Date(
+          new Date(m.start_time).getTime() + m.duration * 60000,
+        ),
       },
-    })
-  )
+    }),
+  );
 
-  return Promise.all(meetings)
-}
+  return Promise.all(meetings);
+};
 
 export const ZoomService = {
   connectZoomAccount,
@@ -200,5 +204,5 @@ export const ZoomService = {
   getMeeting,
   updateMeeting,
   deleteMeeting,
-  syncMeetings
+  syncMeetings,
 };

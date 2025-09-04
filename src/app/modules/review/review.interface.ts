@@ -6,9 +6,10 @@ export type IReviewFilterRequest = {
 };
 
 export type IReview = {
-  userId: string;
+  authorId: string;
   modelType: ReviewModelType;
-  referenceId: string;
+  courseId?: string;
+  userId?: string;
   rating: number;
   comment: string;
 };

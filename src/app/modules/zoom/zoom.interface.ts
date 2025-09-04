@@ -13,14 +13,14 @@ export type IZoomAccount = {
 
 export type IZoomMeeting = {
   userId: string;
-  zoomAccountId?: string;
-  zoomMeetingId?: string;
+  zoomAccountId: string;
+  zoomMeetingId: string;
   topic: string;
   agenda: string;
   startUrl: string;
   joinUrl: string;
   password: string;
-  duration: string;
+  duration: number;
   startTime: string;
   endTime: string;
 };

@@ -7,6 +7,6 @@ export type IMessage = {
   senderId: string;
   chatId: string;
   receiverId?: string | undefined;
-  text?: string;
+  text: string;
   imageUrl?: string[];
 };

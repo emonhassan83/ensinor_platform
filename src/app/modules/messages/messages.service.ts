@@ -78,7 +78,7 @@ const insertIntoDB = async (payload: IMessage) => {
 
   const chatListReceiver = await prisma.chat.findMany({
     where: {
-      participants: { some: { userId: result.receiverId } },
+      participants: { some: { userId: result.receiverId  as string} },
     },
     include: { participants: true, messages: true },
   });

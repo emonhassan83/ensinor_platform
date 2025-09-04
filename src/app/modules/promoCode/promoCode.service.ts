@@ -26,7 +26,7 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.PromoCodeWhereInput[] = [{ referenceId: reference }];
+  const andConditions: Prisma.PromoCodeWhereInput[] = reference ? [{ course: { id: reference } }] : [];
 
   // Search across Package and nested User fields
   if (searchTerm) {
