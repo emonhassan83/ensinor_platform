@@ -59,7 +59,7 @@ const loginUser = async (payload: TLoginUser) => {
     config.jwt_refresh_expires_in as TExpiresIn,
   );
 
-// Update lastActive + save FCM token if provided
+  // Update lastActive + save FCM token if provided
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -71,6 +71,14 @@ const loginUser = async (payload: TLoginUser) => {
   return {
     accessToken,
     refreshToken,
+    user: {
+      id: user?.id,
+      name: user?.name,
+      email: user?.email,
+      photoUrl: user?.email,
+      role: user?.role,
+      status: user?.status,
+    },
   };
 };
 

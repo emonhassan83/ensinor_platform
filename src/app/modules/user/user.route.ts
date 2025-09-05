@@ -11,23 +11,6 @@ const router = express.Router();
 const storage = memoryStorage();
 const upload = multer({ storage });
 
-router.get('/:id', auth(UserRole.super_admin), UserController.getUserById);
-
-router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
-
-router.get(
-  '/my-profile',
-  auth(
-    UserRole.super_admin,
-    UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.employee,
-    UserRole.instructor,
-    UserRole.student,
-  ),
-  UserController.getMyProfile,
-);
-
 router.post(
   '/register',
   upload.single('image'),
@@ -81,7 +64,7 @@ router.post(
 );
 
 router.patch(
-  '/:id',
+  '/status/:id',
   auth(UserRole.super_admin),
   validateRequest(UserValidation.changeProfileStatus),
   UserController.changeProfileStatus,
@@ -124,4 +107,22 @@ router.delete(
   ),
   UserController.deleteMyProfile,
 );
+
+router.get(
+  '/my-profile',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
+  UserController.getMyProfile,
+);
+
+router.get('/:id', auth(UserRole.super_admin), UserController.getUserById);
+
+router.get('/', auth(UserRole.super_admin), UserController.getAllUser);
+
 export const userRoutes = router;

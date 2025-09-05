@@ -1,28 +1,77 @@
 import {
   CompanyRequest,
-  Prisma
+  Prisma,
+  RegisterWith,
+  UserRole,
+  UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { ICompanyRequest, ICompanyRequestFilterRequest } from './companyRequest.interface';
+import {
+  ICompanyRequest,
+  ICompanyRequestFilterRequest,
+} from './companyRequest.interface';
 import { companyRequestSearchAbleFields } from './companyRequest.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
+import {
+  hashedPassword,
+  sendApprovalEmail,
+  sendDenialEmail,
+} from '../user/user.utils';
+import { generateDefaultPassword } from '../../utils/passwordGenerator';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({
     where: {
       id: payload.userId,
+      status: UserStatus.active,
+      isDeleted: false,
     },
   });
-
   if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
+  // check previous status validation
+  const existingPendingRequest = await prisma.companyRequest.findFirst({
+    where: {
+      userId: payload.userId,
+      status: UserStatus.pending,
+    },
+  });
+
+  if (existingPendingRequest) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'You already have a pending company request. Please wait until it is approved or rejected.',
+    );
+  }
+
+  // Organization email duplicate check
+  const existingOrgEmail = await prisma.companyRequest.findUnique({
+    where: { organizationEmail: payload.organizationEmail },
+  });
+  if (existingOrgEmail) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'This organization email is already used for another company request.',
+    );
+  }
+
   const result = await prisma.companyRequest.create({
     data: payload,
-    include: { user: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
 
   if (!result) {
@@ -72,7 +121,6 @@ const getAllFromDB = async (
 
   const result = await prisma.companyRequest.findMany({
     where: whereConditions,
-    include: { user: true },
     skip,
     take: limit,
     orderBy:
@@ -83,6 +131,16 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.companyRequest.count({
@@ -102,7 +160,22 @@ const getAllFromDB = async (
 const getByIdFromDB = async (id: string): Promise<CompanyRequest | null> => {
   const result = await prisma.companyRequest.findUnique({
     where: { id },
-    include: { user: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          role: true,
+          status: true,
+        },
+      },
+    },
   });
 
   return result;
@@ -110,17 +183,96 @@ const getByIdFromDB = async (id: string): Promise<CompanyRequest | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<ICompanyRequest>,
-): Promise<CompanyRequest> => {
-  const result = await prisma.companyRequest.update({
+  payload: { status: UserStatus },
+): Promise<CompanyRequest | null> => {
+  const { status } = payload;
+
+  const request = await prisma.companyRequest.findUnique({
     where: { id },
-    data: payload,
     include: { user: true },
   });
 
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Company request not updated!');
+  if (!request) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
+
+  // Approve and create company + admin
+  if (status === UserStatus.active) {
+    const password = generateDefaultPassword(12); // random secure password
+    const hashPassword = await hashedPassword(password);
+
+    const result = await prisma.$transaction(async transactionClient => {
+      const updatedRequest = await transactionClient.companyRequest.update({
+        where: { id },
+        data: { status: UserStatus.active },
+        include: { user: true },
+      });
+
+      const user = await transactionClient.user.create({
+        data: {
+          name: updatedRequest.name,
+          email: updatedRequest.organizationEmail,
+          password: hashPassword,
+          role: UserRole.company_admin,
+          registerWith: RegisterWith.credentials,
+          verification: {
+            create: { otp: '', expiresAt: null, status: true },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email:true,
+          photoUrl: true
+        }
+      });
+
+      const companyAdmin = await transactionClient.companyAdmin.create({
+        data: { userId: user.id },
+      });
+
+      await transactionClient.company.create({
+        data: {
+          userId: companyAdmin.id,
+          name: updatedRequest.name,
+          industryType: updatedRequest.companyType,
+        },
+      });
+
+      // Send approval email with credentials
+      await sendApprovalEmail(user.email, user.name, password);
+
+      return updatedRequest;
+    });
+
+    return result;
+  }
+
+  // Deny and delete request
+  if (status === UserStatus.deleted) {
+    await prisma.companyRequest.delete({ where: { id } });
+
+    // Send denial email
+    await sendDenialEmail(request.organizationEmail, request.name);
+
+    return null;
+  }
+
+  // Other status update
+  const result = await prisma.companyRequest.update({
+    where: { id },
+    data: { status },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
+  });
 
   return result;
 };

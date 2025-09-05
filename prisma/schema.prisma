@@ -96,7 +96,7 @@ model User {
   gradingSystem              GradingSystem[]
   bundlesAuthored            CourseBundle[]       @relation("BundleAuthor")
   verification               Verification?
-  companyRequest             CompanyRequest?
+  companyRequest             CompanyRequest[]
   usersOnArticles            UsersOnArticles[]
   cv                         CV?
   zoomAccount                ZoomAccount[]
@@ -225,9 +225,9 @@ model Company {
 
 model CompanyRequest {
   id                    String     @id @default(uuid())
-  userId                String     @unique
+  userId                String
   name                  String
-  organizationEmail     String
+  organizationEmail     String     @unique
   companyType           String
   phoneNumber           String
   role                  String

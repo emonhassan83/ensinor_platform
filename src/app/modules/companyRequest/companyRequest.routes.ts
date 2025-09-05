@@ -33,15 +33,9 @@ router.get(
   CompanyRequestController.getByIdFromDB,
 );
 
-router.put(
+router.patch(
   '/:id',
-  auth(
-    UserRole.student,
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.employee,
-    UserRole.company_admin,
-  ),
+   auth(UserRole.super_admin),
   validateRequest(CompanyRequestValidation.updateValidationSchema),
   CompanyRequestController.updateIntoDB,
 );
