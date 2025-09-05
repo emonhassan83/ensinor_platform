@@ -1,7 +1,11 @@
 import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
-import { hashedPassword } from './user.utils';
+import {
+  hashedPassword,
+  sendBusinessInstructorInvitationEmail,
+  sendCompanyApprovalApprovalEmail,
+} from './user.utils';
 import {
   IBusinessInstructor,
   ICompanyAdmin,
@@ -17,12 +21,11 @@ import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
+import { generateDefaultPassword } from '../../utils/passwordGenerator';
 
 const registerAUser = async (
   payload: IRegisterUser,
 ): Promise<IUserResponse> => {
-  console.log(payload);
-
   const { password, confirmPassword, user } = payload;
 
   if (password !== confirmPassword) {
@@ -103,17 +106,18 @@ const registerAUser = async (
 const createCompanyAdmin = async (
   payload: ICompanyAdmin,
 ): Promise<IUserResponse> => {
-  const hashPassword = await hashedPassword(payload.password);
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
 
   const result = await prisma.$transaction(async transactionClient => {
+    // 1️⃣ Create User
     const user = await transactionClient.user.create({
       data: {
-        name: payload.user.name,
-        email: payload.user.email,
+        name: payload.name, // Company admin name (you can separate if needed)
+        email: payload.organizationEmail,
         password: hashPassword,
         role: UserRole.company_admin,
         registerWith: RegisterWith.credentials,
-        // Create verification record at the same time
         verification: {
           create: {
             otp: '',
@@ -121,15 +125,31 @@ const createCompanyAdmin = async (
             status: true,
           },
         },
+        status: UserStatus.active,
       },
     });
 
-    await transactionClient.companyAdmin.create({
+    // 2️⃣ Create CompanyAdmin
+    const companyAdmin = await transactionClient.companyAdmin.create({
       data: {
         userId: user.id,
-        ...payload.companyAdmin,
       },
     });
+
+    // 3️⃣ Create Company
+    await transactionClient.company.create({
+      data: {
+        userId: companyAdmin.id, // relation: Company → CompanyAdmin.id
+        name: payload.name,
+        industryType: payload.companyType,
+        size: payload.companySize,
+        employee: payload.numberOfPeopleToTrain,
+        instructor: payload.trainingNeeds,
+      },
+    });
+
+    // 4️⃣ Send email with credentials
+    await sendCompanyApprovalApprovalEmail(user.email, user.name, password);
 
     return user;
   });
@@ -140,13 +160,27 @@ const createCompanyAdmin = async (
 const createBusinessInstructor = async (
   payload: IBusinessInstructor,
 ): Promise<IUserResponse> => {
-  const hashPassword = await hashedPassword(payload.password);
+  const { user, businessInstructor } = payload;
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
+
+  const company = await prisma.user.findFirst({
+    where: {
+      id: businessInstructor.company,
+      role: UserRole.company_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!company || company?.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company not found or deleted!');
+  }
 
   const result = await prisma.$transaction(async transactionClient => {
-    const user = await transactionClient.user.create({
+    const userData = await transactionClient.user.create({
       data: {
-        name: payload.user.name,
-        email: payload.user.email,
+        name: user.name,
+        email: user.email,
         password: hashPassword,
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
@@ -154,21 +188,30 @@ const createBusinessInstructor = async (
         verification: {
           create: {
             otp: '',
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
-            status: false,
+            expiresAt: null,
+            status: true,
           },
         },
+        status: UserStatus.active,
       },
     });
 
     await transactionClient.businessInstructor.create({
       data: {
-        userId: user.id,
-        companyId: payload.businessInstructor.company,
+        userId: userData.id,
+        companyId: company.id,
+        designation: businessInstructor.designation,
       },
     });
 
-    return user;
+    // 4️⃣ Send email with credentials
+    await sendBusinessInstructorInvitationEmail(
+      userData.email,
+      userData.name,
+      password,
+    );
+
+    return userData;
   });
 
   return result;
@@ -196,7 +239,7 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
       },
     });
 
-    await transactionClient.businessInstructor.create({
+    await transactionClient.employee.create({
       data: {
         userId: user.id,
         companyId: payload.employee.company,
@@ -433,6 +476,7 @@ const updateAProfile = async (userId: string, payload: any) => {
     where: {
       id: userId,
       status: UserStatus.active,
+      isDeleted: false,
     },
   });
   if (!user || user?.isDeleted) {
@@ -476,6 +520,7 @@ const updateAProfile = async (userId: string, payload: any) => {
       break;
 
     case UserRole.business_instructors:
+      console.log({user})
       profileData = await prisma.businessInstructor.upsert({
         where: { userId: user.id },
         update: payload.businessInstructor ?? {},

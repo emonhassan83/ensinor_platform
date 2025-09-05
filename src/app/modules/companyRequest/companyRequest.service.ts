@@ -17,10 +17,9 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import {
   hashedPassword,
-  sendApprovalEmail,
-  sendDenialEmail,
 } from '../user/user.utils';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
+import { sendApprovalEmail, sendDenialEmail } from './companyRequest.utils';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({

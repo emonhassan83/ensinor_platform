@@ -65,16 +65,12 @@ const createBusinessInstructor = catchAsync(
     }
 
     const result = await UserServices.createBusinessInstructor(req.body);
-    const sendOtp = await otpServices.resendOtp(result?.email);
     const { id, name, email, photoUrl, contactNo, status } = result;
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
       message: 'Business instructor profile created successfully!',
-      data: {
-        user: { id, name, email, photoUrl, contactNo, status },
-        otpInfo: sendOtp,
-      },
+      data: { id, name, email, photoUrl, contactNo, status },
     });
   },
 );
@@ -88,16 +84,12 @@ const createEmployee = catchAsync(async (req: Request, res: Response) => {
   }
 
   const result = await UserServices.createEmployee(req.body);
-  const sendOtp = await otpServices.resendOtp(result?.email);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Employee profile created successfully!',
-    data: {
-      user: { id, name, email, photoUrl, contactNo, status },
-      otpInfo: sendOtp,
-    },
+    data: { id, name, email, photoUrl, contactNo, status },
   });
 });
 
@@ -132,16 +124,12 @@ const createStudent = catchAsync(async (req: Request, res: Response) => {
   }
 
   const result = await UserServices.createStudent(req.body);
-  const sendOtp = await otpServices.resendOtp(result?.email);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Student profile created successfully!',
-    data: {
-      user: { id, name, email, photoUrl, contactNo, status },
-      otpInfo: sendOtp,
-    },
+    data: { id, name, email, photoUrl, contactNo, status },
   });
 });
 

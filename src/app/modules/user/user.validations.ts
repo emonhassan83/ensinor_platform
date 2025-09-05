@@ -7,11 +7,13 @@ import { UserStatus } from '@prisma/client';
 const registerAUser = z.object({
   body: z.object({
     password: z.string({ required_error: 'Password is required!' }),
-    confirmPassword: z.string({ required_error: 'Confirm password is required!' }),
+    confirmPassword: z.string({
+      required_error: 'Confirm password is required!',
+    }),
     user: z.object({
       name: z.string({ required_error: 'Name is required!' }),
-      email: z.string().email('Invalid email address')
-    })
+      email: z.string().email('Invalid email address'),
+    }),
   }),
 });
 
@@ -20,23 +22,19 @@ const registerAUser = z.object({
 // ----------------------
 const createCompanyAdmin = z.object({
   body: z.object({
-    password: z.string({ required_error: 'Password is required!' }),
-    user: z.object({
-      name: z.string({ required_error: 'Name is required!' }),
-      email: z.string().email('Invalid email address'),
-      contactNo: z.string({ required_error: 'Contact number is required!' }),
-      bio: z.string().optional(),
-      dateOfBirth: z.string().optional(),
-      city: z.string().optional(),
-      country: z.string().optional(),
-      photoUrl: z.string().optional(),
+    name: z.string({ required_error: 'Name is required!' }),
+    organizationEmail: z
+      .string()
+      .email({ message: 'Invalid organization email!' }),
+    companyType: z.string({ required_error: 'Company type is required!' }),
+    phoneNumber: z.string({ required_error: 'Phone number is required!' }),
+    role: z.string({ required_error: 'Role is required!' }),
+    companySize: z.number({ required_error: 'Company size is required!' }),
+    numberOfPeopleToTrain: z.number({
+      required_error: 'Number of people to train is required!',
     }),
-    company: z.object({
-      name: z.string({ required_error: 'Company name is required!' }),
-      industryType: z.string().email('Industry type is required!'),
-      logo: z.string().optional(),
-      color: z.string().optional(),
-    }),
+    trainingNeeds: z.number({ required_error: 'Training needs is required!' }),
+    description: z.string({ required_error: 'Description is required!' }),
   }),
 });
 
@@ -45,20 +43,21 @@ const createCompanyAdmin = z.object({
 // ----------------------
 const createBusinessInstructor = z.object({
   body: z.object({
-    password: z.string({ required_error: 'Password is required!' }),
     user: z.object({
       name: z.string({ required_error: 'Name is required!' }),
       email: z.string().email('Invalid email address'),
-      contactNo: z.string({ required_error: 'Contact number is required!' }),
-      bio: z.string().optional(),
-      dateOfBirth: z.string().optional(),
-      city: z.string().optional(),
-      country: z.string().optional(),
-      photoUrl: z.string().optional(),
+      bio: z.string({
+        required_error: 'Business Instructors bio is required!',
+      }),
     }),
     businessInstructor: z.object({
-      company: z.string({ required_error: 'Company id is required!' }),
-    })
+      company: z
+        .string({ required_error: 'Company id is required!' })
+        .uuid('company must be a valid UUID'),
+      designation: z.string({
+        required_error: 'Business Instructors designation is required!',
+      }),
+    }),
   }),
 });
 
@@ -79,7 +78,7 @@ const createEmployee = z.object({
       photoUrl: z.string().optional(),
     }),
     employee: z.object({
-      company: z.string({ required_error: 'Company id is required!' })
+      company: z.string({ required_error: 'Company id is required!' }),
     }),
   }),
 });

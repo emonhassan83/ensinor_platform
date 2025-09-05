@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Create validation
 const createValidationSchema = z.object({
   body: z.object({
-    userId: z.string({ required_error: "User ID is required!" }),
+    userId: z.string({ required_error: "User ID is required!" }).uuid('user must be a valid UUID'),
     name: z.string({ required_error: "Name is required!" }),
     organizationEmail: z.string().email({ message: "Invalid organization email!" }),
     companyType: z.string({ required_error: "Company type is required!" }),

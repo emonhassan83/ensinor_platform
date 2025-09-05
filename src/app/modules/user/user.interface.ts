@@ -41,39 +41,26 @@ export type IRegisterUser = {
 export type IUserResponse = Omit<IUser, 'password'>;
 
 export type ICompanyAdmin = {
-  password: string;
-  user: {
-    name: string;
-    email: string;
-    contactNo: string;
-    bio?: string;
-    dateOfBirth?: string;
-    city?: string;
-    country?: string;
-    photoUrl?: string;
-  };
-  companyAdmin: {
-    name: string;
-    industryType: string;
-    logo?: string;
-    color?: string;
-  };
+  name: string;
+  organizationEmail: string;
+  companyType: string;
+  phoneNumber: string;
+  role: string;
+  companySize: number;
+  numberOfPeopleToTrain: number;
+  trainingNeeds: number;
+  description: string;
 };
 
 export type IBusinessInstructor = {
-  password: string;
   user: {
     name: string;
     email: string;
-    contactNo: string;
-    bio?: string;
-    dateOfBirth?: string;
-    city?: string;
-    country?: string;
-    photoUrl?: string;
+    bio: string;
   };
   businessInstructor: {
     company: string;
+    designation: string;
   };
 };
 

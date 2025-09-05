@@ -30,7 +30,7 @@ router.post(
 
 router.post(
   '/business-instructor',
-  auth(UserRole.super_admin),
+  auth(UserRole.company_admin),
   upload.single('image'),
   parseData(),
   validateRequest(UserValidation.createBusinessInstructor),

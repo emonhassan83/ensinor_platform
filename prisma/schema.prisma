@@ -107,6 +107,7 @@ model User {
   reviewId                   String?
   reviewProfileReview        Review?              @relation("AuthorProfileReviews")
   userReview                 Review[]             @relation("UserReviews")
+  companyBusinessInstructor  BusinessInstructor[]  @relation("company")
 
   @@map("users")
 }
@@ -196,10 +197,9 @@ model CompanyAdmin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user               User                @relation(references: [id], fields: [userId])
-  businessInstructor BusinessInstructor?
-  employee           Employee?
-  company            Company?
+  user     User      @relation(references: [id], fields: [userId])
+  employee Employee?
+  company  Company?
 
   @@map("company_admins")
 }
@@ -278,24 +278,39 @@ model Invitation {
 }
 
 model BusinessInstructor {
-  id        String   @id @unique @default(uuid())
-  userId    String   @unique
-  companyId String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @unique @default(uuid())
+  userId      String   @unique
+  designation String
+  university  String?
+  session     String?
+  subjects    String?
+  linkedIn    String?
+  facebook    String?
+  twitter     String?
+  instagram   String?
+  website     String?
+  avgRating   Float    @default(0.0)
+  ratingCount Int      @default(0)
+  companyId   String 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user    User         @relation(references: [id], fields: [userId])
-  company CompanyAdmin @relation(references: [id], fields: [companyId])
+  user    User @relation(references: [id], fields: [userId])
+  company User @relation("company", references: [id], fields: [companyId])
 
   @@map("business_instructors")
 }
 
 model Employee {
-  id        String   @id @unique @default(uuid())
-  userId    String   @unique
-  companyId String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @unique @default(uuid())
+  userId     String   @unique
+  interests  String[] @default([])
+  university String?
+  session    String?
+  subjects   String?
+  companyId  String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user    User         @relation(references: [id], fields: [userId])
   company CompanyAdmin @relation(references: [id], fields: [companyId])
