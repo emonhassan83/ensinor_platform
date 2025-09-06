@@ -1,11 +1,7 @@
 import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
-import {
-  hashedPassword,
-  sendBusinessInstructorInvitationEmail,
-  sendCompanyApprovalApprovalEmail,
-} from './user.utils';
+import { hashedPassword } from './user.utils';
 import {
   IBusinessInstructor,
   ICompanyAdmin,
@@ -26,6 +22,8 @@ import {
   sendUserActiveEmail,
   sendUserDeniedEmail,
 } from '../../utils/email/sentUserStatusEmail';
+import { sendCompanyApprovalEmail } from '../../utils/email/sentCompanyStatusEmail';
+import { sendBusinessInstructorInvitation } from '../../utils/email/sentBusinessInstructorInvitation';
 
 const registerAUser = async (
   payload: IRegisterUser,
@@ -153,7 +151,7 @@ const createCompanyAdmin = async (
     });
 
     // 4️⃣ Send email with credentials
-    await sendCompanyApprovalApprovalEmail(user.email, user.name, password);
+    await sendCompanyApprovalEmail(user.email, user.name, password);
 
     return user;
   });
@@ -178,6 +176,20 @@ const createBusinessInstructor = async (
   });
   if (!company || company?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company not found or deleted!');
+  }
+
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: payload.user.email,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (isExist) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'This email already exist in this platform!',
+    );
   }
 
   const result = await prisma.$transaction(async transactionClient => {
@@ -209,7 +221,7 @@ const createBusinessInstructor = async (
     });
 
     // 4️⃣ Send email with credentials
-    await sendBusinessInstructorInvitationEmail(
+    await sendBusinessInstructorInvitation(
       userData.email,
       userData.name,
       password,
@@ -348,7 +360,7 @@ const changeProfileStatus = async (
       role: true,
       status: true,
       isDeleted: true,
-    }
+    },
   });
 
   // 🎯 Send email based on status
@@ -545,14 +557,9 @@ const updateAProfile = async (userId: string, payload: any) => {
       break;
 
     case UserRole.business_instructors:
-      console.log({ user });
-      profileData = await prisma.businessInstructor.upsert({
+      profileData = await prisma.businessInstructor.update({
         where: { userId: user.id },
-        update: payload.businessInstructor ?? {},
-        create: {
-          userId: user.id,
-          ...(payload.businessInstructor ?? {}),
-        },
+        data: payload.businessInstructor ?? {},
       });
       break;
 

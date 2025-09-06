@@ -19,7 +19,7 @@ import {
   hashedPassword,
 } from '../user/user.utils';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
-import { sendApprovalEmail, sendDenialEmail } from '../../utils/email/sentCompanyStatusEmail';
+import { sendCompanyApprovalEmail, sendCompanyDenialEmail } from '../../utils/email/sentCompanyStatusEmail';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({
@@ -241,7 +241,7 @@ const updateIntoDB = async (
       });
 
       // Send approval email with credentials
-      await sendApprovalEmail(user.email, user.name, password);
+      await sendCompanyApprovalEmail(user.email, user.name, password);
 
       return updatedRequest;
     });
@@ -254,7 +254,7 @@ const updateIntoDB = async (
     await prisma.companyRequest.delete({ where: { id } });
 
     // Send denial email
-    await sendDenialEmail(request.organizationEmail, request.name);
+    await sendCompanyDenialEmail(request.organizationEmail, request.name);
 
     return null;
   }

@@ -1,4 +1,10 @@
-import { BusinessInstructor, CompanyAdmin, Prisma, User, UserStatus } from '@prisma/client';
+import {
+  BusinessInstructor,
+  CompanyAdmin,
+  Prisma,
+  User,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IBusinessInstructorFilterRequest } from './businessInstructor.interface';
@@ -38,11 +44,12 @@ const getAllFromDB = async (
     });
   }
 
-  const whereConditions: Prisma.BusinessInstructorWhereInput = { AND: andConditions };
+  const whereConditions: Prisma.BusinessInstructorWhereInput = {
+    AND: andConditions,
+  };
 
   const result = await prisma.businessInstructor.findMany({
     where: whereConditions,
-    include: { user: true, company: true },
     skip,
     take: limit,
     orderBy:
@@ -53,6 +60,29 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true
+        },
+      },
+      company: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          companyAdmin: {
+            select: {
+              company: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   const total = await prisma.businessInstructor.count({
@@ -69,10 +99,46 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<BusinessInstructor | null> => {
+const getByIdFromDB = async (
+  id: string,
+): Promise<BusinessInstructor | null> => {
   const result = await prisma.businessInstructor.findUnique({
     where: { id },
-    include: { user: true, company: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+        },
+      },
+      company: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+          companyAdmin: {
+            select: {
+              company: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   return result;
@@ -80,13 +146,16 @@ const getByIdFromDB = async (id: string): Promise<BusinessInstructor | null> => 
 
 const updateIntoDB = async (
   id: string,
-payload: { businessInstructor?: Partial<BusinessInstructor>; user?: Partial<User> }
+  payload: {
+    businessInstructor?: Partial<BusinessInstructor>;
+    user?: Partial<User>;
+  },
 ): Promise<BusinessInstructor> => {
-    const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
+  const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
     where: { id },
   });
 
-    const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async tx => {
     // Update BusinessInstructor fields
     const updatedBusinessInstructor = payload.businessInstructor
       ? await tx.businessInstructor.update({
@@ -103,7 +172,26 @@ payload: { businessInstructor?: Partial<BusinessInstructor>; user?: Partial<User
       });
     }
 
-    return updatedBusinessInstructor;
+    // Re-fetch with populated user
+    return tx.businessInstructor.findUniqueOrThrow({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            photoUrl: true,
+            bio: true,
+            dateOfBirth: true,
+            contactNo: true,
+            city: true,
+            country: true,
+            status: true
+          },
+        }
+      },
+    });
   });
 
   return updated;
@@ -114,7 +202,7 @@ const deleteFromDB = async (id: string): Promise<User> => {
     where: { id },
   });
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async tx => {
     const deletedUser = await tx.user.update({
       where: { id: businessInstructor.userId },
       data: { status: UserStatus.deleted, isDeleted: true },

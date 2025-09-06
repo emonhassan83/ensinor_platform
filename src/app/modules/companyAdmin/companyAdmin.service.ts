@@ -5,6 +5,7 @@ import { ICompanyAdminFilterRequest } from './companyAdmin.interface';
 import { companyAdminSearchAbleFields } from './companyAdmin.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { uploadToS3 } from '../../utils/s3';
 
 const getAllFromDB = async (
   params: ICompanyAdminFilterRequest,
@@ -130,12 +131,21 @@ const getByIdFromDB = async (id: string): Promise<CompanyAdmin | null> => {
 const updateIntoDB = async (
   id: string,
   payload: { company?: Partial<CompanyAdmin>; user?: Partial<any> },
+  file: any,
 ): Promise<CompanyAdmin> => {
   const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
     where: { id },
   });
   if (!companyAdmin) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Company admin not exists!');
+  }
+
+  // file upload
+  if (file) {
+    payload.user!.photoUrl = await uploadToS3({
+      file: file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
   }
 
   // Perform update

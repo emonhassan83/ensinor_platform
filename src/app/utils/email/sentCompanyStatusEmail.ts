@@ -1,6 +1,6 @@
 import emailSender from "../emailSender";
 
-export const sendApprovalEmail = async (email: string, name: string, password: string) => {
+export const sendCompanyApprovalEmail = async (email: string, name: string, password: string) => {
     console.log({email, name, password});
     
   await emailSender(
@@ -22,7 +22,7 @@ export const sendApprovalEmail = async (email: string, name: string, password: s
   );
 };
 
-export const sendDenialEmail = async (email: string, name: string) => {
+export const sendCompanyDenialEmail = async (email: string, name: string) => {
   await emailSender(
     email,
     "❌ Company Request Denied",
