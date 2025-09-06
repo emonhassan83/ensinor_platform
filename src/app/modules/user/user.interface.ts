@@ -78,6 +78,7 @@ export type IEmployee = {
   };
   employee: {
     company: string;
+    department: string;
   };
 };
 

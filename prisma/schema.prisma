@@ -107,7 +107,8 @@ model User {
   reviewId                   String?
   reviewProfileReview        Review?              @relation("AuthorProfileReviews")
   userReview                 Review[]             @relation("UserReviews")
-  companyBusinessInstructor  BusinessInstructor[]  @relation("company")
+  companyBusinessInstructor  BusinessInstructor[] @relation("company")
+  companyEmployee                   Employee? @relation("companyUser")
 
   @@map("users")
 }
@@ -197,9 +198,8 @@ model CompanyAdmin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(references: [id], fields: [userId])
-  employee Employee?
-  company  Company?
+  user    User     @relation(references: [id], fields: [userId])
+  company Company?
 
   @@map("company_admins")
 }
@@ -255,6 +255,7 @@ model Department {
 
   author     User         @relation(fields: [authorId], references: [id])
   invitation Invitation[]
+  employee   Employee[]
 
   @@map("departments")
 }
@@ -291,7 +292,7 @@ model BusinessInstructor {
   website     String?
   avgRating   Float    @default(0.0)
   ratingCount Int      @default(0)
-  companyId   String 
+  companyId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -302,18 +303,20 @@ model BusinessInstructor {
 }
 
 model Employee {
-  id         String   @id @unique @default(uuid())
-  userId     String   @unique
-  interests  String[] @default([])
-  university String?
-  session    String?
-  subjects   String?
-  companyId  String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @unique @default(uuid())
+  userId       String   @unique
+  interests    String[] @default([])
+  university   String?
+  session      String?
+  subjects     String?
+  companyId    String   @unique
+  departmentId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user    User         @relation(references: [id], fields: [userId])
-  company CompanyAdmin @relation(references: [id], fields: [companyId])
+  user       User       @relation(references: [id], fields: [userId])
+  company    User       @relation("companyUser", references: [id], fields: [companyId])
+  department Department @relation(references: [id], fields: [departmentId])
 
   @@map("employees")
 }

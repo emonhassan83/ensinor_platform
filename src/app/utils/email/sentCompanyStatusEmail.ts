@@ -1,8 +1,6 @@
 import emailSender from "../emailSender";
 
 export const sendCompanyApprovalEmail = async (email: string, name: string, password: string) => {
-    console.log({email, name, password});
-    
   await emailSender(
     email,
     "🎉 Congratulations! Your Company Admin Account is Approved",

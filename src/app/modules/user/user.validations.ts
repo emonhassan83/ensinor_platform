@@ -78,7 +78,12 @@ const createEmployee = z.object({
       photoUrl: z.string().optional(),
     }),
     employee: z.object({
-      company: z.string({ required_error: 'Company id is required!' }),
+      company: z
+        .string({ required_error: 'Company id is required!' })
+        .uuid('company must be a valid UUID'),
+      department: z
+        .string({ required_error: 'Department id is required!' })
+        .uuid('department must be a valid UUID'),
     }),
   }),
 });

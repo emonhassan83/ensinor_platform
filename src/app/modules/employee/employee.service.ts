@@ -42,7 +42,29 @@ const getAllFromDB = async (
 
   const result = await prisma.employee.findMany({
     where: whereConditions,
-    include: { user: true, company: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      company: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          companyAdmin: {
+            select: {
+              company: true,
+            },
+          },
+        },
+      },
+    },
     skip,
     take: limit,
     orderBy:
@@ -72,7 +94,35 @@ const getAllFromDB = async (
 const getByIdFromDB = async (id: string): Promise<Employee | null> => {
   const result = await prisma.employee.findUnique({
     where: { id },
-    include: { user: true, company: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+        },
+      },
+      company: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          companyAdmin: {
+            select: {
+              company: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   return result;
@@ -88,12 +138,12 @@ const updateIntoDB = async (
 
   const updated = await prisma.$transaction(async tx => {
     // Update Employee fields
-    const updatedEmployee = payload.employee
-      ? await tx.employee.update({
-          where: { id },
-          data: payload.employee,
-        })
-      : employee;
+    if (payload.employee) {
+      await tx.employee.update({
+        where: { id },
+        data: payload.employee,
+      });
+    }
 
     // Update nested user fields
     if (payload.user) {
@@ -103,7 +153,28 @@ const updateIntoDB = async (
       });
     }
 
-    return updatedEmployee;
+    // ✅ Always fetch with user populated
+    const updatedEmployeeWithUser = await tx.employee.findUniqueOrThrow({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            photoUrl: true,
+            bio: true,
+            dateOfBirth: true,
+            contactNo: true,
+            city: true,
+            country: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    return updatedEmployeeWithUser;
   });
 
   return updated;

@@ -2,13 +2,26 @@ import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import prisma from '../../utils/prisma';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { Department, Prisma } from '@prisma/client';
+import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { uploadToS3 } from '../../utils/s3';
 import { departmentSearchableFields } from './departments.constant';
 import { IDepartment, IDepartmentFilterRequest } from './departments.interface';
 
 const insertIntoDB = async (payload: IDepartment, file: any) => {
+  const { authorId } = payload;
+  const author = await prisma.user.findUnique({
+    where: {
+      id: authorId,
+      role: UserRole.company_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author || author?.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
   // upload to image
   if (file) {
     payload.image = (await uploadToS3({
@@ -19,6 +32,21 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
 
   const result = await prisma.department.create({
     data: payload,
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      createdAt: true,
+      updatedAt: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Department creation failed!');
@@ -30,11 +58,15 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
 const getAllFromDB = async (
   filters: IDepartmentFilterRequest,
   options: IPaginationOptions,
+  userId?: string,
 ) => {
   const { limit, page, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = filters;
 
   const andConditions: Prisma.DepartmentWhereInput[] = [{ isDeleted: false }];
+  if (userId) {
+    andConditions.push({ authorId: userId });
+  }
 
   if (searchTerm) {
     andConditions.push({
@@ -70,6 +102,21 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      createdAt: true,
+      updatedAt: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
   const total = await prisma.department.count({
     where: whereConditions,
@@ -95,6 +142,17 @@ const getByIdFromDB = async (id: string) => {
           name: true,
           email: true,
           photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          role: true,
+          status: true,
+          lastActive: true,
+          isDeleted: true,
+          createdAt: true,
+          updatedAt: true,
         },
       },
     },
@@ -130,6 +188,21 @@ const updateIntoDB = async (
   const result = await prisma.department.update({
     where: { id },
     data: payload,
+     select: {
+      id: true,
+      name: true,
+      image: true,
+      createdAt: true,
+      updatedAt: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
 
   return result;
@@ -142,7 +215,7 @@ const deleteFromDB = async (id: string) => {
   if (!department || department.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Department not found!');
   }
-  
+
   const result = await prisma.department.update({
     where: { id },
     data: { isDeleted: true },

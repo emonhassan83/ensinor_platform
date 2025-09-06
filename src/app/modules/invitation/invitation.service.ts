@@ -1,30 +1,108 @@
 import {
-  CompanyAdmin,
-  CompanyRequest,
   Invitation,
   Prisma,
-  User,
+  RegisterWith,
+  UserRole,
   UserStatus,
 } from '@prisma/client';
+import httpStatus from 'http-status';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IGroupInvitation, IInvitation, IInvitationFilterRequest } from './invitation.interface';
+import {
+  IGroupInvitation,
+  IInvitation,
+  IInvitationFilterRequest,
+} from './invitation.interface';
 import { invitationSearchAbleFields } from './invitation.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { generateDefaultPassword } from '../../utils/passwordGenerator';
+import { hashedPassword } from '../user/user.utils';
+import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 
 const insertIntoDB = async (payload: IInvitation) => {
-  const result = await prisma.invitation.create({
-    data: payload,
-    include: { user: true },
+  const { userId, departmentId, name, email } = payload;
+
+  // 1. Check if inviter (company admin) exists
+  const inviter = await prisma.user.findFirst({
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+    select: {
+      id: true,
+      name: true,
+      companyAdmin: {
+        select: {
+          company: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!inviter) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+  }
+
+  // 2. Check department validity
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
+  });
+  if (!department) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
+  }
+
+  // 3. Default password for invited employees (can be reset later)
+  const defaultPassword = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(defaultPassword);
+
+  // 4. Create user + employee in a transaction
+  const result = await prisma.$transaction(async tx => {
+    const newUser = await tx.user.create({
+      data: {
+        name,
+        email,
+        password: hashPassword,
+        role: UserRole.employee,
+        status: UserStatus.active,
+        registerWith: RegisterWith.credentials,
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: null,
+            status: true,
+          },
+        },
+        expireAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        photoUrl: true,
+      },
+    });
+
+    const newEmployee = await tx.employee.create({
+      data: {
+        userId: newUser.id,
+        companyId: inviter.id,
+        departmentId: departmentId,
+      },
+    });
+
+    // 5. Send congratulation email
+    await sendEmployeeInvitationEmail(
+      newUser.email,
+      newUser.name,
+      defaultPassword,
+      inviter.name,
+      inviter.companyAdmin?.company?.name ?? '',
+    );
+
+    return { user: newUser, employee: newEmployee };
   });
 
-  if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Company request creation failed!',
-    );
-  }
   return result;
 };
 
@@ -40,7 +118,7 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
 
   try {
     // Insert multiple invitations
-   await prisma.invitation.createMany({
+    await prisma.invitation.createMany({
       data: invitations,
       skipDuplicates: true, // important to avoid unique constraint errors
     });
@@ -75,15 +153,15 @@ const getAllFromDB = async (
 
   // Search across Invitation and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: invitationSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: invitationSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -141,7 +219,7 @@ const updateIntoDB = async (
   id: string,
   payload: Partial<IInvitation>,
 ): Promise<Invitation> => {
-    const invitation = await prisma.invitation.findUniqueOrThrow({
+  const invitation = await prisma.invitation.findUniqueOrThrow({
     where: { id },
   });
   if (!invitation) {

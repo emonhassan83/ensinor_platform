@@ -2,10 +2,9 @@ import { z } from 'zod';
 
 const createValidationSchema = z.object({
   body: z.object({
+    authorId: z
+      .string({ required_error: 'Department author is required' }),
     name: z.string({ required_error: 'Department name is required' }),
-    image: z
-      .string({ required_error: 'Department image is required' })
-      .optional(),
   }),
 });
 

@@ -259,6 +259,7 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
       data: {
         userId: user.id,
         companyId: payload.employee.company,
+        departmentId: payload.employee.department,
       },
     });
 
@@ -564,13 +565,9 @@ const updateAProfile = async (userId: string, payload: any) => {
       break;
 
     case UserRole.employee:
-      profileData = await prisma.employee.upsert({
+      profileData = await prisma.employee.update({
         where: { userId: user.id },
-        update: payload.employee ?? {},
-        create: {
-          userId: user.id,
-          ...(payload.employee ?? {}),
-        },
+        data: payload.employee ?? {},
       });
       break;
 

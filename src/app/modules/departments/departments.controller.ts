@@ -19,8 +19,22 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
 const getAllFromDB = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, departmentFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-
+  
   const result = await DepartmentServices.getAllFromDB(filters, options);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Department retrieval successfully',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getAllMyFromDB = catchAsync(async (req: Request, res: Response) => {
+  const filters = pick(req.query, departmentFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await DepartmentServices.getAllFromDB(filters, options, req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -66,6 +80,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const DepartmentController = {
   insertIntoDB,
   getAllFromDB,
+  getAllMyFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB

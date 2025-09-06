@@ -29,6 +29,12 @@ router.put(
   DepartmentController.updateIntoDB,
 );
 
+router.get(
+  '/my-department',
+  auth(UserRole.company_admin),
+  DepartmentController.getAllMyFromDB,
+);
+
 router.get('/:id', DepartmentController.getByIdFromDB);
 
 router.get('/', DepartmentController.getAllFromDB);
