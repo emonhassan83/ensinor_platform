@@ -18,5 +18,5 @@ export type IGroupInvitation = {
   departmentId: string;
   name?: string;
   groupName: string;
-  email: string[];
+  emails: string[];
 };

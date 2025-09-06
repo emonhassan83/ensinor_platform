@@ -272,7 +272,8 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
 const createInstructor = async (
   payload: IInstructor,
 ): Promise<IUserResponse> => {
-  const hashPassword = await hashedPassword(payload.password);
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
@@ -286,8 +287,8 @@ const createInstructor = async (
         verification: {
           create: {
             otp: '',
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
-            status: false,
+            expiresAt: null, // now + 30 min
+            status: true,
           },
         },
       },

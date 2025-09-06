@@ -47,10 +47,8 @@ router.post(
 );
 
 router.post(
-  '/instructor',
+  '/instructor-request',
   auth(UserRole.super_admin),
-  upload.single('image'),
-  parseData(),
   validateRequest(UserValidation.createInstructor),
   UserController.createInstructor,
 );

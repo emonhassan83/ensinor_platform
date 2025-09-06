@@ -102,16 +102,12 @@ const createInstructor = catchAsync(async (req: Request, res: Response) => {
   }
 
   const result = await UserServices.createInstructor(req.body);
-  const sendOtp = await otpServices.resendOtp(result?.email);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Instructor profile created successfully!',
-    data: {
-      user: { id, name, email, photoUrl, contactNo, status },
-      otpInfo: sendOtp,
-    },
+    data: { id, name, email, photoUrl, contactNo, status },
   });
 });
 

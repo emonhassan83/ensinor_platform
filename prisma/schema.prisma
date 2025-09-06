@@ -108,7 +108,7 @@ model User {
   reviewProfileReview        Review?              @relation("AuthorProfileReviews")
   userReview                 Review[]             @relation("UserReviews")
   companyBusinessInstructor  BusinessInstructor[] @relation("company")
-  companyEmployee                   Employee? @relation("companyUser")
+  companyEmployee            Employee[]           @relation("companyUser")
 
   @@map("users")
 }
@@ -309,7 +309,7 @@ model Employee {
   university   String?
   session      String?
   subjects     String?
-  companyId    String   @unique
+  companyId    String
   departmentId String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -325,9 +325,10 @@ model Instructor {
   id          String   @id @unique @default(uuid())
   userId      String   @unique
   designation String
+  experience  Int? // in year
   university  String?
   session     String?
-  subjects    String
+  subjects    String?
   linkedIn    String?
   facebook    String?
   twitter     String?

@@ -93,27 +93,16 @@ const createEmployee = z.object({
 // ----------------------
 const createInstructor = z.object({
   body: z.object({
-    password: z.string({ required_error: 'Password is required!' }),
     user: z.object({
       name: z.string({ required_error: 'Name is required!' }),
       email: z.string().email('Invalid email address'),
       contactNo: z.string({ required_error: 'Contact number is required!' }),
-      bio: z.string().optional(),
-      dateOfBirth: z.string().optional(),
-      city: z.string().optional(),
-      country: z.string().optional(),
-      photoUrl: z.string().optional(),
+      bio: z.string({ required_error: 'Biography is required!' })
     }),
     instructor: z.object({
       designation: z.string({ required_error: 'Designation is required!' }),
-      university: z.string().optional(),
-      session: z.string().optional(),
-      subjects: z.string({ required_error: 'Subjects are required!' }),
-      linkedIn: z.string().url().optional(),
-      facebook: z.string().url().optional(),
-      twitter: z.string().url().optional(),
-      instagram: z.string().url().optional(),
-      website: z.string().url().optional(),
+      university: z.string({ required_error: 'University is required!' }),
+      experience: z.number({ required_error: 'Experience is required!' })
     }),
   }),
 });

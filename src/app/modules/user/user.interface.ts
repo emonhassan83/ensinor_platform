@@ -83,27 +83,16 @@ export type IEmployee = {
 };
 
 export type IInstructor = {
-  password: string;
   user: {
     name: string;
     email: string;
     contactNo: string;
     bio?: string;
-    dateOfBirth?: string;
-    city?: string;
-    country?: string;
-    photoUrl?: string;
   };
   instructor: {
     designation: string;
     university?: string;
-    session?: string;
-    subjects: string;
-    linkedIn?: string;
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-    website?: string;
+    experience?: number;
   };
 };
 

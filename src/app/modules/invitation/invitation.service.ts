@@ -52,11 +52,23 @@ const insertIntoDB = async (payload: IInvitation) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
   }
 
-  // 3. Default password for invited employees (can be reset later)
+  // 3. Check if email already registered
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true },
+  });
+  if (existingUser) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      `The email ${email} is already registered in the system.`,
+    );
+  }
+
+  // 4. Default password for invited employees (can be reset later)
   const defaultPassword = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(defaultPassword);
 
-  // 4. Create user + employee in a transaction
+  // 5. Create user + employee in a transaction
   const result = await prisma.$transaction(async tx => {
     const newUser = await tx.user.create({
       data: {
@@ -91,7 +103,7 @@ const insertIntoDB = async (payload: IInvitation) => {
       },
     });
 
-    // 5. Send congratulation email
+    // 6. Send congratulation email
     await sendEmployeeInvitationEmail(
       newUser.email,
       newUser.name,
@@ -107,39 +119,93 @@ const insertIntoDB = async (payload: IInvitation) => {
 };
 
 const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
-  // Transform emails into multiple rows
-  const invitations = payload.email.map(email => ({
-    userId: payload.userId,
-    departmentId: payload.departmentId,
-    name: payload?.name ?? '',
-    groupName: payload.groupName,
-    email,
-  }));
+  const { userId, departmentId, emails, groupName } = payload;
 
-  try {
-    // Insert multiple invitations
-    await prisma.invitation.createMany({
-      data: invitations,
-      skipDuplicates: true, // important to avoid unique constraint errors
-    });
-
-    // If you also need the inserted rows with relations:
-    const insertedInvitations = await prisma.invitation.findMany({
-      where: {
-        userId: payload.userId,
-        departmentId: payload.departmentId,
-        email: { in: payload.email },
+  // 1. Validate inviter
+  const inviter = await prisma.user.findFirst({
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+    select: {
+      id: true,
+      name: true,
+      companyAdmin: {
+        select: { company: { select: { id: true, name: true } } },
       },
-      include: { user: true, department: true },
-    });
+    },
+  });
+  if (!inviter) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+  }
 
-    return insertedInvitations;
-  } catch (error: any) {
+  // 2. Validate department
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
+  });
+  if (!department) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
+  }
+
+  // 3. Check for existing users by email
+  const existingUsers = await prisma.user.findMany({
+    where: { email: { in: emails } },
+    select: { email: true },
+  });
+  if (existingUsers.length > 0) {
+    const alreadyRegistered = existingUsers.map(u => u.email);
     throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      error.message || 'Invitation creation failed!',
+      httpStatus.CONFLICT,
+      `The following emails are already registered: ${alreadyRegistered.join(', ')}`,
     );
   }
+
+  // 4. Prepare invitations
+  const defaultPassword = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(defaultPassword);
+
+  const results = await prisma.$transaction(async tx => {
+    const invitedEmployees: any[] = [];
+
+    for (const email of emails) {
+      // Create User
+      const user = await tx.user.create({
+        data: {
+          name: groupName, // or provide individual names if available
+          email,
+          password: hashPassword,
+          role: UserRole.employee,
+          status: UserStatus.active,
+          registerWith: RegisterWith.credentials,
+          verification: {
+            create: { otp: '', expiresAt: null, status: true },
+          },
+        },
+        select: { id: true, name: true, email: true },
+      });
+
+      // Create Employee
+      const employee = await tx.employee.create({
+        data: {
+          userId: user.id,
+          companyId: inviter.id,
+          departmentId,
+        },
+      });
+
+      // Queue Email (non-blocking)
+      sendEmployeeInvitationEmail(
+        user.email,
+        user.name,
+        defaultPassword,
+        inviter.name,
+        inviter.companyAdmin?.company?.name ?? '',
+      ).catch(console.error);
+
+      invitedEmployees.push({ user, employee });
+    }
+
+    return invitedEmployees;
+  });
+
+  return results;
 };
 
 const getAllFromDB = async (

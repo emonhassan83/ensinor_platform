@@ -22,7 +22,7 @@ const bulkCreateValidationSchema = z.object({
     groupName: z.string({
       required_error: 'Group name is required for invitations!',
     }),
-    email: z.array(
+    emails: z.array(
       z
         .string({ required_error: 'Email is required!' })
         .email('Invalid email format'),
