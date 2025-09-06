@@ -19,7 +19,7 @@ import {
   hashedPassword,
 } from '../user/user.utils';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
-import { sendApprovalEmail, sendDenialEmail } from './companyRequest.utils';
+import { sendApprovalEmail, sendDenialEmail } from '../../utils/email/sentCompanyStatusEmail';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({
@@ -49,13 +49,13 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
   }
 
   // Organization email duplicate check
-  const existingOrgEmail = await prisma.companyRequest.findUnique({
-    where: { organizationEmail: payload.organizationEmail },
+  const existingOrgEmail = await prisma.user.findUnique({
+    where: { email: payload.organizationEmail },
   });
   if (existingOrgEmail) {
     throw new ApiError(
       httpStatus.CONFLICT,
-      'This organization email is already used for another company request.',
+      'This organization email is already used try another email !',
     );
   }
 
@@ -217,12 +217,14 @@ const updateIntoDB = async (
           verification: {
             create: { otp: '', expiresAt: null, status: true },
           },
+          status: UserStatus.active
         },
         select: {
           id: true,
           name: true,
           email:true,
-          photoUrl: true
+          photoUrl: true,
+          status: true
         }
       });
 

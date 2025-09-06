@@ -22,6 +22,10 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
+import {
+  sendUserActiveEmail,
+  sendUserDeniedEmail,
+} from '../../utils/email/sentUserStatusEmail';
 
 const registerAUser = async (
   payload: IRegisterUser,
@@ -316,13 +320,18 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
   return result;
 };
 
-const changeProfileStatus = async (userId: string, status: UserStatus) => {
-  const isUserExist = await prisma.user.findUnique({
+const changeProfileStatus = async (
+  userId: string,
+  payload: { status: UserStatus },
+) => {
+  const { status } = payload;
+
+  const user = await prisma.user.findUnique({
     where: {
       id: userId,
     },
   });
-  if (!isUserExist) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
   }
 
@@ -330,8 +339,24 @@ const changeProfileStatus = async (userId: string, status: UserStatus) => {
     where: {
       id: userId,
     },
-    data: status,
+    data: { status },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      photoUrl: true,
+      role: true,
+      status: true,
+      isDeleted: true,
+    }
   });
+
+  // 🎯 Send email based on status
+  if (status === UserStatus.active) {
+    await sendUserActiveEmail(user.email, user.name);
+  } else if (status === UserStatus.denied) {
+    await sendUserDeniedEmail(user.email, user.name);
+  }
 
   return updatedUser;
 };
@@ -520,7 +545,7 @@ const updateAProfile = async (userId: string, payload: any) => {
       break;
 
     case UserRole.business_instructors:
-      console.log({user})
+      console.log({ user });
       profileData = await prisma.businessInstructor.upsert({
         where: { userId: user.id },
         update: payload.businessInstructor ?? {},

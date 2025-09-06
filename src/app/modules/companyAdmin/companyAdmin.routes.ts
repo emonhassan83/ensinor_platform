@@ -4,8 +4,12 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CompanyAdminValidation } from './companyAdmin.validation';
+import multer, { memoryStorage } from 'multer';
+import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
+const storage = memoryStorage();
+const upload = multer({ storage });
 
 router.get(
   '/',
@@ -22,6 +26,8 @@ router.get(
 router.put(
   '/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
+  upload.single('image'),
+  parseData(),
   validateRequest(CompanyAdminValidation.updateValidationSchema),
   CompanyAdminController.updateIntoDB,
 );

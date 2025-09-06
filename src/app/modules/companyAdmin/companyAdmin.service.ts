@@ -4,6 +4,7 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { ICompanyAdminFilterRequest } from './companyAdmin.interface';
 import { companyAdminSearchAbleFields } from './companyAdmin.constant';
 import prisma from '../../utils/prisma';
+import ApiError from '../../errors/ApiError';
 
 const getAllFromDB = async (
   params: ICompanyAdminFilterRequest,
@@ -42,7 +43,6 @@ const getAllFromDB = async (
 
   const result = await prisma.companyAdmin.findMany({
     where: whereConditions,
-    include: { user: true, company: true },
     skip,
     take: limit,
     orderBy:
@@ -53,6 +53,27 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      company: {
+        select: {
+          name: true,
+          industryType: true,
+          logo: true,
+          color: true,
+          employee: true,
+          instructor: true,
+          size: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.companyAdmin.count({
@@ -72,7 +93,35 @@ const getAllFromDB = async (
 const getByIdFromDB = async (id: string): Promise<CompanyAdmin | null> => {
   const result = await prisma.companyAdmin.findUnique({
     where: { id },
-    include: { user: true, company: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+          lastActive: true,
+          isDeleted: true,
+        },
+      },
+      company: {
+        select: {
+          name: true,
+          industryType: true,
+          logo: true,
+          color: true,
+          employee: true,
+          instructor: true,
+          size: true,
+        },
+      },
+    },
   });
 
   return result;
@@ -80,30 +129,53 @@ const getByIdFromDB = async (id: string): Promise<CompanyAdmin | null> => {
 
 const updateIntoDB = async (
   id: string,
-payload: { companyAdmin?: Partial<CompanyAdmin>; user?: Partial<any> }
+  payload: { company?: Partial<CompanyAdmin>; user?: Partial<any> },
 ): Promise<CompanyAdmin> => {
-    const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
+  const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
     where: { id },
   });
+  if (!companyAdmin) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Company admin not exists!');
+  }
 
-    const updated = await prisma.$transaction(async (tx) => {
-    // Update CompanyAdmin fields
-    const updatedCompanyAdmin = payload.companyAdmin
-      ? await tx.companyAdmin.update({
-          where: { id },
-          data: payload.companyAdmin,
-        })
-      : companyAdmin;
-
-    // Update nested user fields
-    if (payload.user) {
-      await tx.user.update({
-        where: { id: companyAdmin.userId },
-        data: payload.user,
-      });
-    }
-
-    return updatedCompanyAdmin;
+  // Perform update
+  const updated = await prisma.companyAdmin.update({
+    where: { id },
+    data: {
+      user: payload.user
+        ? {
+            update: {
+              ...(payload.user ?? {}),
+            },
+          }
+        : undefined,
+      company: payload.company
+        ? {
+            update: {
+              ...(payload.company ?? {}),
+            },
+          }
+        : undefined,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+          lastActive: true,
+          isDeleted: true,
+        },
+      },
+      company: true,
+    },
   });
 
   return updated;
@@ -113,8 +185,11 @@ const deleteFromDB = async (id: string): Promise<User> => {
   const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
     where: { id },
   });
+  if (!companyAdmin) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Company admin not exists!');
+  }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async tx => {
     const deletedUser = await tx.user.update({
       where: { id: companyAdmin.userId },
       data: { status: UserStatus.deleted, isDeleted: true },

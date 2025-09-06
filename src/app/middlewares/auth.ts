@@ -31,17 +31,13 @@ const auth = (...requiredRoles: UserRole[]) => {
     const user = await prisma.user.findUnique({
       where: { email },
     })
-    if (!user) {
+    if (!user || user?.isDeleted) {
       throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !')
     }
-    //* checking if the user is already deleted
-    if (user?.isDeleted) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'This user is deleted !')
-    }
 
-    //* checking if the user is blocked
-    if (user?.status === UserStatus.blocked) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'This user is blocked !!')
+    //* checking if the user is not active
+    if (user?.status !== UserStatus.active) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Your profile not active yet !')
     }
 
     if (requiredRoles && !requiredRoles.includes(role)) {
