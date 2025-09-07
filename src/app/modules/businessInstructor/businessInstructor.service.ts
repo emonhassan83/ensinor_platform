@@ -10,6 +10,7 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { IBusinessInstructorFilterRequest } from './businessInstructor.interface';
 import { businessInstructorSearchAbleFields } from './businessInstructor.constant';
 import prisma from '../../utils/prisma';
+import { uploadToS3 } from '../../utils/s3';
 
 const getAllFromDB = async (
   params: IBusinessInstructorFilterRequest,
@@ -66,7 +67,7 @@ const getAllFromDB = async (
           id: true,
           name: true,
           email: true,
-          photoUrl: true
+          photoUrl: true,
         },
       },
       company: {
@@ -150,10 +151,19 @@ const updateIntoDB = async (
     businessInstructor?: Partial<BusinessInstructor>;
     user?: Partial<User>;
   },
+  file: any
 ): Promise<BusinessInstructor> => {
   const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
     where: { id },
   });
+
+  // file upload
+  if (file) {
+    payload.user!.photoUrl = await uploadToS3({
+      file: file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+  }
 
   const updated = await prisma.$transaction(async tx => {
     // Update BusinessInstructor fields
@@ -187,9 +197,9 @@ const updateIntoDB = async (
             contactNo: true,
             city: true,
             country: true,
-            status: true
+            status: true,
           },
-        }
+        },
       },
     });
   });

@@ -33,7 +33,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await InstructorService.updateIntoDB(req.params.id, req.body);
+  const result = await InstructorService.updateIntoDB(req.params.id, req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

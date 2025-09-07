@@ -4,6 +4,7 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { IInstructorFilterRequest } from './instructors.interface';
 import { instructorsSearchAbleFields } from './instructors.constant';
 import prisma from '../../utils/prisma';
+import { uploadToS3 } from '../../utils/s3';
 
 const getAllFromDB = async (
   params: IInstructorFilterRequest,
@@ -108,10 +109,19 @@ const updateIntoDB = async (
     instructor?: Partial<Instructor>;
     user?: Partial<User>;
   },
+  file: any,
 ): Promise<Instructor> => {
   const instructor = await prisma.instructor.findUniqueOrThrow({
     where: { id },
   });
+
+  // file upload
+  if (file) {
+    payload.user!.photoUrl = await uploadToS3({
+      file: file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+  }
 
   const updated = await prisma.$transaction(async tx => {
     // Update Instructor fields

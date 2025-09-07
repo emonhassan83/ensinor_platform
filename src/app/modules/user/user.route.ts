@@ -20,12 +20,12 @@ router.post(
 );
 
 router.post(
-  '/company-admin',
+  '/company-admin-invitation',
   auth(UserRole.super_admin),
   upload.single('image'),
   parseData(),
   validateRequest(UserValidation.createCompanyAdmin),
-  UserController.createCompanyAdmin,
+  UserController.invitationCompanyAdmin,
 );
 
 router.post(
@@ -60,7 +60,7 @@ router.post(
 );
 
 router.post(
-  '/student',
+  '/student-invitation',
   upload.single('image'),
   parseData(),
   validateRequest(UserValidation.createStudent),

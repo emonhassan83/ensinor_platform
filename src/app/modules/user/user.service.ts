@@ -28,6 +28,7 @@ import {
   sendInstructorInvitationEmail,
   sendInstructorRequestEmail,
 } from '../../utils/email/sentInstructorEmail';
+import { sendStudentInvitationEmail } from '../../utils/email/sentStudentInvitation';
 
 const registerAUser = async (
   payload: IRegisterUser,
@@ -109,7 +110,7 @@ const registerAUser = async (
   return newUser;
 };
 
-const createCompanyAdmin = async (
+const invitationCompanyAdmin = async (
   payload: ICompanyAdmin,
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
@@ -381,7 +382,20 @@ const invitationInstructor = async (
 };
 
 const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
-  const hashPassword = await hashedPassword(payload.password);
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
+
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: payload.user.email
+    },
+  });
+  if (isExist) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'This email already exist in this platform!',
+    );
+  }
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
@@ -391,6 +405,15 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
         password: hashPassword,
         role: UserRole.student,
         registerWith: RegisterWith.credentials,
+         status: UserStatus.active,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: null,
+            status: true,
+          },
+        },
       },
     });
 
@@ -400,6 +423,9 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
         ...payload.student,
       },
     });
+
+    // 4️⃣ Send email with credentials
+    await sendStudentInvitationEmail(user.email, user.name, password);
 
     return user;
   });
@@ -698,7 +724,7 @@ const deleteAProfile = async (userId: string) => {
 
 export const UserServices = {
   registerAUser,
-  createCompanyAdmin,
+  invitationCompanyAdmin,
   createBusinessInstructor,
   createEmployee,
   createInstructor,

@@ -4,6 +4,7 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { IEmployeeFilterRequest } from './employee.interface';
 import { employeeSearchAbleFields } from './employee.constant';
 import prisma from '../../utils/prisma';
+import { uploadToS3 } from '../../utils/s3';
 
 const getAllFromDB = async (
   params: IEmployeeFilterRequest,
@@ -131,10 +132,19 @@ const getByIdFromDB = async (id: string): Promise<Employee | null> => {
 const updateIntoDB = async (
   id: string,
   payload: { employee?: Partial<Employee>; user?: Partial<any> },
+  file: any,
 ): Promise<Employee> => {
   const employee = await prisma.employee.findUniqueOrThrow({
     where: { id },
   });
+
+  // file upload
+  if (file) {
+    payload.user!.photoUrl = await uploadToS3({
+      file: file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+  }
 
   const updated = await prisma.$transaction(async tx => {
     // Update Employee fields
