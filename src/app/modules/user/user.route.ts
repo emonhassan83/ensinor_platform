@@ -48,9 +48,15 @@ router.post(
 
 router.post(
   '/instructor-request',
-  auth(UserRole.super_admin),
   validateRequest(UserValidation.createInstructor),
   UserController.createInstructor,
+);
+
+router.post(
+  '/instructor-invitation',
+  auth(UserRole.super_admin),
+  validateRequest(UserValidation.createInstructor),
+  UserController.invitationInstructor,
 );
 
 router.post(

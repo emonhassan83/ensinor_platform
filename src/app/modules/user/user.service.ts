@@ -24,6 +24,10 @@ import {
 } from '../../utils/email/sentUserStatusEmail';
 import { sendCompanyApprovalEmail } from '../../utils/email/sentCompanyStatusEmail';
 import { sendBusinessInstructorInvitation } from '../../utils/email/sentBusinessInstructorInvitation';
+import {
+  sendInstructorInvitationEmail,
+  sendInstructorRequestEmail,
+} from '../../utils/email/sentInstructorEmail';
 
 const registerAUser = async (
   payload: IRegisterUser,
@@ -275,6 +279,18 @@ const createInstructor = async (
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: payload.user.email
+    },
+  });
+  if (isExist) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'This email already exist in this platform!',
+    );
+  }
+
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
@@ -287,7 +303,7 @@ const createInstructor = async (
         verification: {
           create: {
             otp: '',
-            expiresAt: null, // now + 30 min
+            expiresAt: null,
             status: true,
           },
         },
@@ -300,6 +316,63 @@ const createInstructor = async (
         ...payload.instructor,
       },
     });
+
+    // 4️⃣ Send email with credentials
+    await sendInstructorRequestEmail(user.email, user.name, password);
+
+    return user;
+  });
+
+  return result;
+};
+
+const invitationInstructor = async (
+  payload: IInstructor,
+): Promise<IUserResponse> => {
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
+
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: payload.user.email
+    },
+  });
+  if (isExist) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'This email already exist in this platform!',
+    );
+  }
+
+  const result = await prisma.$transaction(async transactionClient => {
+    const user = await transactionClient.user.create({
+      data: {
+        name: payload.user.name,
+        email: payload.user.email,
+        password: hashPassword,
+        role: UserRole.instructor,
+        registerWith: RegisterWith.credentials,
+        status: UserStatus.active,
+        // Create verification record at the same time
+        verification: {
+          create: {
+            otp: '',
+            expiresAt: null,
+            status: true,
+          },
+        },
+      },
+    });
+
+    await transactionClient.instructor.create({
+      data: {
+        userId: user.id,
+        ...payload.instructor,
+      },
+    });
+
+    // 4️⃣ Send email with credentials
+    await sendInstructorInvitationEmail(user.email, user.name, password);
 
     return user;
   });
@@ -584,13 +657,9 @@ const updateAProfile = async (userId: string, payload: any) => {
       break;
 
     case UserRole.instructor:
-      profileData = await prisma.instructor.upsert({
+      profileData = await prisma.instructor.update({
         where: { userId: user.id },
-        update: payload.instructor ?? {},
-        create: {
-          userId: user.id,
-          ...(payload.instructor ?? {}),
-        },
+        data: payload.instructor ?? {},
       });
       break;
 
@@ -633,6 +702,7 @@ export const UserServices = {
   createBusinessInstructor,
   createEmployee,
   createInstructor,
+  invitationInstructor,
   createStudent,
   changeProfileStatus,
   getAllUser,

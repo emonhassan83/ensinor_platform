@@ -106,7 +106,25 @@ const createInstructor = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Instructor profile created successfully!',
+    message: 'Instructor profile request successfully!',
+    data: { id, name, email, photoUrl, contactNo, status },
+  });
+});
+
+const invitationInstructor = catchAsync(async (req: Request, res: Response) => {
+  if (req?.file) {
+    req.body.photoUrl = await uploadToS3({
+      file: req.file,
+      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+  }
+
+  const result = await UserServices.invitationInstructor(req.body);
+  const { id, name, email, photoUrl, contactNo, status } = result;
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Instructor profile invitation successfully!',
     data: { id, name, email, photoUrl, contactNo, status },
   });
 });
@@ -240,6 +258,7 @@ export const UserController = {
   createBusinessInstructor,
   createEmployee,
   createInstructor,
+  invitationInstructor,
   createStudent,
   changeProfileStatus,
   getAllUser,

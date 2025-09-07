@@ -42,7 +42,6 @@ const getAllFromDB = async (
 
   const result = await prisma.instructor.findMany({
     where: whereConditions,
-    include: { user: true },
     skip,
     take: limit,
     orderBy:
@@ -53,6 +52,16 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.instructor.count({
@@ -72,7 +81,22 @@ const getAllFromDB = async (
 const getByIdFromDB = async (id: string): Promise<Instructor | null> => {
   const result = await prisma.instructor.findUnique({
     where: { id },
-    include: { user: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          bio: true,
+          dateOfBirth: true,
+          contactNo: true,
+          city: true,
+          country: true,
+          status: true,
+        },
+      },
+    },
   });
 
   return result;
