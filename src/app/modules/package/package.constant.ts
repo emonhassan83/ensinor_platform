@@ -1,3 +1,8 @@
-export const packageSearchAbleFields = ['title', 'audience'];
+export const packageSearchAbleFields = ['title', 'type', 'audience'];
 
-export const packageFilterableFields = ['searchTerm', 'billingCycle', 'audience'];
+export const packageFilterableFields = [
+  'searchTerm',
+  'type',
+  'billingCycle',
+  'audience',
+];

@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { batchFilterableFields } from './batch.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await BatchService.insertIntoDB(req.body);
+  const result = await BatchService.insertIntoDB(req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -43,7 +43,8 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await BatchService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
+    req.file
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -871,6 +871,7 @@ model AffiliateSale {
 model Package {
   id           String              @id @default(uuid())
   title        String
+  type         String
   logo         String
   audience     PackageAudience
   features     String[]
@@ -1372,7 +1373,7 @@ enum UserRole {
 
 enum PackageAudience {
   company_admin
-  student
+  instructor
 }
 
 enum PackageBillingCycle {

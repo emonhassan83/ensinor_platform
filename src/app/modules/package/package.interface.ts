@@ -9,6 +9,7 @@ export type IPackageFilterRequest = {
 
 export type IPackage = {
   title: string;
+  type: string;
   logo: string;
   audience: PackageAudience
   features: string[];

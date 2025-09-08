@@ -4,10 +4,11 @@ import { z } from 'zod';
 const createValidationSchema = z.object({
   body: z.object({
     title: z.string({ required_error: 'Title is required!' }),
+    type: z.string({ required_error: 'Type is required!' }),
     logo: z.string({ required_error: 'Logo is required!' }).optional(),
-    audience: z.enum(['company_admin', 'student'], {
+    audience: z.enum(['company_admin', 'instructor'], {
       required_error: 'Audience is required!',
-      invalid_type_error: 'Audience must be either "company_admin" or "student"',
+      invalid_type_error: 'Audience must be either "company_admin" or "instructor"',
     }),
     features: z.array(z.string(), {
       required_error: 'Features are required!',
@@ -28,9 +29,10 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     title: z.string().optional(),
+    type: z.string().optional(),
     logo: z.string().optional(),
     audience: z
-      .enum(['company_admin', 'student'])
+      .enum(['company_admin', 'instructor'])
       .optional(),
     features: z.array(z.string()).optional(),
     billingCycle: z

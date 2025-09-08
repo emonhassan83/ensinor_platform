@@ -3,9 +3,9 @@ import validateRequest from '../../middlewares/validateRequest';
 import { ArticleValidation } from './article.validations';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
+import { ArticleController } from './article.controller';
 import multer, { memoryStorage } from 'multer';
 import parseData from '../../middlewares/parseData';
-import { ArticleController } from './article.controller';
 
 const router = express.Router();
 const storage = memoryStorage();

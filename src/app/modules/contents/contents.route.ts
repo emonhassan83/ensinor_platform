@@ -15,7 +15,7 @@ router.post(
 );
 
 router.put(
-  '/',
+  '/:id',
   auth(UserRole.super_admin),
   validateRequest(contentsValidation.updateValidationSchema),
   contentsController.updateContents,

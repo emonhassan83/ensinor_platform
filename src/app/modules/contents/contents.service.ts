@@ -68,6 +68,16 @@ const getAllContents = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
   const total = await prisma.content.count({
     where: whereConditions,
@@ -85,7 +95,7 @@ const getAllContents = async (
 
 // Get content by ID
 const getContentsById = async (id: string) => {
- const result = await prisma.content.findUnique({
+  const result = await prisma.content.findUnique({
     where: { id },
     include: {
       createdBy: {
@@ -93,41 +103,39 @@ const getContentsById = async (id: string) => {
           id: true,
           name: true,
           email: true,
-          photoUrl: true
+          photoUrl: true,
         },
       },
     },
-  })
+  });
 
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Content not found')
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Content not found');
   }
 
-  return result
+  return result;
 };
 
 // Update content
 const updateContents = async (id: string, payload: Partial<IContent>) => {
   const existingContent = await prisma.content.findUnique({
     where: { id },
-  })
+  });
 
   if (!existingContent) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Content not found!')
+    throw new ApiError(httpStatus.NOT_FOUND, 'Content not found!');
   }
 
   if (existingContent.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'This content already deleted!')
+    throw new ApiError(httpStatus.NOT_FOUND, 'This content already deleted!');
   }
 
   const updatedContent = await prisma.content.update({
     where: { id },
     data: payload,
-  })
+  });
 
-  // await contentNotifyToAdmin('UPDATED', updatedContent)
-
-  return updatedContent
+  return updatedContent;
 };
 
 // Delete content
@@ -135,13 +143,13 @@ const deleteContents = async (id: string) => {
   const result = await prisma.content.update({
     where: { id },
     data: { isDeleted: true },
-  })
+  });
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Content deletion failed')
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Content deletion failed');
   }
 
-  return result
+  return result;
 };
 
 export const contentsService = {

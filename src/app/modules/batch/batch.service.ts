@@ -1,24 +1,41 @@
-import {
-  Batch,
-  Prisma,
-} from '@prisma/client';
+import httpStatus from 'http-status';
+import { Batch, Prisma, UserRole, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IBatch, IBatchFilterRequest } from './batch.interface';
 import { batchSearchAbleFields } from './batch.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: IBatch) => {
+const insertIntoDB = async (payload: IBatch, file: any) => {
+  const { authorId } = payload;
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      role: UserRole.super_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
+  // upload to image
+  if (file) {
+    payload.logo = (await uploadToS3({
+      file,
+      fileName: `images/batch/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
   const result = await prisma.batch.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Batch creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Batch creation failed!');
   }
 
   return result;
@@ -26,8 +43,7 @@ const insertIntoDB = async (payload: IBatch) => {
 
 const getAllFromDB = async (
   params: IBatchFilterRequest,
-  options: IPaginationOptions,
-  reference?: string
+  options: IPaginationOptions
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
@@ -36,15 +52,15 @@ const getAllFromDB = async (
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: batchSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: batchSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -113,7 +129,8 @@ const getByIdFromDB = async (id: string): Promise<Batch | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<IBatch>
+  payload: Partial<IBatch>,
+  file: any,
 ): Promise<Batch> => {
   const batch = await prisma.batch.findUnique({
     where: { id },
@@ -122,9 +139,17 @@ const updateIntoDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Batch not found!');
   }
 
+  // upload to image
+  if (file) {
+    payload.logo = (await uploadToS3({
+      file,
+      fileName: `images/batch/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
   const result = await prisma.batch.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Batch not updated!');
