@@ -42,6 +42,8 @@ router.patch(
   ArticleController.seenArticleIntoDB,
 );
 
+router.get('/categories', ArticleController.getAllCategoriesFromDB);
+
 router.get('/:id', ArticleController.getByIdFromDB);
 
 router.get('/', ArticleController.getAllFromDB);

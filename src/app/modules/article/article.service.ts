@@ -2,13 +2,27 @@ import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import prisma from '../../utils/prisma';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { uploadToS3 } from '../../utils/s3';
 import { articleSearchableFields } from './article.constant';
 import { IArticle, IArticleFilterRequest } from './article.interface';
 
 const insertIntoDB = async (payload: IArticle, file: any) => {
+  const { authorId } = payload;
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      role: UserRole.super_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
   // upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
@@ -70,6 +84,15 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          photoUrl: true,
+        },
+      },
+    },
   });
   const total = await prisma.article.count({
     where: whereConditions,
@@ -83,6 +106,25 @@ const getAllFromDB = async (
     },
     data: result,
   };
+};
+
+const getAllCategoriesFromDB = async () => {
+  const andConditions: Prisma.ArticleWhereInput[] = [{ isDeleted: false }];
+
+  const whereConditions: Prisma.ArticleWhereInput =
+    andConditions.length > 0 ? { AND: andConditions } : {};
+
+  return await prisma.article.findMany({
+    where: whereConditions,
+    distinct: ['category'],
+    orderBy: {
+      category: 'asc', // ✅ sort alphabetically by category
+    },
+    select: {
+      id: true,
+      category: true,
+    },
+  });
 };
 
 const getByIdFromDB = async (id: string) => {
@@ -175,7 +217,6 @@ const seenArticleIntoDB = async (articleId: string, userId: string) => {
   return updatedArticle;
 };
 
-
 const deleteFromDB = async (id: string) => {
   const article = await prisma.article.findUnique({
     where: { id },
@@ -183,7 +224,7 @@ const deleteFromDB = async (id: string) => {
   if (!article || article?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Article not found!');
   }
-  
+
   const result = await prisma.article.update({
     where: { id },
     data: { isDeleted: true },
@@ -199,6 +240,7 @@ const deleteFromDB = async (id: string) => {
 export const ArticleServices = {
   insertIntoDB,
   getAllFromDB,
+  getAllCategoriesFromDB,
   getByIdFromDB,
   updateIntoDB,
   seenArticleIntoDB,

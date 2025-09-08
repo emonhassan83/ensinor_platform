@@ -1,6 +1,6 @@
 export type IArticleFilterRequest = {
     searchTerm?: string | undefined;
-    title?: string | undefined;
+    category?: string | undefined;
 };
 
 // Interface for User, aligned with Prisma User model

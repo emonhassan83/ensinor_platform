@@ -30,6 +30,16 @@ const getAllFromDB = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllCategoriesFromDB = catchAsync(async (req: Request, res: Response) => {
+  const result = await ArticleServices.getAllCategoriesFromDB();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Article categories retrieval successfully',
+    data: result,
+  })
+});
+
 const getByIdFromDB = catchAsync(async (req: Request, res: Response) => {
   const result = await ArticleServices.getByIdFromDB(req.params.id)
   sendResponse(res, {
@@ -77,6 +87,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const ArticleController = {
   insertIntoDB,
   getAllFromDB,
+  getAllCategoriesFromDB,
   getByIdFromDB,
   updateIntoDB,
   seenArticleIntoDB,
