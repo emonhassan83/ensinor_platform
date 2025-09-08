@@ -1,12 +1,17 @@
 import { CVCertificate, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { ICVCertificate, ICVCertificateFilterRequest } from './cvCertificate.interface';
+import {
+  ICVCertificate,
+  ICVCertificateFilterRequest,
+} from './cvCertificate.interface';
 import { cvCertificateSearchAbleFields } from './cvCertificate.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: ICVCertificate) => {
+const insertIntoDB = async (payload: ICVCertificate, file: any) => {
   const { cvId } = payload;
 
   const cv = await prisma.cV.findFirst({
@@ -18,12 +23,23 @@ const insertIntoDB = async (payload: ICVCertificate) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'CV not found!');
   }
 
+  // upload to file
+  if (file) {
+    payload.file = (await uploadToS3({
+      file,
+      fileName: `file/cv/certificate/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
   const result = await prisma.cVCertificate.create({
     data: payload,
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'CV certificate creation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'CV certificate creation failed!',
+    );
   }
   return result;
 };
@@ -115,12 +131,21 @@ const getByIdFromDB = async (id: string): Promise<CVCertificate | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<ICVCertificate>,
+  file: any,
 ): Promise<CVCertificate> => {
   const cVCertificate = await prisma.cVCertificate.findUnique({
     where: { id },
   });
   if (!cVCertificate) {
     throw new ApiError(httpStatus.NOT_FOUND, 'CV certificate not found!');
+  }
+
+  // upload to file
+  if (file) {
+    payload.file = (await uploadToS3({
+      file,
+      fileName: `file/cv/certificate/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
   }
 
   const result = await prisma.cVCertificate.update({

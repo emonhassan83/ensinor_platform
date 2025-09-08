@@ -12,6 +12,7 @@ import { cvSearchAbleFields } from './cv.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICV, file: any) => {
   const { userId } = payload;
@@ -22,7 +23,7 @@ const insertIntoDB = async (payload: ICV, file: any) => {
     },
   });
   if (!user || user?.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'CV user not found!');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'CV author not found!');
   }
 
   // upload to image
@@ -102,6 +103,9 @@ const getAllFromDB = async (
           photoUrl: true
         }
       },
+      educations: true,
+      experiences: true,
+      certificates: true
     },
   });
 

@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   upload.single('image'),
   parseData(),
   validateRequest(CVValidation.createValidationSchema),
@@ -28,6 +28,7 @@ router.get(
 
 router.get(
   '/',
+  auth(UserRole.student),
   auth(UserRole.super_admin),
   CVController.getAllFromDB,
 );
@@ -36,7 +37,7 @@ router.get('/:id', CVController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   upload.single('image'),
   parseData(),
   validateRequest(CVValidation.updateValidationSchema),
@@ -45,7 +46,7 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   CVController.deleteFromDB,
 );
 

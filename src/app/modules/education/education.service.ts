@@ -5,7 +5,7 @@ import { IEducation, IEducationFilterRequest } from './education.interface';
 import { educationSearchAbleFields } from './education.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
-import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEducation) => {
   const { cvId } = payload;
@@ -78,10 +78,6 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-
-    include: {
-      cv: true,
-    },
   });
 
   const total = await prisma.education.count({

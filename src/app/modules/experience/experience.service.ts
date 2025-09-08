@@ -1,10 +1,11 @@
-import { CV, Education, Experience, Prisma } from '@prisma/client';
+import { Experience, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IExperience, IExperienceFilterRequest } from './experience.interface';
 import { experienceSearchAbleFields } from './experience.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IExperience) => {
   const { cvId } = payload;
@@ -76,11 +77,7 @@ const getAllFromDB = async (
           }
         : {
             createdAt: 'desc',
-          },
-
-    include: {
-      cv: true,
-    },
+          }
   });
 
   const total = await prisma.experience.count({

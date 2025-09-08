@@ -4,34 +4,46 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CVCertificateValidation } from './cvCertificate.validation';
+import multer, { memoryStorage } from 'multer';
+import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
+const storage = memoryStorage();
+const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
+  upload.single('file'),
+  parseData(),
   validateRequest(CVCertificateValidation.createValidationSchema),
   CVCertificateController.insertIntoDB,
 );
 
 router.get(
-  '/:cvId',
-  auth(UserRole.super_admin),
+  '/cv/:cvId',
+  auth(UserRole.student),
   CVCertificateController.getAllFromDB,
 );
 
-router.get('/:id', CVCertificateController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.student),
+  CVCertificateController.getByIdFromDB,
+);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
+  upload.single('file'),
+  parseData(),
   validateRequest(CVCertificateValidation.updateValidationSchema),
   CVCertificateController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   CVCertificateController.deleteFromDB,
 );
 

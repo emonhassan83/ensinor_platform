@@ -36,8 +36,8 @@ const createValidationSchema = z.object({
     skills: z.array(
       z.string({
         required_error: 'CV skills is required!',
-      }),
-    ),
+      })
+    ).optional(),
   }),
 });
 

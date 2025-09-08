@@ -9,29 +9,25 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   validateRequest(ExperienceValidation.createValidationSchema),
   ExperienceController.insertIntoDB,
 );
 
-router.get(
-  '/:cvId',
-  auth(UserRole.super_admin),
-  ExperienceController.getAllFromDB,
-);
+router.get('/cv/:cvId', auth(UserRole.student), ExperienceController.getAllFromDB);
 
-router.get('/:id', ExperienceController.getByIdFromDB);
+router.get('/:id', auth(UserRole.student), ExperienceController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   validateRequest(ExperienceValidation.updateValidationSchema),
   ExperienceController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   ExperienceController.deleteFromDB,
 );
 
