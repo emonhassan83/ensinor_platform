@@ -14,7 +14,5 @@ export const scheduleExpiredUserCleanup = () => {
         },
       },
     });
-
-    console.log('✅ Cleaned up expired unverified users');
   });
 };

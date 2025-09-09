@@ -368,11 +368,11 @@ model Book {
   writer        String
   category      String
   price         Float
-  thumbnails    String
+  thumbnail     String?
   file          String
   popularity    Int        @default(0)
   publishedDate String?
-  status        UserStatus @default(pending)
+  status        BookStatus @default(inReview)
   isDeleted     Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -1407,6 +1407,12 @@ enum UserStatus {
   denied
   blocked
   deleted
+}
+
+enum BookStatus {
+  inReview
+  inPublishing
+  published
 }
 
 enum Gender {

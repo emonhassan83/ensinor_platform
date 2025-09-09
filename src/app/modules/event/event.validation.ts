@@ -20,16 +20,16 @@ const createValidationSchema = z.object({
       .int('Price must be an integer')
       .nonnegative('Price must be a positive number'),
     location: z.string({ required_error: 'Event location is required!' }),
-    date: z.number({ required_error: 'Event date is required!' }),
+    date: z.string({ required_error: 'Event date is required!' }),
     startTime: z.string({ required_error: 'Event startTime is required!' }),
     endTime: z.string({ required_error: 'Event endTime is required!' }),
     description: z.string({
       required_error: 'Event description is required!',
     }),
-    speakerSlogan: z.boolean({
+    speakerSlogan: z.string({
       required_error: 'Event speakerSlogan is required!',
     }),
-    scheduleSlogan: z.boolean({
+    scheduleSlogan: z.string({
       required_error: 'Event scheduleSlogan is required!',
     }),
   }),
@@ -59,7 +59,7 @@ const updateValidationSchema = z.object({
     location: z
       .string({ required_error: 'Event location is required!' })
       .optional(),
-    date: z.number({ required_error: 'Event date is required!' }).optional(),
+    date: z.string({ required_error: 'Event date is required!' }).optional(),
     startTime: z
       .string({ required_error: 'Event startTime is required!' })
       .optional(),
@@ -72,12 +72,12 @@ const updateValidationSchema = z.object({
       })
       .optional(),
     speakerSlogan: z
-      .boolean({
+      .string({
         required_error: 'Event speakerSlogan is required!',
       })
       .optional(),
     scheduleSlogan: z
-      .boolean({
+      .string({
         required_error: 'Event scheduleSlogan is required!',
       })
       .optional(),

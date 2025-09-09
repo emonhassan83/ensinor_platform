@@ -13,9 +13,9 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.instructor),
   upload.fields([
-    { name: 'image', maxCount: 1 },
+    { name: 'thumbnail', maxCount: 1 },
     { name: 'file', maxCount: 1 },
   ]),
   parseData(),
@@ -27,17 +27,23 @@ router.get('/', ShopController.getAllFromDB);
 
 router.get(
   '/my-shop',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.instructor),
   ShopController.getMyShopFromDB,
 );
 
 router.get('/:id', ShopController.getByIdFromDB);
 
+router.patch(
+  '/status/:id',
+  auth(UserRole.super_admin),
+  ShopController.changeStatusIntoDB,
+);
+
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.instructor),
   upload.fields([
-    { name: 'image', maxCount: 1 },
+    { name: 'thumbnail', maxCount: 1 },
     { name: 'file', maxCount: 1 },
   ]),
   parseData(),
@@ -45,6 +51,10 @@ router.put(
   ShopController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), ShopController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin, UserRole.instructor),
+  ShopController.deleteFromDB,
+);
 
 export const ShopRoutes = router;

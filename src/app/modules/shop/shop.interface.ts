@@ -12,7 +12,7 @@ export type IShop = {
   writer: string;
   category: string;
   price: number;
-  thumbnails: string;
+  thumbnail: string;
   file: string;
   publishedDate: string;
 };

@@ -1,8 +1,4 @@
-import {
-  Book,
-  Package,
-  Prisma,
-} from '@prisma/client';
+import { Book, BookStatus, Package, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IShop, IShopFilterRequest } from './shop.interface';
@@ -11,38 +7,49 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 import { UploadedFiles } from '../../interfaces/common.interface';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IShop, files: any) => {
-  // Upload file here
-  if (files) {
-    const { image, documents } = files as UploadedFiles
+  const { authorId } = payload;
 
-    if (image?.length) {
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
+  // upload thumbnail and file
+  if (files) {
+    const { thumbnail, file } = files as UploadedFiles;
+
+    if (thumbnail?.length) {
       const uploadedThumbnail = await uploadToS3({
-        file: image[0],
+        file: thumbnail[0],
         fileName: `images/shop/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
-      })
-      payload.thumbnails = uploadedThumbnail as string
+      });
+      payload.thumbnail = uploadedThumbnail as string;
     }
 
-    if (documents?.length) {
+    if (file?.length) {
       const uploadedFile = await uploadToS3({
-        file: documents[0],
+        file: file[0],
         fileName: `images/shop/files/${Math.floor(100000 + Math.random() * 900000)}`,
-      })
-      payload.file = uploadedFile as string
+      });
+      payload.file = uploadedFile as string;
     }
   }
 
   const result = await prisma.book.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Shop book creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
   }
   return result;
 };
@@ -50,24 +57,26 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 const getAllFromDB = async (
   params: IShopFilterRequest,
   options: IPaginationOptions,
-  userId?: string
+  userId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.BookWhereInput[] = [{ authorId: userId, isDeleted: false }];
+  const andConditions: Prisma.BookWhereInput[] = [
+    { authorId: userId, isDeleted: false },
+  ];
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: shopSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: shopSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -146,30 +155,54 @@ const updateIntoDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
   }
 
-    // Upload file here
+  // upload thumbnail and file
   if (files) {
-    const { image, documents } = files as UploadedFiles
+    const { thumbnail, file } = files as UploadedFiles;
 
-    if (image?.length) {
+    if (thumbnail?.length) {
       const uploadedThumbnail = await uploadToS3({
-        file: image[0],
+        file: thumbnail[0],
         fileName: `images/shop/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
-      })
-      payload.thumbnails = uploadedThumbnail as string
+      });
+      payload.thumbnail = uploadedThumbnail as string;
     }
 
-    if (documents?.length) {
+    if (file?.length) {
       const uploadedFile = await uploadToS3({
-        file: documents[0],
+        file: file[0],
         fileName: `images/shop/files/${Math.floor(100000 + Math.random() * 900000)}`,
-      })
-      payload.file = uploadedFile as string
+      });
+      payload.file = uploadedFile as string;
     }
   }
 
   const result = await prisma.book.update({
     where: { id },
-    data: payload
+    data: payload,
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not updated!');
+  }
+
+  return result;
+};
+
+const changeStatusIntoDB = async (
+  id: string,
+  payload: { status: BookStatus },
+): Promise<Book> => {
+  const { status } = payload;
+
+  const book = await prisma.book.findUnique({
+    where: { id },
+  });
+  if (!book || book?.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
+  }
+
+  const result = await prisma.book.update({
+    where: { id },
+    data: { status },
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not updated!');
@@ -204,5 +237,6 @@ export const ShopService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changeStatusIntoDB,
   deleteFromDB,
 };

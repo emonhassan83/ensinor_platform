@@ -1,10 +1,4 @@
-import {
-  Book,
-  Course,
-  Event,
-  Package,
-  Prisma,
-} from '@prisma/client';
+import { Event, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IEvent, IEventFilterRequest } from './event.interface';
@@ -14,6 +8,19 @@ import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 
 const insertIntoDB = async (payload: IEvent, file: any) => {
+  const { authorId } = payload;
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
   // upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
@@ -23,14 +30,11 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
   }
 
   const result = await prisma.event.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Event creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
   }
   return result;
 };
@@ -38,24 +42,26 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
 const getAllFromDB = async (
   params: IEventFilterRequest,
   options: IPaginationOptions,
-  userId?: string
+  userId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.EventWhereInput[] = [{ authorId: userId, isDeleted: false }];
+  const andConditions: Prisma.EventWhereInput[] = [
+    { authorId: userId, isDeleted: false },
+  ];
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: eventSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: eventSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -135,7 +141,7 @@ const updateIntoDB = async (
   }
 
   // upload file here
- if (file) {
+  if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
       fileName: `images/event/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
@@ -144,7 +150,7 @@ const updateIntoDB = async (
 
   const result = await prisma.event.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not updated!');

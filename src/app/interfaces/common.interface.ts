@@ -4,8 +4,8 @@ export interface UploadedFiles {
   banner?: Express.Multer.File[]
   profile?: Express.Multer.File[]
   images?: Express.Multer.File[]
-  beforeStory?: Express.Multer.File[]
-  afterStory?: Express.Multer.File[]
+  thumbnail?: Express.Multer.File[]
+  file?: Express.Multer.File[]
   videos?: Express.Multer.File[]
   documents?: Express.Multer.File[]
 }

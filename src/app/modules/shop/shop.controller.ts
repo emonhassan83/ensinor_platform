@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { shopFilterableFields } from './shop.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await ShopService.insertIntoDB(req.body, req.file);
+  const result = await ShopService.insertIntoDB(req.body, req.files);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -59,12 +59,25 @@ const updateIntoDB = catchAsync(async (req, res) => {
   const result = await ShopService.updateIntoDB(
     req.params.id,
     req.body,
-    req.file,
+    req.files,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Shop book data updated!',
+    data: result,
+  });
+});
+
+const changeStatusIntoDB = catchAsync(async (req, res) => {
+  const result = await ShopService.changeStatusIntoDB(
+    req.params.id,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Shop book status data updated!',
     data: result,
   });
 });
@@ -85,5 +98,6 @@ export const ShopController = {
   getMyShopFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changeStatusIntoDB,
   deleteFromDB,
 };
