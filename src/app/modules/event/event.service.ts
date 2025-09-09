@@ -6,6 +6,7 @@ import { eventSearchAbleFields } from './event.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEvent, file: any) => {
   const { authorId } = payload;
@@ -118,6 +119,8 @@ const getByIdFromDB = async (id: string): Promise<Event | null> => {
           photoUrl: true,
         },
       },
+      eventSchedule: true,
+      eventSpeaker: true
     },
   });
 

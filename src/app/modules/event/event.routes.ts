@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   upload.single('image'),
   parseData(),
   validateRequest(EventValidation.createValidationSchema),
@@ -24,7 +24,7 @@ router.get('/', EventController.getAllFromDB);
 
 router.get(
   '/my-event',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   EventController.getMyEventFromDB,
 );
 
@@ -32,13 +32,17 @@ router.get('/:id', EventController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
-   upload.single('image'),
+  auth(UserRole.super_admin, UserRole.company_admin),
+  upload.single('image'),
   parseData(),
   validateRequest(EventValidation.updateValidationSchema),
   EventController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), EventController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin, UserRole.company_admin),
+  EventController.deleteFromDB,
+);
 
 export const EventRoutes = router;

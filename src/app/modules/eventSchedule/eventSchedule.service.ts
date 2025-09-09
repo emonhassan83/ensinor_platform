@@ -1,6 +1,7 @@
-import { Book, Course, Event, EventSchedule, Package, Prisma } from '@prisma/client';
+import { EventSchedule, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
+import httpStatus from 'http-status';
 import {
   IEventSchedule,
   IEventScheduleFilterRequest,
@@ -13,10 +14,10 @@ const insertIntoDB = async (payload: IEventSchedule) => {
   const { eventId } = payload;
 
   const event = await prisma.event.findFirst({
-    where: { id: eventId}
-  })
+    where: { id: eventId },
+  });
   if (!event || event?.isDeleted) {
-     throw new ApiError(httpStatus.BAD_REQUEST, 'Event not found!');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Event not found!');
   }
 
   const result = await prisma.eventSchedule.create({
@@ -24,7 +25,10 @@ const insertIntoDB = async (payload: IEventSchedule) => {
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Event schedule creation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Event schedule creation failed!',
+    );
   }
   return result;
 };
@@ -80,6 +84,9 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      eventSpeaker: true,
+    },
   });
 
   const total = await prisma.eventSchedule.count({
@@ -100,7 +107,7 @@ const getByIdFromDB = async (id: string): Promise<EventSchedule | null> => {
   const result = await prisma.eventSchedule.findUnique({
     where: { id },
     include: {
-      event: true,
+      eventSpeaker: true,
     },
   });
 

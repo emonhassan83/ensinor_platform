@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   upload.single('image'),
   parseData(),
   validateRequest(EventSpeakerValidation.createValidationSchema),
@@ -22,13 +22,11 @@ router.post(
 
 router.get('/schedule/:scheduleId', EventSpeakerController.getByScheduleFromDB);
 
-router.get('/event/:eventId', EventSpeakerController.getByEventFromDB);
-
 router.get('/:id', EventSpeakerController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   upload.single('image'),
   parseData(),
   validateRequest(EventSpeakerValidation.updateValidationSchema),
@@ -37,7 +35,7 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   EventSpeakerController.deleteFromDB,
 );
 

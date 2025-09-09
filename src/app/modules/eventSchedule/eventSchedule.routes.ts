@@ -9,14 +9,13 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(EventScheduleValidation.createValidationSchema),
   EventScheduleController.insertIntoDB,
 );
 
 router.get(
   '/event/:eventId',
-  auth(UserRole.super_admin),
   EventScheduleController.getAllByEventFromDB,
 );
 
@@ -24,11 +23,15 @@ router.get('/:id', EventScheduleController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(EventScheduleValidation.updateValidationSchema),
   EventScheduleController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), EventScheduleController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin, UserRole.company_admin),
+  EventScheduleController.deleteFromDB,
+);
 
 export const EventScheduleRoutes = router;

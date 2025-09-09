@@ -7,7 +7,7 @@ const createValidationSchema = z.object({
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
     day: z.string({ required_error: 'day is required!' }),
-    date: z.number({ required_error: 'Event date is required!' }),
+    date: z.string({ required_error: 'Event date is required!' }),
   }),
 });
 
@@ -15,7 +15,7 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     day: z.string({ required_error: 'day is required!' }).optional(),
-    date: z.number({ required_error: 'Event date is required!' }).optional(),
+    date: z.string({ required_error: 'Event date is required!' }).optional(),
   }),
 });
 

@@ -3,9 +3,9 @@ import { z } from 'zod';
 // Create validation
 const createValidationSchema = z.object({
   body: z.object({
-    authorId: z
-      .string({ required_error: 'Author is required' })
-      .uuid('author must be a valid UUID'),
+    eventId: z
+      .string({ required_error: 'Event is required' })
+      .uuid('event must be a valid UUID'),
     eventScheduleId: z
       .string({ required_error: 'Event schedule is required' })
       .uuid('eventScheduleId must be a valid UUID'),

@@ -30,20 +30,6 @@ const getByScheduleFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByEventFromDB = catchAsync(async (req, res) => {
-  const filters = pick(req.query, eventSpeakerFilterableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-
-  const result = await EventSpeakerService.getAllFromDB(filters, options, req.params.eventId);
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Event speaker data fetched!',
-    meta: result.meta,
-    data: result.data,
-  });
-});
 
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await EventSpeakerService.getByIdFromDB(req.params.id);
@@ -82,7 +68,6 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const EventSpeakerController = {
   insertIntoDB,
   getByScheduleFromDB,
-  getByEventFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

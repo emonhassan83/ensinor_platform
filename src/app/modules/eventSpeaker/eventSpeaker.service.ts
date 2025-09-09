@@ -9,8 +9,22 @@ import { eventSpeakerSearchAbleFields } from './eventSpeaker.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEventSpeaker, file: any) => {
+  const { eventId, eventScheduleId } = payload;
+
+  const eventSchedule = await prisma.eventSchedule.findFirst({
+    where: {
+      id: eventScheduleId,
+      eventId,
+      isDeleted: false,
+    },
+  });
+  if (!eventSchedule) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event schedule not found!');
+  }
+
   // upload to image
   if (file) {
     payload.photo = (await uploadToS3({
@@ -35,12 +49,14 @@ const insertIntoDB = async (payload: IEventSpeaker, file: any) => {
 const getAllFromDB = async (
   params: IEventSpeakerFilterRequest,
   options: IPaginationOptions,
-  eventId?: string,
+  scheduleId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.EventSpeakerWhereInput[] = [{ eventId }];
+  const andConditions: Prisma.EventSpeakerWhereInput[] = [
+    { eventScheduleId: scheduleId },
+  ];
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -101,7 +117,6 @@ const getByIdFromDB = async (id: string): Promise<EventSpeaker | null> => {
   const result = await prisma.eventSpeaker.findUnique({
     where: { id },
     include: {
-      event: true,
       schedule: true,
     },
   });
