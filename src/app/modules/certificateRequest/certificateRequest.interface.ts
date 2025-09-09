@@ -7,6 +7,7 @@ export type ICertificateRequestFilterRequest = {
 
 export type ICertificateRequest = {
   authorId: string;
+  userId: string;
   courseId: string;
   status?: CertificateRequestStatus;
   isCompleted?: boolean;

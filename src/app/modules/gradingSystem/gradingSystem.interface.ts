@@ -16,4 +16,3 @@ export type IGradingSystem = {
   authorId: string;
   isDefault?: boolean
 };
-

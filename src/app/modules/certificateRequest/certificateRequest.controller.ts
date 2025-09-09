@@ -30,16 +30,16 @@ const getByUserIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByCourseIdFromDB = catchAsync(async (req, res) => {
+const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateRequestService.getAllFromDB(filters, options, req.params.courseId);
+  const result = await CertificateRequestService.getAllFromDB(filters, options, req.params.authorId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Certificate request by courseId data fetched!',
+    message: 'Certificate request by authorId data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -81,7 +81,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CertificateRequestController = {
   insertIntoDB,
   getByUserIdFromDB,
-  getByCourseIdFromDB,
+  getByAuthorIdFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

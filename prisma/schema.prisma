@@ -86,7 +86,6 @@ model User {
   createdCoupons             Coupon[]             @relation("CouponCreated")
   usedCoupons                Coupon[]             @relation("CouponUsedBy")
   quizAttempt                QuizAttempt[]
-  certificateRequest         CertificateRequest[]
   department                 Department[]
   invitation                 Invitation[]
   enrolledCourse             EnrolledCourse[]
@@ -110,6 +109,8 @@ model User {
   companyBusinessInstructor  BusinessInstructor[] @relation("company")
   companyEmployee            Employee[]           @relation("companyUser")
   quiz                       Quiz[]
+  studentRequest             CertificateRequest[] @relation("studentRequest")
+  authorRequest              CertificateRequest[] @relation("authorRequest")
 
   @@map("users")
 }
@@ -628,15 +629,16 @@ enum CourseGrade {
 
 model CertificateRequest {
   id         String                   @id @default(uuid())
+  userId     String // FK to User (course author)
   authorId   String // FK to User (student requesting)
-  courseId   String // FK to Course
+  courseId   String
   status     CertificateRequestStatus @default(pending)
-  isComplete Boolean                  @default(false)
   createdAt  DateTime                 @default(now())
   updatedAt  DateTime                 @updatedAt
 
   // Relations
-  author User   @relation(fields: [authorId], references: [id])
+  author User   @relation("authorRequest", fields: [authorId], references: [id])
+  user   User   @relation("studentRequest", fields: [userId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
 
   @@map("certificate_requests")
@@ -644,7 +646,6 @@ model CertificateRequest {
 
 enum CertificateRequestStatus {
   pending
-  approved
   completed
   denied
 }
@@ -670,12 +671,6 @@ model Certificate {
   author User   @relation(fields: [authorId], references: [id])
 
   @@map("certificates")
-}
-
-enum CertificateStatus {
-  pending
-  approved
-  rejected
 }
 
 //* Event Related Models
