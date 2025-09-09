@@ -1,4 +1,4 @@
-import { Course, CourseContent, Prisma } from '@prisma/client';
+import { CourseContent, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -9,13 +9,23 @@ import { courseContentSearchAbleFields } from './courseContent.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICourseContent, file: any) => {
+  const { courseId } = payload;
+
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, isDeleted: false },
+  });
+  if (!course) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+  }
+
   // upload to image
   if (file) {
     payload.video = (await uploadToS3({
       file,
-      fileName: `images/courses/videos/${Math.floor(100000 + Math.random() * 900000)}`,
+      fileName: `videos/courses/content/${Math.floor(100000 + Math.random() * 900000)}`,
     })) as string;
   }
 
@@ -34,8 +44,8 @@ const insertIntoDB = async (payload: ICourseContent, file: any) => {
   await prisma.course.update({
     where: { id: payload.courseId },
     data: {
-      lectures: { increment: 1 }, // safely +1
-      duration: { increment: payload.duration }, // safely add duration
+      lectures: { increment: 1 },
+      duration: { increment: payload.duration },
     },
   });
 
@@ -138,7 +148,7 @@ const updateIntoDB = async (
   if (file) {
     payload.video = (await uploadToS3({
       file,
-      fileName: `images/courses/videos/${Math.floor(100000 + Math.random() * 900000)}`,
+      fileName: `videos/courses/content/${Math.floor(100000 + Math.random() * 900000)}`,
     })) as string;
   }
 
@@ -169,14 +179,14 @@ const deleteFromDB = async (id: string): Promise<CourseContent> => {
     where: { id },
   });
   if (!content) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not found!');
   }
 
   const result = await prisma.courseContent.delete({
     where: { id },
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course not deleted!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not deleted!');
   }
 
   // decrement lectures and subtract duration

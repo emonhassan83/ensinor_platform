@@ -1,4 +1,4 @@
-import { CourseLevel } from "@prisma/client";
+import { CourseLevel, CoursesStatus } from '@prisma/client';
 
 export type ICourseFilterRequest = {
   searchTerm?: string | undefined;
@@ -22,4 +22,6 @@ export type ICourse = {
   description: string;
   thumbnail: string;
   hasCertificate: boolean;
+  isFreeCourse: boolean;
+  status?: CoursesStatus;
 };

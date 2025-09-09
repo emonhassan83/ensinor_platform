@@ -1,8 +1,9 @@
 import {
-  Book,
   Course,
-  Package,
+  CoursesStatus,
   Prisma,
+  UserRole,
+  UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
@@ -11,8 +12,22 @@ import { courseSearchAbleFields } from './course.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
+  const { authorId } = payload;
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
   // upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
@@ -21,15 +36,17 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     })) as string;
   }
 
+  // sent isFreeCourse field
+  payload.price === 0 && (payload.isFreeCourse = true);
+  author.role === UserRole.super_admin &&
+    (payload.status = CoursesStatus.approved as any);
+
   const result = await prisma.course.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Course creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Course creation failed!');
   }
   return result;
 };
@@ -37,24 +54,26 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  userId?: string
+  userId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseWhereInput[] = [{ authorId: userId, isDeleted: false }];
+  const andConditions: Prisma.CourseWhereInput[] = [
+    { authorId: userId, isDeleted: false },
+  ];
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: courseSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: courseSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -111,6 +130,15 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
           photoUrl: true,
         },
       },
+      courseContent: {
+        select: {
+          id: true,
+          title: true,
+          video: true,
+          duration: true,
+        },
+      },
+      resource: true,
     },
   });
 
@@ -134,7 +162,7 @@ const updateIntoDB = async (
   }
 
   // upload file here
- if (file) {
+  if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
       fileName: `images/courses/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
@@ -143,11 +171,37 @@ const updateIntoDB = async (
 
   const result = await prisma.course.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not updated!');
   }
+
+  return result;
+};
+
+const changeStatusIntoDB = async (
+  id: string,
+  payload: { status: CoursesStatus },
+): Promise<Course> => {
+  const { status } = payload;
+
+  const course = await prisma.course.findUnique({
+    where: { id },
+  });
+  if (!course || course?.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+  }
+
+  const result = await prisma.course.update({
+    where: { id },
+    data: { status },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course status not updated!');
+  }
+
+  // sent notify to author when changed status
 
   return result;
 };
@@ -178,5 +232,6 @@ export const CourseService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changeStatusIntoDB,
   deleteFromDB,
 };

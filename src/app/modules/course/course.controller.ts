@@ -69,6 +69,19 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const changeStatusIntoDB = catchAsync(async (req, res) => {
+  const result = await CourseService.changeStatusIntoDB(
+    req.params.id,
+    req.body,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course status data updated!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -85,5 +98,6 @@ export const CourseController = {
   getMyCourseFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changeStatusIntoDB,
   deleteFromDB,
 };

@@ -22,9 +22,6 @@ const createValidationSchema = z.object({
     description: z.string({
       required_error: 'Course description is required!',
     }),
-    thumbnail: z
-      .string({ required_error: 'Course thumbnail is required!' })
-      .optional(),
     hasCertificate: z.boolean({
       required_error: 'Course hasCertificate is required!',
     }),

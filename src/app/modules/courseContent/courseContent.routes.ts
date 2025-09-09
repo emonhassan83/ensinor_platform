@@ -13,30 +13,45 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
-  upload.single('image'),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  upload.single('content'),
   parseData(),
   validateRequest(CourseContentValidation.createValidationSchema),
   CourseContentController.insertIntoDB,
 );
 
-router.get(
-  '/:courseId',
-  auth(UserRole.super_admin),
-  CourseContentController.getByCourseIdFromDB,
-);
+router.get('/course/:courseId', CourseContentController.getByCourseIdFromDB);
 
 router.get('/:id', CourseContentController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
-   upload.single('image'),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  upload.single('content'),
   parseData(),
   validateRequest(CourseContentValidation.updateValidationSchema),
   CourseContentController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), CourseContentController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  CourseContentController.deleteFromDB,
+);
 
 export const CourseContentRoutes = router;

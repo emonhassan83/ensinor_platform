@@ -423,30 +423,30 @@ enum OrderModelType {
 
 // Course Related Models
 model Course {
-  id               String      @id @default(uuid())
+  id               String        @id @default(uuid())
   authorId         String
   title            String
   shortDescription String
   category         String
   level            CourseLevel
   language         String
-  points           Int         @default(0)
+  points           Int           @default(0)
   deadline         String?
   price            Float
   description      String
   thumbnail        String?
-  lectures         Int         @default(0)
-  duration         Int         @default(0)
-  hasCertificate   Boolean     @default(false)
-  isFreeCourse     Boolean     @default(false)
-  popularity       Int         @default(0)
-  totalCompleted   Int         @default(0)
-  status           UserStatus  @default(pending)
-  avgRating        Float       @default(0.0)
-  ratingCount      Int         @default(0)
-  isDeleted        Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  lectures         Int           @default(0)
+  duration         Int           @default(0)
+  hasCertificate   Boolean       @default(false)
+  isFreeCourse     Boolean       @default(false)
+  popularity       Int           @default(0)
+  totalCompleted   Int           @default(0)
+  status           CoursesStatus @default(pending)
+  avgRating        Float         @default(0.0)
+  ratingCount      Int           @default(0)
+  isDeleted        Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   author User @relation(fields: [authorId], references: [id])
 
@@ -1407,6 +1407,12 @@ enum UserStatus {
   denied
   blocked
   deleted
+}
+
+enum CoursesStatus {
+  pending
+  approved
+  denied
 }
 
 enum BookStatus {

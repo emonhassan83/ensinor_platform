@@ -13,7 +13,12 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   upload.single('image'),
   parseData(),
   validateRequest(CourseValidation.createValidationSchema),
@@ -23,8 +28,13 @@ router.post(
 router.get('/', CourseController.getAllFromDB);
 
 router.get(
-  '/my-Course',
-  auth(UserRole.super_admin),
+  '/my-course',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   CourseController.getMyCourseFromDB,
 );
 
@@ -32,13 +42,34 @@ router.get('/:id', CourseController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
-   upload.single('image'),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  upload.single('image'),
   parseData(),
   validateRequest(CourseValidation.updateValidationSchema),
   CourseController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), CourseController.deleteFromDB);
+router.patch(
+  '/status/:id',
+  auth(UserRole.super_admin),
+  validateRequest(CourseValidation.updateValidationSchema),
+  CourseController.changeStatusIntoDB,
+);
+
+router.delete(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  CourseController.deleteFromDB,
+);
 
 export const CourseRoutes = router;
