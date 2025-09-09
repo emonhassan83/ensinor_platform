@@ -9,51 +9,77 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuestionValidation.createValidationSchema),
   QuestionController.insertIntoDB,
 );
 
 router.post(
   '/options',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuestionValidation.optionCreateSchema),
-  QuestionController.insertIntoDB,
+  QuestionController.addOptionsToQuestion,
 );
 
-router.get(
-  '/:quizId',
-  auth(UserRole.super_admin),
-  QuestionController.getByQuizIdFromDB,
-);
+router.get('/quiz/:quizId', QuestionController.getByQuizIdFromDB);
 
 router.get('/:id', QuestionController.getByIdFromDB);
 
-router.get('/options/:questionId', QuestionController.getOptionsByQuestionId);
+router.get('/question/:questionId', QuestionController.getOptionsByQuestionId);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuestionValidation.updateValidationSchema),
   QuestionController.updateIntoDB,
 );
 
 router.put(
-  '/options/:id',
-  auth(UserRole.super_admin),
+  '/options/:optionId',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuestionValidation.optionUpdateSchema),
   QuestionController.updateOption,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   QuestionController.deleteFromDB,
 );
 
 router.delete(
   '/options/:optionId',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   QuestionController.deleteOption,
 );
 

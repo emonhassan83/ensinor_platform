@@ -9,26 +9,52 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuizValidation.createValidationSchema),
   QuizController.insertIntoDB,
 );
 
 router.get(
-  '/:courseId',
-  auth(UserRole.super_admin),
-  QuizController.getByCourseIdFromDB,
+  '/author/:authorId',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  QuizController.getByAuthorIdFromDB,
 );
+
+router.get('/course/:courseId', QuizController.getByCourseIdFromDB);
 
 router.get('/:id', QuizController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(QuizValidation.updateValidationSchema),
   QuizController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), QuizController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  QuizController.deleteFromDB,
+);
 
 export const QuizRoutes = router;

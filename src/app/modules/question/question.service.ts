@@ -9,9 +9,10 @@ import {
 import { questionSearchAbleFields } from './question.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuestion) => {
-   const { quizId, name, options } = payload;
+  const { quizId, name, options } = payload;
 
   // 1. Validate quiz existence
   const quiz = await prisma.quiz.findUnique({
@@ -23,11 +24,17 @@ const insertIntoDB = async (payload: IQuestion) => {
 
   // 2. Validate options
   if (!options || options.length === 0) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'At least one option is required!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'At least one option is required!',
+    );
   }
   const hasCorrect = options.some(opt => opt.isCorrect);
   if (!hasCorrect) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'At least one correct option is required!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'At least one correct option is required!',
+    );
   }
 
   // 3. Create question with options
@@ -63,9 +70,8 @@ const addOptionsToQuestion = async (payload: {
   const { questionId, options } = payload;
 
   const question = await prisma.question.findUnique({
-    where: { id: questionId }
+    where: { id: questionId },
   });
-
   if (!question || question.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Question not found!');
   }
@@ -139,7 +145,16 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-    include: { options: true },
+    include: {
+      options: {
+        select: {
+          id: true,
+          optionLevel: true,
+          optionText: true,
+          isCorrect: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.question.count({
@@ -158,7 +173,7 @@ const getAllFromDB = async (
 
 const getOptionsByQuestionId = async (questionId: string) => {
   const question = await prisma.question.findUnique({
-    where: { id: questionId }
+    where: { id: questionId },
   });
 
   if (!question || question.isDeleted) {
@@ -167,8 +182,8 @@ const getOptionsByQuestionId = async (questionId: string) => {
 
   const result = await prisma.options.findMany({
     where: { questionId },
-  })
-   if (!result) {
+  });
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Question options not found!');
   }
 
@@ -220,7 +235,7 @@ const updateOption = async (
   payload: Partial<IQuestionOption>,
 ) => {
   const option = await prisma.options.findUnique({
-    where: { id: optionId }
+    where: { id: optionId },
   });
   if (!option) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Question options not found!');
@@ -267,12 +282,12 @@ const deleteFromDB = async (id: string): Promise<Question> => {
 
 const deleteOption = async (optionId: string) => {
   const option = await prisma.options.findUnique({
-    where: { id: optionId }
+    where: { id: optionId },
   });
   if (!option) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Question options not found!');
   }
-  
+
   const result = await prisma.options.delete({
     where: { id: optionId },
   });

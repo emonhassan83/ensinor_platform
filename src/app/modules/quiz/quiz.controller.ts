@@ -15,11 +15,26 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const getByAuthorIdFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, quizFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await QuizService.getByAuthorIdFromDB(filters, options, req.params.authorId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz by author data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 const getByCourseIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, quizFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await QuizService.getAllFromDB(filters, options, req.params.QuizId);
+  const result = await QuizService.getAllFromDB(filters, options, req.params.courseId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -65,6 +80,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const QuizController = {
   insertIntoDB,
+  getByAuthorIdFromDB,
   getByCourseIdFromDB,
   getByIdFromDB,
   updateIntoDB,

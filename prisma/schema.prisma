@@ -109,6 +109,7 @@ model User {
   userReview                 Review[]             @relation("UserReviews")
   companyBusinessInstructor  BusinessInstructor[] @relation("company")
   companyEmployee            Employee[]           @relation("companyUser")
+  quiz                       Quiz[]
 
   @@map("users")
 }
@@ -528,6 +529,7 @@ model CourseBundleCourses {
 
 model Quiz {
   id           String   @id @default(uuid())
+  authorId     String
   courseId     String
   deadline     String?
   time         String? // e.g. "30m" or "01:00:00"
@@ -540,6 +542,7 @@ model Quiz {
 
   // Relations
   course        Course        @relation(fields: [courseId], references: [id])
+  author        User          @relation(fields: [authorId], references: [id])
   questionsList Question[]
   quizAttempt   QuizAttempt[]
 

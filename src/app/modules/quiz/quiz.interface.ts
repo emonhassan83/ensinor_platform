@@ -6,6 +6,7 @@ export type IQuizFilterRequest = {
 };
 
 export type IQuiz = {
+  authorId: string;
   courseId: string;
   deadline?: string;
   time?: string;

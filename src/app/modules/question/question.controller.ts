@@ -29,7 +29,7 @@ const getByQuizIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, questionFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await QuestionService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await QuestionService.getAllFromDB(filters, options, req.params.quizId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

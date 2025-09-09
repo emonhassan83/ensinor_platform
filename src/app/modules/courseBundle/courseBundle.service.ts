@@ -1,20 +1,48 @@
-import {
-  Course,
-  CourseBundle,
-  Prisma,
-} from '@prisma/client';
+import { Course, CourseBundle, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { ICourseBundle, ICourseBundleFilterRequest } from './courseBundle.interface';
+import {
+  ICourseBundle,
+  ICourseBundleFilterRequest,
+} from './courseBundle.interface';
 import { courseBundleSearchAbleFields } from './courseBundle.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 // ---------------- Insert ----------------
 const insertIntoDB = async (payload: ICourseBundle, file: any) => {
+  const { authorId, course: courseIds, ...bundleData } = payload;
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!author) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found or inactive!');
+  }
+
+  // Validate Courses belong to this author
+  const courses = await prisma.course.findMany({
+    where: {
+      id: { in: courseIds },
+      authorId,
+      isDeleted: false,
+    },
+  });
+  if (courses.length !== courseIds.length) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'One or more courses do not belong to this author!',
+    );
+  }
+
   // upload to image
-   if (file) {
+  if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
       fileName: `images/course-bundles/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
@@ -22,15 +50,23 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
   }
 
   const result = await prisma.courseBundle.create({
-    data: payload,
-    include: {
-      author: true,
-      courseBundleCourses: true,
+    data: {
+      ...bundleData,
+      thumbnail: payload.thumbnail,
+      authorId,
+      courseBundleCourses: {
+        create: courseIds.map(courseId => ({
+          course: { connect: { id: courseId } },
+        })),
+      },
     },
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Course bundle creation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Course bundle creation failed!',
+    );
   }
   return result;
 };
@@ -38,24 +74,26 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
 const getAllFromDB = async (
   params: ICourseBundleFilterRequest,
   options: IPaginationOptions,
-  userId?: string
+  userId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseBundleWhereInput[] = [{ authorId: userId, isDeleted: false }];
+  const andConditions: Prisma.CourseBundleWhereInput[] = [
+    { authorId: userId, isDeleted: false },
+  ];
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: courseBundleSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: courseBundleSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -84,10 +122,6 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-     include: {
-      author: true,
-      courseBundleCourses: { include: { course: true } },
-    },
   });
 
   const total = await prisma.courseBundle.count({
@@ -104,8 +138,8 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<Course | null> => {
-  const result = await prisma.course.findUnique({
+const getByIdFromDB = async (id: string): Promise<CourseBundle | null> => {
+  const result = await prisma.courseBundle.findUnique({
     where: { id },
     include: {
       author: { select: { id: true, name: true, email: true, photoUrl: true } },
@@ -139,10 +173,13 @@ const updateIntoDB = async (
 
   const result = await prisma.courseBundle.update({
     where: { id },
-    data: payload,
+    data: {
+      ...payload,
+       thumbnail: payload.thumbnail,
+    },
     include: {
       author: true,
-      courseBundleCourses: true,
+      courseBundleCourses: { include: { course: true } },
     },
   });
 
