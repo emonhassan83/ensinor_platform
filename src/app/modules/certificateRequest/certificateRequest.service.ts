@@ -1,10 +1,4 @@
-import {
-  CertificateRequest,
-  EnrolledCourse,
-  Prisma,
-  Quiz,
-  QuizAttempt,
-} from '@prisma/client';
+import { CertificateRequest, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -14,9 +8,10 @@ import {
 import { certificateRequestSearchAbleFields } from './certificateRequest.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICertificateRequest) => {
-  const { authorId, courseId } = payload;
+  const { userId, authorId, courseId } = payload;
 
   const course = await prisma.course.findFirst({
     where: {
@@ -27,12 +22,25 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
   }
 
-  const user = await prisma.user.findFirst({
+  const author = await prisma.user.findFirst({
     where: {
       id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
     },
   });
-  if (!user || user?.isDeleted) {
+  if (!author) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate author not found!');
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!user) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Certificate request user not found!',
