@@ -19,12 +19,7 @@ const createValidationSchema = z.object({
 // Update validation
 const updateValidationSchema = z.object({
   body: z.object({
-    status: z.nativeEnum(CertificateRequestStatus).optional(),
-    isCompleted: z
-      .boolean({
-        required_error: 'Certificate request isCompleted is required!',
-      })
-      .optional(),
+    status: z.nativeEnum(CertificateRequestStatus).optional()
   }),
 });
 

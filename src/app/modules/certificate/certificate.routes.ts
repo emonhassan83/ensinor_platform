@@ -13,31 +13,61 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
-  upload.single('image'),
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  upload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'signature', maxCount: 1 },
+  ]),
   parseData(),
   validateRequest(CertificateValidation.createValidationSchema),
   CertificateController.insertIntoDB,
 );
 
 router.get(
-  '/my-requests',
-  auth(UserRole.super_admin),
-  CertificateController.getByUserIdFromDB,
+  '/my-certificate',
+  auth(UserRole.student, UserRole.employee),
+  CertificateController.getByAuthorIdFromDB,
 );
 
 router.get(
-  '/:courseId',
-  auth(UserRole.super_admin),
+  '/course/:courseId',
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
   CertificateController.getByCourseIdFromDB,
 );
 
-router.get('/:id', CertificateController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  CertificateController.getByIdFromDB,
+);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
-  upload.single('image'),
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  upload.fields([
+    { name: 'logo', maxCount: 1 },
+    { name: 'signature', maxCount: 1 },
+  ]),
   parseData(),
   validateRequest(CertificateValidation.updateValidationSchema),
   CertificateController.updateIntoDB,
@@ -45,7 +75,12 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
   CertificateController.deleteFromDB,
 );
 

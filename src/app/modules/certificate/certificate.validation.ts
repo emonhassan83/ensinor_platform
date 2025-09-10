@@ -13,9 +13,6 @@ const createValidationSchema = z.object({
     company: z.string({
       required_error: 'Certificate company is required!',
     }),
-    logo: z.string({
-      required_error: 'Certificate logo is required!',
-    }),
     student: z.string({
       required_error: 'Certificate student is required!',
     }),
@@ -39,11 +36,6 @@ const createValidationSchema = z.object({
     reference: z.string({
       required_error: 'Certificate reference is required!',
     }),
-    signature: z
-      .string({
-        required_error: 'Certificate signature is required!',
-      })
-      .optional(),
   }),
 });
 

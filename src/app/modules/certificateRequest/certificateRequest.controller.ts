@@ -19,7 +19,11 @@ const getByUserIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateRequestService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CertificateRequestService.getAllFromDB(
+    filters,
+    options,
+    { userId: req.user!.userId },
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +38,11 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateRequestService.getAllFromDB(filters, options, req.params.authorId);
+  const result = await CertificateRequestService.getAllFromDB(
+    filters,
+    options,
+    { userId: req.params.authorId },
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -58,7 +66,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CertificateRequestService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

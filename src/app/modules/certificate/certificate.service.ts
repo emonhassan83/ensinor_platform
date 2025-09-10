@@ -1,11 +1,4 @@
-import {
-  Certificate,
-  CertificateRequest,
-  EnrolledCourse,
-  Prisma,
-  Quiz,
-  QuizAttempt,
-} from '@prisma/client';
+import { Certificate, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -16,37 +9,55 @@ import { certificateSearchAbleFields } from './certificate.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
+import { UploadedFiles } from '../../interfaces/common.interface';
 
-const insertIntoDB = async (payload: ICertificate, file: any) => {
+const insertIntoDB = async (payload: ICertificate, files: any) => {
   const { authorId, courseId } = payload;
 
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
+      isDeleted: false,
     },
   });
-  if (!course || course?.isDeleted) {
+  if (!course) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
   }
 
   const user = await prisma.user.findFirst({
     where: {
       id: authorId,
+      isDeleted: false,
+      status: UserStatus.active,
     },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate user not found!');
   }
 
-  // upload to image
-  if (file) {
-    payload.logo = (await uploadToS3({
-      file,
-      fileName: `images/certificate/logo/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
+  // upload thumbnail and file
+  if (files) {
+    const { logo, signature } = files as UploadedFiles;
+
+    if (logo?.length) {
+      const uploadedLogo = await uploadToS3({
+        file: logo[0],
+        fileName: `images/certificate/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+      });
+      payload.logo = uploadedLogo as string;
+    }
+
+    if (signature?.length) {
+      const uploadedSignature = await uploadToS3({
+        file: signature[0],
+        fileName: `images/certificate/signature/${Math.floor(100000 + Math.random() * 900000)}`,
+      });
+      payload.signature = uploadedSignature as string;
+    }
   }
 
-  const result = await prisma.certificateRequest.create({
+  const result = await prisma.certificate.create({
     data: payload,
   });
 
@@ -59,12 +70,20 @@ const insertIntoDB = async (payload: ICertificate, file: any) => {
 const getAllFromDB = async (
   params: ICertificateFilterRequest,
   options: IPaginationOptions,
-  authorId?: string,
+  filterBy: { authorId?: string; courseId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CertificateWhereInput[] = [{ authorId }];
+  const andConditions: Prisma.CertificateWhereInput[] = [];
+
+  // Filter either by authorId or userId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.courseId) {
+    andConditions.push({ courseId: filterBy.courseId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -107,8 +126,25 @@ const getAllFromDB = async (
           },
 
     include: {
-      author: true,
-      course: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      course: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail: true,
+          shortDescription: true,
+          category: true,
+          level: true,
+          language: true,
+        },
+      },
     },
   });
 
@@ -130,7 +166,14 @@ const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
   const result = await prisma.certificate.findUnique({
     where: { id },
     include: {
-      author: true,
+       author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
       course: true,
     },
   });
@@ -145,7 +188,7 @@ const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<ICertificate>,
-  file: any,
+  files: any,
 ): Promise<Certificate> => {
   const certificate = await prisma.certificate.findUnique({
     where: { id },
@@ -154,12 +197,25 @@ const updateIntoDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Certificate not found!');
   }
 
-  // upload to image
-  if (file) {
-    payload.logo = (await uploadToS3({
-      file,
-      fileName: `images/certificate/logo/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
+  // upload thumbnail and file
+  if (files) {
+    const { logo, signature } = files as UploadedFiles;
+
+    if (logo?.length) {
+      const uploadedLogo = await uploadToS3({
+        file: logo[0],
+        fileName: `images/certificate/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+      });
+      payload.logo = uploadedLogo as string;
+    }
+
+    if (signature?.length) {
+      const uploadedSignature = await uploadToS3({
+        file: signature[0],
+        fileName: `images/certificate/signature/${Math.floor(100000 + Math.random() * 900000)}`,
+      });
+      payload.signature = uploadedSignature as string;
+    }
   }
 
   const result = await prisma.certificate.update({

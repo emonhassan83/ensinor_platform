@@ -8,4 +8,6 @@ export interface UploadedFiles {
   file?: Express.Multer.File[]
   videos?: Express.Multer.File[]
   documents?: Express.Multer.File[]
+  logo?: Express.Multer.File[]
+  signature?: Express.Multer.File[]
 }

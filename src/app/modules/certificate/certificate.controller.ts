@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { certificateFilterableFields } from './certificate.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await CertificateService.insertIntoDB(req.body, req.file);
+  const result = await CertificateService.insertIntoDB(req.body, req.files);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -15,11 +15,11 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByUserIdFromDB = catchAsync(async (req, res) => {
+const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CertificateService.getAllFromDB(filters, options, { authorId: req.user!.userId });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +34,7 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateService.getAllFromDB(filters, options, req.params.courseId);
+  const result = await CertificateService.getAllFromDB(filters, options, { courseId: req.params.courseId });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -59,7 +59,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CertificateService.updateIntoDB(
     req.params.id,
     req.body,
-    req.file
+    req.files
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -81,7 +81,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const CertificateController = {
   insertIntoDB,
-  getByUserIdFromDB,
+  getByAuthorIdFromDB,
   getByCourseIdFromDB,
   getByIdFromDB,
   updateIntoDB,

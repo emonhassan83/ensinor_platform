@@ -1,4 +1,9 @@
-import { CertificateRequest, Prisma, UserStatus } from '@prisma/client';
+import {
+  CertificateRequest,
+  CertificateRequestStatus,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -12,15 +17,6 @@ import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICertificateRequest) => {
   const { userId, authorId, courseId } = payload;
-
-  const course = await prisma.course.findFirst({
-    where: {
-      id: courseId,
-    },
-  });
-  if (!course || course?.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
-  }
 
   const author = await prisma.user.findFirst({
     where: {
@@ -47,6 +43,17 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
     );
   }
 
+  const course = await prisma.course.findFirst({
+    where: {
+      id: courseId,
+      authorId,
+      isDeleted: false,
+    },
+  });
+  if (!course) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
+  }
+
   const result = await prisma.certificateRequest.create({
     data: payload,
   });
@@ -63,12 +70,20 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
 const getAllFromDB = async (
   params: ICertificateRequestFilterRequest,
   options: IPaginationOptions,
-  authorId?: string,
+  filterBy: { userId?: string; authorId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CertificateRequestWhereInput[] = [{ authorId }];
+  const andConditions: Prisma.CertificateRequestWhereInput[] = [];
+
+  // Filter either by authorId or userId
+  if (filterBy.userId) {
+    andConditions.push({ userId: filterBy.userId });
+  }
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -111,8 +126,25 @@ const getAllFromDB = async (
           },
 
     include: {
-      author: true,
-      course: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      course: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail: true,
+          shortDescription: true,
+          category: true,
+          level: true,
+          language: true,
+        },
+      },
     },
   });
 
@@ -136,7 +168,14 @@ const getByIdFromDB = async (
   const result = await prisma.certificateRequest.findUnique({
     where: { id },
     include: {
-      author: true,
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
       course: true,
     },
   });
@@ -153,8 +192,10 @@ const getByIdFromDB = async (
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<ICertificateRequest>,
+  payload: { status: CertificateRequestStatus },
 ): Promise<CertificateRequest> => {
+  const { status } = payload;
+
   const certificateRequest = await prisma.certificateRequest.findUnique({
     where: { id },
   });
@@ -164,7 +205,7 @@ const updateIntoDB = async (
 
   const result = await prisma.certificateRequest.update({
     where: { id },
-    data: payload,
+    data: { status },
   });
   if (!result) {
     throw new ApiError(
@@ -172,6 +213,8 @@ const updateIntoDB = async (
       'Certificate request not updated!',
     );
   }
+
+  // sent notification to user
 
   return result;
 };
