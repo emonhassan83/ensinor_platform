@@ -9,28 +9,33 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student),
   validateRequest(WishlistValidation.createValidationSchema),
   WishlistController.insertIntoDB,
 );
 
-router.get('/', WishlistController.getAllFromDB);
+router.get('/', auth(UserRole.student), WishlistController.getAllFromDB);
 
 router.get(
-  '/reference/:referenceId',
-  auth(UserRole.super_admin),
-  WishlistController.getAllByReferenceFromDB,
+  '/my-wishlist',
+  auth(UserRole.student),
+  WishlistController.getAllByUserFromDB,
 );
 
-router.get('/:id', WishlistController.getByIdFromDB);
+router.get('/:id', auth(UserRole.student), WishlistController.getByIdFromDB);
 
-// router.put(
-//   '/:id',
-//   auth(UserRole.super_admin),
-//   validateRequest(WishlistValidation.updateValidationSchema),
-//   WishlistController.updateIntoDB,
-// );
+router.delete('/:id', auth(UserRole.student), WishlistController.deleteFromDB);
 
-router.delete('/:id', auth(UserRole.super_admin), WishlistController.deleteFromDB);
+router.delete(
+  '/course/:courseId',
+  auth(UserRole.student),
+  WishlistController.deleteByReferenceFromDB,
+);
+
+router.delete(
+  '/book/:bookId',
+  auth(UserRole.student),
+  WishlistController.deleteByReferenceFromDB,
+);
 
 export const WishlistRoutes = router;

@@ -8,5 +8,6 @@ export type IWishlistFilterRequest = {
 export type IWishlist = {
   userId: string;
   modelType: WishListModelType;
-  reference: string;
+  courseId?: string;
+  bookId?: string;
 };
