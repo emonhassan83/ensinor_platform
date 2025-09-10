@@ -19,7 +19,7 @@ const getAllByReviewFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, reviewRefFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ReviewRefService.getAllFromDB(filters, options);
+  const result = await ReviewRefService.getAllFromDB(filters, options, req.params.reviewId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

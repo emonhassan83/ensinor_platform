@@ -9,26 +9,47 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
   validateRequest(ReviewRefValidation.createValidationSchema),
   ReviewRefController.insertIntoDB,
 );
 
-router.get(
-  '/review/:reviewId',
-  auth(UserRole.super_admin),
-  ReviewRefController.getAllByReviewFromDB,
-);
+router.get('/review/:reviewId', ReviewRefController.getAllByReviewFromDB);
 
 router.get('/:id', ReviewRefController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
   validateRequest(ReviewRefValidation.updateValidationSchema),
   ReviewRefController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), ReviewRefController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.student,
+  ),
+  ReviewRefController.deleteFromDB,
+);
 
 export const ReviewRefRoutes = router;

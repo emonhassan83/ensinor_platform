@@ -19,7 +19,7 @@ const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, reviewFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ReviewService.getAllFromDB(filters, options, req.params.referenceId);
+  const result = await ReviewService.getAllFromDB(filters, options);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -30,11 +30,11 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getAllByReferenceFromDB = catchAsync(async (req, res) => {
+const getAllByCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, reviewFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ReviewService.getAllFromDB(filters, options);
+  const result = await ReviewService.getAllFromDB(filters, options, req.params.courseId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -81,7 +81,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const ReviewController = {
   insertIntoDB,
   getAllFromDB,
-  getAllByReferenceFromDB,
+  getAllByCourseFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

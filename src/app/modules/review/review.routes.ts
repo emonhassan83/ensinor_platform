@@ -9,28 +9,28 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(ReviewValidation.createValidationSchema),
   ReviewController.insertIntoDB,
 );
 
 router.get('/', ReviewController.getAllFromDB);
 
-router.get(
-  '/reference/:referenceId',
-  auth(UserRole.super_admin),
-  ReviewController.getAllByReferenceFromDB,
-);
+router.get('/course/:courseId', ReviewController.getAllByCourseFromDB);
 
 router.get('/:id', ReviewController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(ReviewValidation.updateValidationSchema),
   ReviewController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), ReviewController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  ReviewController.deleteFromDB,
+);
 
 export const ReviewRoutes = router;

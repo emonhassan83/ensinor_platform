@@ -1,5 +1,3 @@
-import { ReviewModelType } from "@prisma/client";
-
 export type IReviewFilterRequest = {
   searchTerm?: string | undefined;
   modelType?: string | undefined;
@@ -7,9 +5,7 @@ export type IReviewFilterRequest = {
 
 export type IReview = {
   authorId: string;
-  modelType: ReviewModelType;
-  courseId?: string;
-  userId?: string;
+  courseId: string;
   rating: number;
   comment: string;
 };

@@ -1,52 +1,110 @@
-import {
-  Coupon,
-  Event,
-  Prisma,
-  Review,
-} from '@prisma/client';
+import { Prisma, Review, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IReview, IReviewFilterRequest } from './review.interface';
 import { reviewSearchAbleFields } from './review.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IReview) => {
-  const result = await prisma.review.create({
-    data: payload
-  });
+  const { authorId, courseId, rating } = payload;
 
-  if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Review creation failed!',
-    );
+  // Step 1: Validate course
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, isDeleted: false },
+  });
+  if (!course) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
   }
 
-  return result;
+  // Step 2: Validate user (review author)
+  const user = await prisma.user.findFirst({
+    where: { id: authorId, isDeleted: false, status: UserStatus.active },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Review user not found!');
+  }
+
+  // Step 3: Create Review
+  const review = await prisma.review.create({
+    data: payload,
+  });
+  if (!review) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Review creation failed!');
+  }
+
+  // Step 4: Recalculate Course Rating
+  const courseReviews = await prisma.review.findMany({
+    where: { courseId, isDeleted: false },
+    select: { rating: true },
+  });
+
+  const courseRatingCount = courseReviews.length;
+  const courseAvgRating =
+    courseReviews.reduce((sum, r) => sum + r.rating, 0) / courseRatingCount;
+
+  await prisma.course.update({
+    where: { id: courseId },
+    data: {
+      avgRating: parseFloat(courseAvgRating.toFixed(1)),
+      ratingCount: courseRatingCount,
+    },
+  });
+
+  // Step 5: Recalculate Author Rating
+  const authorIdOfCourse = course.authorId;
+
+  const authorCourses = await prisma.course.findMany({
+    where: { authorId: authorIdOfCourse, isDeleted: false },
+    select: { avgRating: true, ratingCount: true },
+  });
+
+  const totalRatings = authorCourses.reduce((sum, c) => sum + c.ratingCount, 0);
+  const totalWeightedRating = authorCourses.reduce(
+    (sum, c) => sum + c.avgRating * c.ratingCount,
+    0,
+  );
+
+  const authorAvgRating = totalRatings
+    ? totalWeightedRating / totalRatings
+    : 0;
+
+  await prisma.user.update({
+    where: { id: authorIdOfCourse },
+    data: {
+      avgRating: parseFloat(authorAvgRating.toFixed(1)),
+      ratingCount: totalRatings,
+    },
+  });
+
+  return review;
 };
 
 const getAllFromDB = async (
   params: IReviewFilterRequest,
   options: IPaginationOptions,
-  reference?: string
+  courseId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.ReviewWhereInput[] = [];
+  if (courseId) {
+    andConditions.push({ courseId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: reviewSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: reviewSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -75,6 +133,28 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          photoUrl: true,
+        },
+      },
+      reviewRef: {
+        select: {
+          id: true,
+          comment: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              photoUrl: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   const total = await prisma.review.count({
@@ -99,8 +179,20 @@ const getByIdFromDB = async (id: string): Promise<Review | null> => {
         select: {
           id: true,
           name: true,
-          email: true,
           photoUrl: true,
+        },
+      },
+      reviewRef: {
+        select: {
+          id: true,
+          comment: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              photoUrl: true,
+            },
+          },
         },
       },
     },
@@ -114,7 +206,7 @@ const getByIdFromDB = async (id: string): Promise<Review | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<IReview>
+  payload: Partial<IReview>,
 ): Promise<Review> => {
   const review = await prisma.review.findUnique({
     where: { id },
@@ -125,7 +217,7 @@ const updateIntoDB = async (
 
   const result = await prisma.review.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Review not updated!');
