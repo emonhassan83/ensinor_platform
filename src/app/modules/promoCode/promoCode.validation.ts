@@ -1,3 +1,4 @@
+import { CouponModel } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -6,10 +7,11 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
-    modelType: z.string({ required_error: 'PromoCode modelType is required!' }),
-    referenceId: z
-      .string({ required_error: 'Reference is required' })
-      .uuid('reference must be a valid UUID'),
+    modelType: z.nativeEnum(CouponModel),
+    // Conditional reference field
+    bookId: z.string().uuid('Book ID must be a valid UUID').optional(),
+    courseId: z.string().uuid('Course ID must be a valid UUID').optional(),
+    eventId: z.string().uuid('Event ID must be a valid UUID').optional(),
     expireAt: z
       .string({ required_error: 'PromoCode expireAt is required!' })
       .optional(),

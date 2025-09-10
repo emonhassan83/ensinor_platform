@@ -1,4 +1,4 @@
-import { CouponModel } from "@prisma/client";
+import { CouponModel } from '@prisma/client';
 
 export type IPromoCodeFilterRequest = {
   searchTerm?: string | undefined;
@@ -10,9 +10,12 @@ export type IPromoCodeFilterRequest = {
 export type IPromoCode = {
   authorId: string;
   modelType: CouponModel;
-  referenceId: string;
+  bookId?: string;
+  courseId?: string;
+  eventId?: string;
+  name: string;
+  expireAt: Date;
   code: string;
   discount: number;
-  maxUsage: number
-  expireAt: Date;
+  maxUsage: number;
 };

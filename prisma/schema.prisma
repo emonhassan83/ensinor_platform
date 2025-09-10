@@ -100,6 +100,7 @@ model User {
   cv                         CV?
   zoomAccount                ZoomAccount[]
   promoCode                  PromoCode[]
+  usePromoCode               PromoCode[]          @relation("PromoCodeUsedBy")
   affiliate                  Affiliate[]
   meetingAssignmentsAuthored MeetingAssignment[]  @relation("MeetingAssignmentsAuthored")
   meetingAssignmentsJoined   MeetingAssignment[]  @relation("MeetingAssignmentsJoined")
@@ -628,13 +629,13 @@ enum CourseGrade {
 }
 
 model CertificateRequest {
-  id         String                   @id @default(uuid())
-  userId     String // FK to User (course author)
-  authorId   String // FK to User (student requesting)
-  courseId   String
-  status     CertificateRequestStatus @default(pending)
-  createdAt  DateTime                 @default(now())
-  updatedAt  DateTime                 @updatedAt
+  id        String                   @id @default(uuid())
+  userId    String // FK to User (course author)
+  authorId  String // FK to User (student requesting)
+  courseId  String
+  status    CertificateRequestStatus @default(pending)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
 
   // Relations
   author User   @relation("authorRequest", fields: [authorId], references: [id])
@@ -773,10 +774,15 @@ model Coupon {
   courseId  String?
   eventId   String?
 
-  name     String
-  expireAt DateTime
-  code     String   @unique
-  discount Float
+  name      String
+  code      String   @unique
+  discount  Float
+  maxUsage  Int?
+  usedCount Int      @default(0)
+  expireAt  DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   author User   @relation("CouponCreated", fields: [authorId], references: [id])
@@ -785,9 +791,6 @@ model Coupon {
   book   Book?   @relation(fields: [bookId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   event  Event?  @relation(fields: [eventId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@map("coupons")
 }
@@ -799,6 +802,7 @@ model PromoCode {
   bookId    String?
   courseId  String?
   eventId   String?
+  name      String
   code      String      @unique
   discount  Float
   maxUsage  Int?
@@ -809,6 +813,7 @@ model PromoCode {
   updatedAt DateTime    @updatedAt
 
   author User?   @relation(fields: [authorId], references: [id])
+  usedBy User[]  @relation("PromoCodeUsedBy")
   book   Book?   @relation(fields: [bookId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
   event  Event?  @relation(fields: [eventId], references: [id])

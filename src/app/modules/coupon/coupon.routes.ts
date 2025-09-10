@@ -9,22 +9,32 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(CouponValidation.createValidationSchema),
   CouponController.insertIntoDB,
 );
 
 router.get('/', CouponController.getAllFromDB);
 
-router.get(
-  '/reference/:referenceId',
-  auth(UserRole.super_admin),
-  CouponController.getAllByReferenceFromDB,
-);
+// router.get(
+//   '/reference/:referenceId',
+//   auth(UserRole.super_admin),
+//   CouponController.getAllByReferenceFromDB,
+// );
 
 router.get(
-  '/user/my-coupon',
-  auth(UserRole.super_admin),
+  '/my-coupon',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   CouponController.getMyCouponsFromDB,
 );
 
@@ -32,11 +42,25 @@ router.get('/:id', CouponController.getByIdFromDB);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(CouponValidation.updateValidationSchema),
   CouponController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), CouponController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  CouponController.deleteFromDB,
+);
 
 export const CouponRoutes = router;

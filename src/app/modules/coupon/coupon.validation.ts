@@ -1,3 +1,4 @@
+import { CouponModel } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -6,10 +7,12 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
-    modelType: z.string({ required_error: 'Coupon modelType is required!' }),
-    referenceId: z
-      .string({ required_error: 'Reference is required' })
-      .uuid('reference must be a valid UUID'),
+    modelType: z.nativeEnum(CouponModel),
+    // Conditional reference field
+    bookId: z.string().uuid('Book ID must be a valid UUID').optional(),
+    courseId: z.string().uuid('Course ID must be a valid UUID').optional(),
+    eventId: z.string().uuid('Event ID must be a valid UUID').optional(),
+
     name: z.string({ required_error: 'Coupon name is required!' }),
     expireAt: z
       .string({ required_error: 'Coupon expireAt is required!' })
@@ -19,6 +22,7 @@ const createValidationSchema = z.object({
       .number({ required_error: 'Coupon discount is required!' })
       .int('Coupon discount must be an integer')
       .nonnegative('Coupon discount must be a positive number'),
+       maxUsage: z.number().int().positive().optional(),
   }),
 });
 
@@ -33,7 +37,9 @@ const updateValidationSchema = z.object({
     discount: z
       .number({ required_error: 'Coupon discount is required!' })
       .int('Coupon discount must be an integer')
-      .nonnegative('Coupon discount must be a positive number').optional(),
+      .nonnegative('Coupon discount must be a positive number')
+      .optional(),
+      maxUsage: z.number().int().positive().optional(),
   }),
 });
 

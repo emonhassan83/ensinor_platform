@@ -10,7 +10,7 @@ const insertIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Event insert successfully!',
+    message: 'Coupon insert successfully!',
     data: result,
   });
 });
@@ -19,12 +19,12 @@ const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, couponFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CouponService.getAllFromDB(filters, options, req.params.referenceId);
+  const result = await CouponService.getAllFromDB(filters, options);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Events data fetched!',
+    message: 'Coupons data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -39,7 +39,7 @@ const getAllByReferenceFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Events data fetched!',
+    message: 'Coupons data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -54,7 +54,7 @@ const getMyCouponsFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'My Events data fetched!',
+    message: 'My Coupons data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -65,7 +65,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Event data fetched by id!',
+    message: 'Coupon data fetched by id!',
     data: result,
   });
 });
@@ -78,7 +78,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Event data updated!',
+    message: 'Coupon data updated!',
     data: result,
   });
 });
@@ -88,7 +88,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Event data deleted!',
+    message: 'Coupon data deleted!',
     data: result,
   });
 });

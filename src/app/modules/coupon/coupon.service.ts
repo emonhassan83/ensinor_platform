@@ -1,25 +1,113 @@
-import {
-  Coupon,
-  Event,
-  Prisma,
-} from '@prisma/client';
+import { Coupon, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { ICoupon, ICouponFilterRequest } from './coupon.interface';
 import { couponSearchAbleFields } from './coupon.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICoupon) => {
-  const result = await prisma.coupon.create({
-    data: payload
-  });
+  const {
+    authorId,
+    modelType,
+    bookId,
+    courseId,
+    eventId,
+    code,
+    discount,
+    expireAt,
+    maxUsage,
+  } = payload;
 
-  if (!result) {
+  // 1️⃣ Check author exists
+  const author = await prisma.user.findUnique({
+    where: { id: authorId, status: UserStatus.active, isDeleted: false },
+  });
+  if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+
+  // 2️⃣ Validate discount
+  if (discount <= 0)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Discount must be positive!');
+
+  // 3️⃣ Validate expiration date
+  if (new Date(expireAt) <= new Date())
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Coupon creation failed!',
+      'Coupon expiration must be in the future!',
     );
+
+  // 4️⃣ Validate code uniqueness
+  const existing = await prisma.coupon.findUnique({ where: { code } });
+  if (existing)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists!');
+
+  // 5️⃣ Validate model-specific reference
+  switch (modelType) {
+    case 'books':
+      if (!bookId)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Book ID is required for BOOK coupon!',
+        );
+      const book = await prisma.book.findFirst({
+        where: { id: bookId, authorId, isDeleted: false },
+      });
+      if (!book)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Book not found or does not belong to author!',
+        );
+      break;
+
+    case 'courses':
+      if (!courseId)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Course ID is required for COURSE coupon!',
+        );
+      const course = await prisma.course.findFirst({
+        where: { id: courseId, authorId, isDeleted: false },
+      });
+      if (!course)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Course not found or does not belong to author!',
+        );
+      break;
+
+    case 'events':
+      if (!eventId)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Event ID is required for EVENT coupon!',
+        );
+      const event = await prisma.event.findFirst({
+        where: { id: eventId, authorId, isDeleted: false },
+      });
+      if (!event)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Event not found or does not belong to author!',
+        );
+      break;
+
+    default:
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid coupon model type!');
+  }
+
+  // 6️⃣ Validate maxUsage
+  if (maxUsage !== undefined && maxUsage <= 0)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Max usage must be greater than 0!',
+    );
+
+  // ✅ Create coupon
+  const result = await prisma.coupon.create({ data: payload });
+
+  if (!result) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon creation failed!');
   }
 
   return result;
@@ -28,24 +116,27 @@ const insertIntoDB = async (payload: ICoupon) => {
 const getAllFromDB = async (
   params: ICouponFilterRequest,
   options: IPaginationOptions,
-  reference?: string
+  authorId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.CouponWhereInput[] = [];
+  if (authorId) {
+    andConditions.push({ authorId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: couponSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: couponSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -74,6 +165,31 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      course: {
+        select: {
+          title: true,
+        },
+      },
+      book: {
+        select: {
+          title: true,
+        },
+      },
+      event: {
+        select: {
+          title: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.coupon.count({
@@ -102,6 +218,9 @@ const getByIdFromDB = async (id: string): Promise<Coupon | null> => {
           photoUrl: true,
         },
       },
+      course: true,
+      book: true,
+      event: true,
     },
   });
 
@@ -114,7 +233,7 @@ const getByIdFromDB = async (id: string): Promise<Coupon | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<ICoupon>
+  payload: Partial<ICoupon>,
 ): Promise<Coupon> => {
   const event = await prisma.coupon.findUnique({
     where: { id },
@@ -125,7 +244,7 @@ const updateIntoDB = async (
 
   const result = await prisma.coupon.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Coupon not updated!');

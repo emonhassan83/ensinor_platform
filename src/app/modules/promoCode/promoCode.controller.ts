@@ -19,7 +19,7 @@ const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, promoCodeFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await PromoCodeService.getAllFromDB(filters, options, req.params.referenceId);
+  const result = await PromoCodeService.getAllFromDB(filters, options);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

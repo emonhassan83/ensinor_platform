@@ -9,9 +9,12 @@ export type ICouponFilterRequest = {
 export type ICoupon = {
   authorId: string;
   modelType: CouponModel;
-  referenceId: string;
+  bookId?: string;
+  courseId?: string;
+  eventId?: string;
   name: string;
   expireAt: Date;
   code: string;
   discount: number;
+  maxUsage: number;
 };
