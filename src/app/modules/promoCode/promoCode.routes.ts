@@ -33,7 +33,7 @@ router.get('/', PromoCodeController.getAllFromDB);
 // );
 
 router.get(
-  '/user/my-promo-code',
+  '/my-promo-code',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,

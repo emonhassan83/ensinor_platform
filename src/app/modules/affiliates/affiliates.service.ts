@@ -1,4 +1,10 @@
-import { AffiliateLink, Prisma } from '@prisma/client';
+import {
+  Affiliate,
+  AffiliateLink,
+  CoursesStatus,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -9,8 +15,23 @@ import {
 import { affiliateSearchAbleFields } from './affiliates.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
+import config from '../../config';
 
 const createAffiliateAccount = async (payload: IAffiliateAccount) => {
+  const { userId } = payload;
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
   const result = await prisma.affiliate.create({
     data: payload,
   });
@@ -21,13 +42,82 @@ const createAffiliateAccount = async (payload: IAffiliateAccount) => {
       'Affiliate account creation failed!',
     );
   }
+  return result;
+};
+
+const getAffiliateAccount = async (
+  userId: string,
+): Promise<Affiliate | null> => {
+  const result = await prisma.affiliate.findFirst({
+    where: { userId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Oops! Affiliate account not found!',
+    );
+  }
 
   return result;
 };
 
 const insertIntoDB = async (payload: IAffiliates) => {
+  const { affiliateId, courseId } = payload;
+
+  // 1️⃣ Validate affiliate exists
+  const affiliate = await prisma.affiliate.findFirst({
+    where: { id: affiliateId },
+  });
+  if (!affiliate) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate account not found!');
+  }
+
+  // 2️⃣ Validate course exists
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
+  });
+  if (!course) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Course not found or not available!',
+    );
+  }
+
+  // 3️⃣ Prevent duplicate affiliate link for the same affiliate & course
+  const existingLink = await prisma.affiliateLink.findFirst({
+    where: {
+      affiliateId,
+      courseId,
+    },
+  });
+
+  if (existingLink) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Affiliate link already exists for this course!',
+    );
+  }
+
+  // 4️⃣ Generate affiliate link
+  const affiliateLink = `${config.client_url}/course/${courseId}?aff=${affiliateId}`;
+
+  // 5️⃣ Create new affiliate link
   const result = await prisma.affiliateLink.create({
-    data: payload,
+    data: {
+      ...payload,
+      link: affiliateLink,
+    },
   });
 
   if (!result) {
@@ -43,12 +133,15 @@ const insertIntoDB = async (payload: IAffiliates) => {
 const getAllFromDB = async (
   params: IAffiliatesFilterRequest,
   options: IPaginationOptions,
-  reference?: string,
+  affiliateId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.AffiliateLinkWhereInput[] = [];
+  if (affiliateId) {
+    andConditions.push({ affiliateId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -90,16 +183,9 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
     include: {
-      affiliate: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              photoUrl: true,
-            },
-          },
+      course: {
+        select: {
+          title: true,
         },
       },
     },
@@ -135,13 +221,13 @@ const getByIdFromDB = async (id: string): Promise<AffiliateLink | null> => {
           },
         },
       },
+      course: true,
     },
   });
 
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Affiliate link not found!');
   }
-
   return result;
 };
 
@@ -187,6 +273,7 @@ const deleteFromDB = async (id: string): Promise<AffiliateLink> => {
 
 export const AffiliateService = {
   createAffiliateAccount,
+  getAffiliateAccount,
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,

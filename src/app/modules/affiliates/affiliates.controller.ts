@@ -16,6 +16,17 @@ const createAffiliatesAccount = catchAsync(async (req, res) => {
   });
 });
 
+const getAffiliatesAccount = catchAsync(async (req, res) => {
+  const result = await AffiliateService.getAffiliateAccount(req.user!.userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Affiliate account retrieve successfully!',
+    data: result,
+  });
+});
+
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await AffiliateService.insertIntoDB(req.body);
   sendResponse(res, {
@@ -46,7 +57,7 @@ const getMyAffiliateFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, affiliateSearchAbleFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AffiliateService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await AffiliateService.getAllFromDB(filters, options, req.params.affiliateId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -93,6 +104,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const AffiliateController = {
   insertIntoDB,
   createAffiliatesAccount,
+  getAffiliatesAccount,
   getAllByCourseFromDB,
   getMyAffiliateFromDB,
   getByIdFromDB,

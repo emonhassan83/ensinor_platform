@@ -21,13 +21,13 @@ router.post(
 );
 
 router.get(
-  '/course/:referenceId',
+  '/account',
   auth(UserRole.super_admin),
-  AffiliateController.getAllByCourseFromDB,
+  AffiliateController.getAffiliatesAccount,
 );
 
 router.get(
-  '/user/my-affiliate',
+  '/affiliate-link/:affiliateId',
   auth(UserRole.super_admin),
   AffiliateController.getMyAffiliateFromDB,
 );

@@ -42,7 +42,9 @@ const insertIntoDB = async (payload: ICoupon) => {
   if (existing)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists!');
 
-  // 5️⃣ Validate model-specific reference
+  // 5️⃣ Validate model-specific reference + active coupon check
+  let referenceWhere: any = { authorId, isActive: true };
+
   switch (modelType) {
     case 'books':
       if (!bookId)
@@ -57,6 +59,16 @@ const insertIntoDB = async (payload: ICoupon) => {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Book not found or does not belong to author!',
+        );
+
+      // Check active coupon for this book
+      const existingBookCoupon = await prisma.coupon.findFirst({
+        where: { ...referenceWhere, modelType: 'books', bookId },
+      });
+      if (existingBookCoupon)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An active coupon already exists for this book!',
         );
       break;
 
@@ -74,6 +86,16 @@ const insertIntoDB = async (payload: ICoupon) => {
           httpStatus.BAD_REQUEST,
           'Course not found or does not belong to author!',
         );
+
+      // Check active coupon for this course
+      const existingCourseCoupon = await prisma.coupon.findFirst({
+        where: { ...referenceWhere, modelType: 'courses', courseId },
+      });
+      if (existingCourseCoupon)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An active coupon already exists for this course!',
+        );
       break;
 
     case 'events':
@@ -89,6 +111,16 @@ const insertIntoDB = async (payload: ICoupon) => {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Event not found or does not belong to author!',
+        );
+
+      // Check active coupon for this event
+      const existingEventCoupon = await prisma.coupon.findFirst({
+        where: { ...referenceWhere, modelType: 'events', eventId },
+      });
+      if (existingEventCoupon)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An active coupon already exists for this event!',
         );
       break;
 

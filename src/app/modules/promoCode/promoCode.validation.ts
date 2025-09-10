@@ -20,7 +20,7 @@ const createValidationSchema = z.object({
       .number({ required_error: 'PromoCode discount is required!' })
       .int('PromoCode discount must be an integer')
       .nonnegative('PromoCode discount must be a positive number'),
-    maxUsage: z.string({ required_error: 'PromoCode maxUsage is required!' }),
+    maxUsage: z.number({ required_error: 'PromoCode maxUsage is required!' }),
   }),
 });
 
@@ -39,7 +39,7 @@ const updateValidationSchema = z.object({
       .nonnegative('PromoCode discount must be a positive number')
       .optional(),
     maxUsage: z
-      .string({ required_error: 'PromoCode maxUsage is required!' })
+      .number({ required_error: 'PromoCode maxUsage is required!' })
       .optional(),
   }),
 });
