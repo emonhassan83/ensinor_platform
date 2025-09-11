@@ -7,7 +7,10 @@ export type IResourceFilterRequest = {
 
 export type IResource = {
   name: string;
+  authorId: string;
   modelType: ResourceModelType;
-  reference: string;
+  courseId?: string;
+  bookId?: string;
+  eventId?: string;
   file: string;
 };

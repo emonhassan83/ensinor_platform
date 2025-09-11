@@ -112,6 +112,7 @@ model User {
   quiz                       Quiz[]
   studentRequest             CertificateRequest[] @relation("studentRequest")
   authorRequest              CertificateRequest[] @relation("authorRequest")
+  resource                   Resource[]
 
   @@map("users")
 }
@@ -1198,18 +1199,18 @@ model Resource {
   id        String            @id @default(uuid())
   name      String
   modelType ResourceModelType
+  authorId  String
   bookId    String?
   courseId  String?
   eventId   String?
-  articleId String?
   file      String
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  book    Book?    @relation(fields: [bookId], references: [id])
-  course  Course?  @relation(fields: [courseId], references: [id])
-  event   Event?   @relation(fields: [eventId], references: [id])
-  article Article? @relation(fields: [articleId], references: [id])
+  author User    @relation(fields: [authorId], references: [id])
+  book   Book?   @relation(fields: [bookId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
 
   @@map("resources")
 }
@@ -1217,7 +1218,6 @@ model Resource {
 enum ResourceModelType {
   course
   event
-  article
   book
 }
 
@@ -1263,9 +1263,8 @@ model Article {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  author   User              @relation(fields: [authorId], references: [id])
-  seenBy   UsersOnArticles[] // ✅ join table for tracking who has seen
-  resource Resource[]
+  author User              @relation(fields: [authorId], references: [id])
+  seenBy UsersOnArticles[] // ✅ join table for tracking who has seen
 
   @@map("articles")
 }

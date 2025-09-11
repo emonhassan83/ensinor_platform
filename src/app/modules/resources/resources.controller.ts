@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { resourceFilterableFields } from './resources.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await ResourceService.insertIntoDB(req.body);
+  const result = await ResourceService.insertIntoDB(req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -15,11 +15,13 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getAllFromDB = catchAsync(async (req, res) => {
+const getAllMyFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, resourceFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-
-  const result = await ResourceService.getAllFromDB(filters, options);
+  
+  const result = await ResourceService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -30,11 +32,47 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getAllByReferenceFromDB = catchAsync(async (req, res) => {
+const getAllByCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, resourceFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ResourceService.getAllFromDB(filters, options, req.params.referenceId);
+  const result = await ResourceService.getAllFromDB(filters, options, {
+    courseId: req.params.courseId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Resources data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getAllByBookFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, resourceFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await ResourceService.getAllFromDB(filters, options, {
+    bookId: req.params.bookId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Resources data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getAllByEventFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, resourceFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await ResourceService.getAllFromDB(filters, options, {
+    eventId: req.params.eventId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -56,10 +94,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await ResourceService.updateIntoDB(
-    req.params.id,
-    req.body
-  );
+  const result = await ResourceService.updateIntoDB(req.params.id, req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -80,8 +115,10 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const ResourceController = {
   insertIntoDB,
-  getAllFromDB,
-  getAllByReferenceFromDB,
+  getAllMyFromDB,
+  getAllByCourseFromDB,
+  getAllByBookFromDB,
+  getAllByEventFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,
