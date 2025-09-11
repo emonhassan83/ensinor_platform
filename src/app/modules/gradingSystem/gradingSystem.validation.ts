@@ -29,7 +29,7 @@ const createValidationSchema = z.object({
       .string({
         required_error: 'Course id required !',
       })
-      .uuid({ message: 'Invalid UUID' }),
+      .uuid({ message: 'Invalid UUID' }).optional(),
     authorId: z
       .string({
         required_error: 'Author id required !',

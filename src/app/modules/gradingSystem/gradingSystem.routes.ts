@@ -35,16 +35,25 @@ router.get(
     UserRole.super_admin,
     UserRole.business_instructors,
     UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.student,
   ),
   GradingSystemController.getByCourseIdFromDB,
 );
 
-router.get('/:id', GradingSystemController.getByIdFromDB);
 
 router.get(
-  '/grade/:gradingSystemId',
-  GradingSystemController.getGradesByGradingSystemId,
+  '/my-grading-system',
+  auth(
+    UserRole.super_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  GradingSystemController.getGradesByAuthorId,
 );
+
+router.get('/:id', GradingSystemController.getByIdFromDB);
 
 router.put(
   '/:id',
@@ -58,7 +67,7 @@ router.put(
 );
 
 router.put(
-  '/grade/:id',
+  '/grade/:gradeId',
   auth(
     UserRole.super_admin,
     UserRole.business_instructors,

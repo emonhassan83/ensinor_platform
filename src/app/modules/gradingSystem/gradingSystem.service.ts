@@ -1,4 +1,4 @@
-import { GradingSystem, Prisma, Question } from '@prisma/client';
+import { GradingSystem, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -9,29 +9,76 @@ import {
 import { gradingSystemSearchAbleFields } from './gradingSystem.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
-const insertIntoDB = async (payload: IGradingSystem) => {
-   const { courseId, authorId } = payload;
+const insertIntoDB = async (payload: IGradingSystem, currentUser: any) => {
+  const { courseId, authorId } = payload;
 
-  // 1. Validate quiz existence
-  const course = await prisma.course.findUnique({
-    where: { id: courseId },
-  });
-  if (!course || course.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
-  }
-
-  // 2. Validate user existence
+  // 1. Validate user existence
   const author = await prisma.user.findUnique({
     where: { id: authorId },
   });
   if (!author || author.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
-  // 3. Create grading system with options
+  // 2. Set isDefault based on current user role
+  if (currentUser.role === 'super_admin') {
+    payload.isDefault = true;
+  } else {
+    payload.isDefault = false;
+
+    // Validate normal users cannot create grading system for other users
+    if (authorId !== currentUser.userId) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'You can only create grading system for yourself!',
+      );
+    }
+  }
+
+  // 3. If not default, validate course existence
+  if (!payload.isDefault) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+    if (!course || course.isDeleted) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+    }
+
+    // 4. Prevent duplicate grading system for same course & author
+    const existingSystem = await prisma.gradingSystem.findFirst({
+      where: {
+        courseId,
+        authorId,
+        isDeleted: false,
+      },
+    });
+    if (existingSystem) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'You have already created a grading system for this course!',
+      );
+    }
+  } else {
+    // 5. For default grading system, prevent duplicates
+    const existingDefault = await prisma.gradingSystem.findFirst({
+      where: {
+        isDefault: true,
+        isDeleted: false,
+      },
+    });
+    if (existingDefault) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Default grading system already exists!',
+      );
+    }
+  }
+
+  // 6. Create grading system
   const result = await prisma.gradingSystem.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
@@ -45,40 +92,85 @@ const insertIntoDB = async (payload: IGradingSystem) => {
 };
 
 const addGrade = async (payload: IGrade) => {
-  const { gradingSystemId } = payload;
+  const { gradingSystemId, minScore, maxScore, gradeLabel } = payload;
 
+  // 1️⃣ Validate grading system existence
   const gradingSystem = await prisma.gradingSystem.findUnique({
-    where: { id: gradingSystemId }
+    where: { id: gradingSystemId },
+    include: { grades: true },
   });
 
   if (!gradingSystem || gradingSystem.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
   }
 
+  // 2️⃣ Validate score range
+  if (minScore < 0 || maxScore > 100 || minScore > maxScore) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Invalid score range! minScore must be >= 0, maxScore <= 100, and minScore <= maxScore.',
+    );
+  }
+
+  // 3️⃣ Check for overlapping score ranges
+  const overlap = gradingSystem.grades.some(
+    g =>
+      (minScore >= g.minScore && minScore <= g.maxScore) ||
+      (maxScore >= g.minScore && maxScore <= g.maxScore) ||
+      (minScore <= g.minScore && maxScore >= g.maxScore),
+  );
+
+  if (overlap) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'This grade range overlaps with an existing grade in the system!',
+    );
+  }
+
+  // 4️⃣ Check for duplicate grade label
+  const duplicateLabel = gradingSystem.grades.some(
+    g => g.gradeLabel === gradeLabel,
+  );
+  if (duplicateLabel) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'This grade label already exists in the grading system!',
+    );
+  }
+
+  // 5️⃣ Create the grade
   const result = await prisma.grade.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Grade options creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Grade creation failed!');
   }
+
   return result;
 };
 
 const getAllFromDB = async (
   params: IGradingSystemFilterRequest,
   options: IPaginationOptions,
-  courseId?: string,
+  filterBy: {
+    authorId?: string;
+    courseId?: string;
+  },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.GradingSystemWhereInput[] = [
-    { courseId, isDeleted: false },
+    { isDeleted: false },
   ];
+  // Filter either by authorId, courseId, bookId or eventId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.courseId) {
+    andConditions.push({ courseId: filterBy.courseId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -119,7 +211,12 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-    include: { grades: true },
+    include: {
+      grades: {
+        select: { id: true, minScore: true, maxScore: true, gradeLabel: true },
+      },
+      course: { select: { title: true } },
+    },
   });
 
   const total = await prisma.gradingSystem.count({
@@ -138,7 +235,7 @@ const getAllFromDB = async (
 
 const getGradesByGradingSystemId = async (gradeId: string) => {
   const grade = await prisma.grade.findUnique({
-    where: { id: gradeId }
+    where: { id: gradeId },
   });
 
   if (!grade) {
@@ -147,8 +244,8 @@ const getGradesByGradingSystemId = async (gradeId: string) => {
 
   const result = await prisma.grade.findMany({
     where: { gradingSystemId: gradeId },
-  })
-   if (!result) {
+  });
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grade options not found!');
   }
 
@@ -160,6 +257,7 @@ const getByIdFromDB = async (id: string): Promise<GradingSystem | null> => {
     where: { id },
     include: {
       grades: true,
+      course: { select: { title: true } },
     },
   });
 
@@ -192,12 +290,9 @@ const updateIntoDB = async (
   return result;
 };
 
-const updateGrade = async (
-  gradeId: string,
-  payload: Partial<IGrade>,
-) => {
+const updateGrade = async (gradeId: string, payload: Partial<IGrade>) => {
   const grade = await prisma.grade.findUnique({
-    where: { id: gradeId }
+    where: { id: gradeId },
   });
   if (!grade) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grades not found!');
@@ -205,56 +300,64 @@ const updateGrade = async (
 
   const result = await prisma.grade.update({
     where: { id: gradeId },
-    data:payload,
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Grade option updated failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Grade option updated failed!');
   }
   return result;
 };
 
 const deleteFromDB = async (id: string): Promise<GradingSystem> => {
   const gradeSystem = await prisma.gradingSystem.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!gradeSystem || gradeSystem?.isDeleted) {
+  if (!gradeSystem) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
   }
 
-  const result = await prisma.gradingSystem.update({
-    where: { id },
-    data: {
-      isDeleted: true,
-    },
+  const result = await prisma.$transaction(async tx => {
+    // 1. Fetch the grading system
+    const gradeSystem = await tx.gradingSystem.findUnique({
+      where: { id },
+    });
+
+    if (!gradeSystem || gradeSystem.isDeleted) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
+    }
+
+    // 2. delete all grades associated with this grading system
+    await tx.grade.deleteMany({
+      where: { gradingSystemId: id },
+    });
+
+    // 3. Soft delete the grading system itself
+    const deletedSystem = await tx.gradingSystem.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
+
+    return deletedSystem;
   });
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not deleted!');
-  }
 
   return result;
 };
 
 const deleteGrade = async (gradeId: string) => {
   const grade = await prisma.grade.findUnique({
-    where: { id: gradeId }
+    where: { id: gradeId },
   });
   if (!grade) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grade options not found!');
   }
-  
+
   const result = await prisma.grade.delete({
     where: { id: gradeId },
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Grade option deletion failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Grade option deletion failed!');
   }
   return result;
 };

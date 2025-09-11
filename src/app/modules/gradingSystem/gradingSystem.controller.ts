@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { gradingSystemFilterableFields } from './gradingSystem.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await GradingSystemService.insertIntoDB(req.body);
+  const result = await GradingSystemService.insertIntoDB(req.body, req.user);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -29,7 +29,9 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, gradingSystemFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await GradingSystemService.getAllFromDB(filters, options, req.params.gradeId);
+  const result = await GradingSystemService.getAllFromDB(filters, options, {
+    courseId: req.params.courseId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -37,6 +39,23 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
     message: 'Grading system by course data fetched!',
     meta: result.meta,
     data: result.data,
+  });
+});
+
+const getGradesByAuthorId = catchAsync(async (req, res) => {
+  const filters = pick(req.query, gradingSystemFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await GradingSystemService.getAllFromDB(
+    filters,
+    options,
+   { authorId: req.user!.userId,}
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Grades data fetched by author!',
+    data: result,
   });
 });
 
@@ -50,20 +69,10 @@ const getByIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getGradesByGradingSystemId = catchAsync(async (req, res) => {
-  const result = await GradingSystemService.getGradesByGradingSystemId(req.params.gradingId);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Grades data fetched by id!',
-    data: result,
-  });
-});
-
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await GradingSystemService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -76,7 +85,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
 const updateGrade = catchAsync(async (req, res) => {
   const result = await GradingSystemService.updateGrade(
     req.params.gradeId,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -111,9 +120,9 @@ export const GradingSystemController = {
   addGrade,
   getByCourseIdFromDB,
   getByIdFromDB,
-  getGradesByGradingSystemId,
+  getGradesByAuthorId,
   updateIntoDB,
   updateGrade,
   deleteFromDB,
-  deleteGrade
+  deleteGrade,
 };
