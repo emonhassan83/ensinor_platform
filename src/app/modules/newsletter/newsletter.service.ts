@@ -5,7 +5,142 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { NewsletterStatus, Prisma, RecurrenceType } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { newsletterSearchableFields } from './newsletter.constant';
-import { INewsletter, INewsletterFilterRequest } from './newsletter.interface';
+import {
+  INewsletter,
+  INewsletterFilterRequest,
+  ISubscriber,
+} from './newsletter.interface';
+
+const subscribeUser = async (payload: ISubscriber) => {
+  const { email } = payload;
+
+  const existing = await prisma.newsletterSubscriber.findFirst({
+    where: { email },
+  });
+  if (existing) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'This email is already subscribed!',
+    );
+  }
+
+  const result = await prisma.newsletterSubscriber.create({
+    data: payload,
+  });
+  if (!result) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Newsletter subscription creation failed!',
+    );
+  }
+
+  return result;
+};
+
+const unsubscribeUser = async (payload: { email: string }) => {
+  const { email } = payload;
+
+  const existing = await prisma.newsletterSubscriber.findFirst({
+    where: { email },
+  });
+  if (!existing) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Subscriber not found!');
+  }
+
+  const result = await prisma.newsletterSubscriber.update({
+    where: { id: existing.id },
+    data: { status: NewsletterStatus.unsubscribed },
+  });
+  if (!result) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Newsletter subscription created failed!',
+    );
+  }
+
+  return result;
+};
+
+const getAllSubscribeFromDB = async (
+  filters: INewsletterFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { limit, page, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = filters;
+
+  const andConditions: Prisma.NewsletterSubscriberWhereInput[] = [];
+
+  if (searchTerm) {
+    andConditions.push({
+      OR: newsletterSearchableFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
+
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  const whereConditions: Prisma.NewsletterSubscriberWhereInput =
+    andConditions.length > 0 ? { AND: andConditions } : {};
+
+  const result = await prisma.newsletterSubscriber.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? { [options.sortBy]: options.sortOrder }
+        : {
+            createdAt: 'desc',
+          },
+  });
+  const total = await prisma.newsletterSubscriber.count({
+    where: whereConditions,
+  });
+
+  return {
+    meta: {
+      total,
+      page,
+      limit,
+    },
+    data: result,
+  };
+};
+
+const changeStatusIntoDB = async (payload: {
+  email: string;
+  status: NewsletterStatus;
+}) => {
+  const { email, status } = payload;
+  const newsletter = await prisma.newsletterSubscriber.findFirst({
+    where: { email },
+  });
+  if (!newsletter) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Newsletter subscriber not found!',
+    );
+  }
+
+  const result = await prisma.newsletterSubscriber.update({
+    where: { id: newsletter.id },
+    data: { status },
+  });
+
+  return result;
+};
 
 const insertIntoDB = async (payload: INewsletter) => {
   const result = await prisma.newsletter.create({
@@ -87,10 +222,7 @@ const getByIdFromDB = async (id: string) => {
   return result;
 };
 
-const updateIntoDB = async (
-  id: string,
-  payload: Partial<INewsletter>,
-) => {
+const updateIntoDB = async (id: string, payload: Partial<INewsletter>) => {
   const newsletter = await prisma.newsletter.findUnique({
     where: { id },
   });
@@ -106,28 +238,6 @@ const updateIntoDB = async (
   return result;
 };
 
-const changeStatusIntoDB = async (
-  id: string,
-  status: NewsletterStatus
-) => {
-  const newsletter = await prisma.newsletter.findUnique({
-    where: { id },
-  });
-  if (!newsletter) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Newsletter not found!');
-  }
-
-  const result = await prisma.newsletter.update({
-    where: { id },
-    data: {
-      status
-    },
-  });
-
-  return result;
-};
-
-
 const deleteFromDB = async (id: string) => {
   const newsletter = await prisma.newsletter.findUnique({
     where: { id },
@@ -135,7 +245,7 @@ const deleteFromDB = async (id: string) => {
   if (!newsletter) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Newsletter not found!');
   }
-  
+
   const result = await prisma.newsletter.delete({
     where: { id },
   });
@@ -148,6 +258,9 @@ const deleteFromDB = async (id: string) => {
 };
 
 export const NewsletterServices = {
+  subscribeUser,
+  unsubscribeUser,
+  getAllSubscribeFromDB,
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,

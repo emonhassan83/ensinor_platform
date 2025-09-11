@@ -6,6 +6,50 @@ import { NewsletterServices } from './newsletter.service';
 import { newsletterFilterableFields } from './newsletter.constant';
 import pick from '../../utils/pick';
 
+const subscribeUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await NewsletterServices.subscribeUser(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Newsletter subscribe successfully!',
+    data: result,
+  });
+});
+
+const unsubscribeUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await NewsletterServices.unsubscribeUser(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Newsletter unsubscribe successfully!',
+    data: result,
+  });
+});
+
+const getAllSubscribeUser = catchAsync(async (req: Request, res: Response) => {
+  const filters = pick(req.query, newsletterFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await NewsletterServices.getAllSubscribeFromDB(filters, options);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Newsletter subscriber retrieve successfully!',
+    data: result,
+  });
+});
+
+const changeStatusIntoDB = catchAsync(async (req: Request, res: Response) => {
+  const result = await NewsletterServices.changeStatusIntoDB(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Newsletter subscriber status changed successfully!',
+    data: result,
+  });
+});
+
 const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
   const result = await NewsletterServices.insertIntoDB(req.body);
   sendResponse(res, {
@@ -51,17 +95,6 @@ const updateIntoDB = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const changeStatusIntoDB = catchAsync(async (req: Request, res: Response) => {
-  const result = await NewsletterServices.changeStatusIntoDB(req.params.id, req.body);
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Newsletter status changed successfully!',
-    data: result,
-  });
-});
-
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await NewsletterServices.deleteFromDB(req.params.id)
 
@@ -74,6 +107,9 @@ const deleteFromDB = catchAsync(async (req, res) => {
 })
 
 export const NewsletterController = {
+  subscribeUser,
+  unsubscribeUser,
+  getAllSubscribeUser,
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,

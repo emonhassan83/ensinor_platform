@@ -622,14 +622,14 @@ model EnrolledCourse {
 }
 
 enum CourseGrade {
-  A_PLUS 
-  A 
+  A_PLUS
+  A
   A_MINUS
   B_PLUS
   B
   B_MINUS
   C_PLUS
-  C 
+  C
   C_MINUS
   D_PLUS
   D
@@ -1345,15 +1345,42 @@ model Support {
 }
 
 model Newsletter {
-  id           String           @id @default(uuid())
-  email        String           @unique // Subscriber email
-  recurrence   RecurrenceType   @default(once) // How often to send newsletter
-  scheduleDate DateTime         @default(now()) // Next scheduled date for sending
-  status       NewsletterStatus @default(active)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id           String             @id @default(uuid())
+  title        String
+  content      String
+  category     NewsletterCategory
+  scheduleDate DateTime           @default(now())
+  status       NewsletterStatus   @default(active)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@map("newsletters")
+}
+
+model NewsletterSubscriber {
+  id         String               @id @default(uuid())
+  email      String
+  name       String?
+  category   NewsletterCategory[] // multiple preferences
+  recurrence RecurrenceType       @default(once)
+  status     NewsletterStatus     @default(active)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  // to prevent duplicate subscriptions
+  @@unique([email, category], name: "unique_subscriber_email_category")
+  @@map("newsletter_subscribers")
+}
+
+enum NewsletterCategory {
+  promo
+  coupon
+  course_update
+  shop
+  blogs
+  activityBased
+  subscription
+  greeting
 }
 
 enum RecurrenceType {

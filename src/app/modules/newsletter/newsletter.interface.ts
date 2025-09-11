@@ -1,4 +1,4 @@
-import { RecurrenceType } from "@prisma/client";
+import { NewsletterCategory, RecurrenceType } from "@prisma/client";
 
 export type INewsletterFilterRequest = {
     searchTerm?: string | undefined;
@@ -7,7 +7,15 @@ export type INewsletterFilterRequest = {
 };
 
 // Interface for User, aligned with Prisma User model
-export type INewsletter = {
+export type ISubscriber = {
   email: string
+  category: NewsletterCategory[]
   recurrence: RecurrenceType;
+};
+
+// Interface for User, aligned with Prisma User model
+export type INewsletter = {
+  title: string
+  content: string;
+  category: NewsletterCategory;
 };
