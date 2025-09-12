@@ -152,7 +152,6 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
             select: {
               id: true,
               name: true,
-              email: true,
               photoUrl: true,
             },
           },

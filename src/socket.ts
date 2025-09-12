@@ -5,6 +5,7 @@ import getUserDetailsFromToken from './app/utils/vaildateUserFromToken';
 import { callbackFn } from './app/utils/CallbackFn';
 import ApiError from './app/errors/ApiError';
 import prisma from './app/utils/prisma';
+import { ChatService } from './app/modules/chat/chat.service';
 
 let io: Server;
 const initializeSocketIO = (server: HttpServer) => {
@@ -111,12 +112,12 @@ const initializeSocketIO = (server: HttpServer) => {
 
       // ----------------- send-message -----------------
       socket.on('send-message', async (payload, callback) => {
-        payload.senderId = user.id;
+        payload.sender = user.id;
 
         let chat = await prisma.chat.findFirst({
           where: {
             participants: {
-              every: { userId: { in: [payload.senderId, payload.receiverId] } },
+              every: { userId: { in: [payload.sender, payload.receiver] } },
             },
           },
         });
@@ -127,8 +128,8 @@ const initializeSocketIO = (server: HttpServer) => {
               type: 'private',
               participants: {
                 create: [
-                  { userId: payload.senderId },
-                  { userId: payload.receiverId },
+                  { userId: payload.sender },
+                  { userId: payload.receiver },
                 ],
               },
             },
@@ -138,8 +139,8 @@ const initializeSocketIO = (server: HttpServer) => {
         const result = await prisma.message.create({
           data: {
             chatId: chat.id,
-            senderId: payload.senderId,
-            receiverId: payload.receiverId,
+            senderId: payload.sender,
+            receiverId: payload.receiver,
             text: payload.text,
             imageUrl: payload.imageUrl,
           },
@@ -147,6 +148,20 @@ const initializeSocketIO = (server: HttpServer) => {
 
         const senderMessage = 'new-message::' + chat.id;
         io.emit(senderMessage, result);
+
+         const ChatListSender = await ChatService.getMyChatList(
+          result?.senderId.toString(),
+        );
+        const senderChat = 'chat-list::' + result.senderId.toString();
+        io.emit(senderChat, ChatListSender);
+
+        const ChatListReceiver = await ChatService.getMyChatList(
+          result?.receiverId!.toString(),
+        );
+
+        const receiverChat = 'chat-list::' + result.receiverId!.toString();
+
+        io.emit(receiverChat, ChatListReceiver);
 
         callbackFn(callback, {
           statusCode: httpStatus.OK,

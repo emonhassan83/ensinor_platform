@@ -35,7 +35,7 @@ router.get(
     UserRole.instructor,
     UserRole.student,
   ),
-  ChatController.getAllFromDB,
+  ChatController.getMyChatFromDB,
 );
 
 router.get('/:id', ChatController.getByIdFromDB);

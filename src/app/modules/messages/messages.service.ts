@@ -78,7 +78,7 @@ const insertIntoDB = async (payload: IMessage) => {
 
   const chatListReceiver = await prisma.chat.findMany({
     where: {
-      participants: { some: { userId: result.receiverId  as string} },
+      participants: { some: { userId: result.receiverId as string } },
     },
     include: { participants: true, messages: true },
   });
@@ -93,9 +93,9 @@ const getMessagesByChatId = async (chatId: string) => {
   const result = await prisma.message.findMany({
     where: { chatId },
     include: {
-      sender: { select: { id: true, name: true, email: true, photoUrl: true } },
+      sender: { select: { id: true, name: true, photoUrl: true } },
       receiver: {
-        select: { id: true, name: true, email: true, photoUrl: true },
+        select: { id: true, name: true, photoUrl: true },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -144,6 +144,36 @@ const updateIntoDB = async (
   return result;
 };
 
+const seenMessage = async (userId: string, chatId: string) => {
+  // Step 1: Find all unseen messages in this chat
+  const unseenMessages = await prisma.message.findMany({
+    where: {
+      chatId,
+      seen: false,
+      senderId: { not: userId },
+    },
+    select: { id: true },
+  });
+
+  const unseenMessageIds = unseenMessages.map(m => m.id);
+
+  if (unseenMessageIds.length === 0) {
+    console.log('No unseen messages found');
+    return { message: 'No messages to update' };
+  }
+
+  // Step 2: Update all unseen messages
+  const updatedMessages = await prisma.message.updateMany({
+    where: {
+      id: { in: unseenMessageIds },
+    },
+    data: { seen: true },
+  });
+
+  return updatedMessages;
+};
+
+
 const deleteFromDB = async (id: string): Promise<Message> => {
   const message = await prisma.message.findUniqueOrThrow({
     where: { id },
@@ -172,6 +202,7 @@ export const MessageService = {
   getMessagesByChatId,
   getByIdFromDB,
   updateIntoDB,
+  seenMessage,
   deleteFromDB,
   deleteMessagesByChatId,
 };

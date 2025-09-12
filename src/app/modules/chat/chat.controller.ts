@@ -40,6 +40,17 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getMyChatFromDB = catchAsync(async (req, res) => {
+  const result = await ChatService.getMyChatList(req.user!.userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'All my Chat data fetched!',
+    data: result,
+  });
+});
+
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await ChatService.getByIdFromDB(req.params.id);
   sendResponse(res, {
@@ -78,6 +89,7 @@ export const ChatController = {
   insertIntoDB,
   addParticipationIntoDB,
   getAllFromDB,
+  getMyChatFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,
