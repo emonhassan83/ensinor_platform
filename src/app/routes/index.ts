@@ -230,7 +230,7 @@ const moduleRoutes = [
     route: ArticleRoutes,
   },
   {
-    path: '/chat',
+    path: '/chats',
     route: ChatRoutes,
   },
   {

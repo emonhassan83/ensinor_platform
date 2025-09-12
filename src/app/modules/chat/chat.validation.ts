@@ -5,19 +5,26 @@ import { z } from 'zod';
 const createValidationSchema = z.object({
   body: z.object({
     type: z.nativeEnum(ChatType),
-    groupName: z
-      .string({ required_error: 'Chat groupName is required!' })
-      .optional(),
-    groupImage: z
-      .string({ required_error: 'Chat groupImage is required!' })
-      .optional(),
-    participants: z.array(
-      z.object({
-        userId: z.string({ required_error: "Participant userId is required" }),
-      })
-    ).min(1, "At least one participant is required"),
+    groupName: z.string().optional(),
+    groupImage: z.string().optional(),
+    participants: z
+      .array(
+        z.object({
+          userId: z.string().uuid('Participant userId must be valid UUID'),
+        }),
+      )
+      .min(1, 'At least one participant is required'),
   }),
+}).superRefine((data, ctx) => {
+  if (data.body.type === 'private' && data.body.participants.length !== 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Private chat must have exactly 2 participants',
+      path: ['participants'],
+    });
+  }
 });
+
 
 // Update validation
 const updateValidationSchema = z.object({

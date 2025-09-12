@@ -1,12 +1,41 @@
-import { Batch, Chat, Prisma } from '@prisma/client';
+import { Chat, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IChat, IChatFilterRequest } from './chat.interface';
 import { chatSearchAbleFields } from './chat.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: IChat & { participants: { userId: string }[] }) => {
+const insertIntoDB = async (
+  payload: IChat & { participants: { userId: string }[] },
+) => {
+  // Step 1: collect all userIds from payload
+  const userIds = payload.participants.map(p => p.userId);
+
+  // Step 2: find all users that exist in DB
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      id: { in: userIds },
+      isDeleted: false,
+      status: UserStatus.active,
+    },
+    select: { id: true },
+  });
+
+  // Step 3: check if any userIds are missing
+  const existingIds = existingUsers.map(u => u.id);
+  const missingIds = userIds.filter(id => !existingIds.includes(id));
+
+  if (missingIds.length > 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Invalid user(s). These userIds do not exist: ${missingIds.join(', ')}`,
+    );
+  }
+
+  // Step 4: create chat
   const result = await prisma.chat.create({
     data: {
       type: payload.type,
@@ -25,7 +54,6 @@ const insertIntoDB = async (payload: IChat & { participants: { userId: string }[
             select: {
               id: true,
               name: true,
-              email: true,
               photoUrl: true,
             },
           },
@@ -40,7 +68,6 @@ const insertIntoDB = async (payload: IChat & { participants: { userId: string }[
 
   return result;
 };
-
 
 const getAllFromDB = async (
   params: IChatFilterRequest,
@@ -132,15 +159,15 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
         },
       },
       messages: {
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         take: 1, // latest message only
       },
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { updatedAt: 'desc' },
   });
 
   if (!chats || chats.length === 0) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Chat list not found");
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Chat list not found');
   }
 
   const data = [];
@@ -148,14 +175,14 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
   for (const chat of chats) {
     // Filter participants (exclude myself)
     const otherParticipants = chat.participants.filter(
-      (p) => p.userId !== userId
+      p => p.userId !== userId,
     );
 
     // যদি সার্চ টার্ম থাকে তবে নাম দিয়ে ফিল্টার করব
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
-      const match = otherParticipants.some((p) =>
-        p.user?.name?.toLowerCase().includes(lower)
+      const match = otherParticipants.some(p =>
+        p.user?.name?.toLowerCase().includes(lower),
       );
       if (!match) continue;
     }
@@ -180,7 +207,7 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
         type: chat.type,
         groupName: chat.groupName,
         groupImage: chat.groupImage,
-        participants: otherParticipants.map((p) => p.user),
+        participants: otherParticipants.map(p => p.user),
       },
       message: latestMessage,
       unreadMessageCount,
@@ -201,17 +228,16 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
   return data;
 };
 
-
 const getByIdFromDB = async (id: string): Promise<Chat | null> => {
   const result = await prisma.chat.findUnique({
     where: { id },
     include: {
-     participants: true
+      participants: true,
     },
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Batch not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops!not found!');
   }
 
   return result;
@@ -220,12 +246,21 @@ const getByIdFromDB = async (id: string): Promise<Chat | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<IChat>,
+  file: any,
 ): Promise<Chat> => {
   const chat = await prisma.chat.findUnique({
     where: { id },
   });
   if (!chat) {
     throw new ApiError(httpStatus.NOT_FOUND, 'chat not found!');
+  }
+
+  // upload to image
+  if (file) {
+    payload.groupImage = (await uploadToS3({
+      file,
+      fileName: `images/chat/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
   }
 
   const result = await prisma.chat.update({

@@ -53,7 +53,8 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await ChatService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
+    req.file
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
