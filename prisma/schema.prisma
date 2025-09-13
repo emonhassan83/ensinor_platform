@@ -438,7 +438,7 @@ model Order {
   paymentStatus  PaymentStatus  @default(unpaid)
   paymentMethod  PaymentMethod  @default(Stripe)
   transactionId  String?
-  documents      String[] // Array of document URLs or file paths
+  documents      String // Array of document URLs or file paths
   isDeleted      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

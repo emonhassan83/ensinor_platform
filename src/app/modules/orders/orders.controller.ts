@@ -16,10 +16,12 @@ const createOrders = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAllOrders = catchAsync(async (req: Request, res: Response) => {
+const getAuthorOrders = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, orderFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ordersService.getAllOrders(filters, options);
+  const result = await ordersService.getAllOrders(filters, options, {
+    authorId: req.user!.userId
+  });
 
   sendResponse(res, {
     statusCode: 200,
@@ -30,6 +32,21 @@ const getAllOrders = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyOrders = catchAsync(async (req: Request, res: Response) => {
+  const filters = pick(req.query, orderFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const result = await ordersService.getAllOrders(filters, options, {
+    userId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'My orders fetched successfully',
+    data: result,
+  });
+});
+
 const getOrdersById = catchAsync(async (req: Request, res: Response) => {
   const result = await ordersService.getOrdersById(req.params.id);
 
@@ -37,23 +54,6 @@ const getOrdersById = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: 'Order fetched successfully',
-    data: result,
-  });
-});
-
-const getMyOrders = catchAsync(async (req: Request, res: Response) => {
-  const filters = pick(req.query, orderFilterableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ordersService.getAllOrders(
-    filters,
-    options,
-    req.user!.userId,
-  );
-
-  sendResponse(res, {
-    statusCode: 200,
-    success: true,
-    message: 'My orders fetched successfully',
     data: result,
   });
 });
@@ -88,7 +88,7 @@ const deleteOrders = catchAsync(async (req: Request, res: Response) => {
 
 export const ordersController = {
   createOrders,
-  getAllOrders,
+  getAuthorOrders,
   getOrdersById,
   updateOrders,
   deleteOrders,

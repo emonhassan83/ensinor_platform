@@ -9,10 +9,13 @@ export type IOrderFilterRequest = {
 
 export interface IOrder {
   userId: string
+  authorId: string
   modelType: OrderModelType
-  reference: string
+  bookId?: string
+  courseId?: string
+  courseBundleId: string
   amount: number
   paymentMethod: PaymentMethod
-  documents?: string[]
+  documents?: string
   transactionId?: string
 }

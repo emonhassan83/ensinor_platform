@@ -7,11 +7,14 @@ import { OrderModelType, Prisma, UserStatus } from '@prisma/client';
 import { orderSearchAbleFields } from './orders.constants';
 import prisma from '../../utils/prisma';
 
-const modelConfig: Record<OrderModelType, {
-  model: any; // or proper delegate type
-  priceField: string;
-  popularityField: string;
-}> = {
+const modelConfig: Record<
+  OrderModelType,
+  {
+    model: any; // or proper delegate type
+    priceField: string;
+    popularityField: string;
+  }
+> = {
   [OrderModelType.book]: {
     model: prisma.book,
     priceField: 'price',
@@ -29,13 +32,16 @@ const modelConfig: Record<OrderModelType, {
   },
 };
 
-
 const createOrders = async (payload: IOrder) => {
-  const { userId, modelType, reference } = payload;
+  const { userId, modelType } = payload;
 
   // ✅ Validate user
   const user = await prisma.user.findUnique({
-    where: { id: userId, status: UserStatus.active, isDeleted: false },
+    where: {
+      id: userId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
   });
   if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exist!');
@@ -47,20 +53,39 @@ const createOrders = async (payload: IOrder) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid order model type!');
   }
 
-  // ✅ Fetch referenced entity
-  const entity = await config.model.findFirst({
-    where: { id: reference, isDeleted: false },
-  });
-  if (!entity) {
-    throw new ApiError(httpStatus.BAD_REQUEST, `Reference ${modelType} does not exist!`);
+  // ✅ Resolve reference ID
+  let referenceId: string | undefined;
+  if (modelType === OrderModelType.book) referenceId = payload.bookId;
+  if (modelType === OrderModelType.course) referenceId = payload.courseId;
+  if (modelType === OrderModelType.courseBundle) referenceId = payload.courseBundleId;
+
+  if (!referenceId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Reference ID is required');
   }
 
-  // ✅ Assign price
+  // ✅ Fetch referenced entity
+  const entity = await config.model.findFirst({
+    where: { id: referenceId, isDeleted: false },
+  });
+  if (!entity) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Reference ${modelType} does not exist!`,
+    );
+  }
+
+  // ✅ Special case for book documents
+  if (modelType === OrderModelType.book) {
+    payload.documents = entity.file;
+  }
+
+  // ✅ Assign price & author
   payload.amount = entity[config.priceField];
+  payload.authorId = entity.authorId;
 
   // ✅ Increment popularity (atomic update)
   await config.model.update({
-    where: { id: reference },
+    where: { id: referenceId },
     data: {
       [config.popularityField]: { increment: 1 },
     },
@@ -81,14 +106,20 @@ const createOrders = async (payload: IOrder) => {
 const getAllOrders = async (
   params: IOrderFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy: { authorId?: string; userId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.OrderWhereInput[] = [
-    { userId, isDeleted: false },
-  ];
+  const andConditions: Prisma.OrderWhereInput[] = [{ isDeleted: false }];
+
+  // Filter either by authorId or userId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.userId) {
+    andConditions.push({ userId: filterBy.userId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -147,7 +178,7 @@ const getAllOrders = async (
 
 const getOrdersById = async (id: string) => {
   const order = await prisma.order.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       user: {
         select: {
@@ -169,9 +200,9 @@ const getOrdersById = async (id: string) => {
 
 const updateOrders = async (id: string, payload: Partial<IOrder>) => {
   const order = await prisma.order.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!order || order?.isDeleted) {
+  if (!order) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
   }
   const updated = await prisma.order.update({
@@ -197,8 +228,8 @@ const updateOrders = async (id: string, payload: Partial<IOrder>) => {
 };
 
 const deleteOrders = async (id: string) => {
-  const order = await prisma.order.findUnique({ where: { id } });
-  if (!order || order.isDeleted) {
+  const order = await prisma.order.findUnique({ where: { id, isDeleted: false } });
+  if (!order) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Order already deleted!');
   }
 
