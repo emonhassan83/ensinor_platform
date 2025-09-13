@@ -1,4 +1,4 @@
-import { CoInstructor, Prisma } from '@prisma/client';
+import { CoInstructor, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -8,6 +8,8 @@ import {
 import { coInstructorsSearchAbleFields } from './coInstructors.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { sendCoInstructorInvitationEmail } from '../../utils/email/sentCoInstructorInvitation';
+import httpStatus from 'http-status';
 
 const inviteCoInstructor = async (payload: ICoInstructors) => {
   const { invitedById, coInstructorId, courseId } = payload;
@@ -22,9 +24,15 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
       'Course not found or access denied',
     );
 
+  // Check inviter exists
+  const inviter = await prisma.user.findUnique({
+    where: { id: invitedById, status: UserStatus.active, isDeleted: false },
+  });
+  if (!inviter) throw new ApiError(httpStatus.NOT_FOUND, 'Inviter not found');
+
   // Check co-instructor exists
   const coInstructorUser = await prisma.user.findUnique({
-    where: { id: coInstructorId },
+    where: { id: coInstructorId, status: UserStatus.active, isDeleted: false },
   });
   if (!coInstructorUser)
     throw new ApiError(httpStatus.NOT_FOUND, 'Co-Instructor user not found');
@@ -34,8 +42,17 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     data: payload,
   });
   if (!coInstructor) {
-    throw new ApiError(httpStatus.CONFLICT, 'Co instructors creation fails !');
+    throw new ApiError(httpStatus.CONFLICT, 'Co-Instructor creation failed!');
   }
+
+  // Send email
+  await sendCoInstructorInvitationEmail(
+    coInstructorUser.email,
+    coInstructorUser.name,
+    inviter.name,
+    course.title,
+  );
+
   return coInstructor;
 };
 
@@ -108,7 +125,6 @@ const getAllFromDB = async (
       },
       course: {
         select: {
-          id: true,
           title: true,
         },
       },

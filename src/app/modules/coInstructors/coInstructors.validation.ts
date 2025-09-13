@@ -12,13 +12,13 @@ const createValidationSchema = z.object({
     coInstructorId: z
       .string({ required_error: 'Co instructor is required' })
       .uuid('coInstructorId must be a valid UUID'),
-    permissions: z.nativeEnum(Permission),
+    permissions: z.array(z.nativeEnum(Permission)),
   }),
 });
 
 const updateValidationSchema = z.object({
   body: z.object({
-    permissions: z.nativeEnum(Permission),
+    permissions: z.array(z.nativeEnum(Permission)),
   }),
 });
 

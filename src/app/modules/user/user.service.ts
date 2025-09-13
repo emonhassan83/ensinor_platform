@@ -205,6 +205,7 @@ const createBusinessInstructor = async (
         password: hashPassword,
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
+        status: UserStatus.active,
         // Create verification record at the same time
         verification: {
           create: {
@@ -213,7 +214,6 @@ const createBusinessInstructor = async (
             status: true,
           },
         },
-        status: UserStatus.active,
       },
     });
 
@@ -300,6 +300,7 @@ const createInstructor = async (
         password: hashPassword,
         role: UserRole.instructor,
         registerWith: RegisterWith.credentials,
+        status: UserStatus.active,
         // Create verification record at the same time
         verification: {
           create: {

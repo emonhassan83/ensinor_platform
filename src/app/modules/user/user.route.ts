@@ -29,7 +29,7 @@ router.post(
 );
 
 router.post(
-  '/business-instructor',
+  '/business-instructor-invitation',
   auth(UserRole.company_admin),
   upload.single('image'),
   parseData(),
