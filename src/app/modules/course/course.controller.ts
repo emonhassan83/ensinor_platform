@@ -19,7 +19,7 @@ const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CourseService.getAllFromDB(filters, options);
+  const result = await CourseService.getAllFromDB(filters, options, req.user!.userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +34,26 @@ const getMyCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CourseService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CourseService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My Courses data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getMyInstructorCourse = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseService.getAllFromDB(filters, options, {
+    instructorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -96,6 +115,7 @@ export const CourseController = {
   insertIntoDB,
   getAllFromDB,
   getMyCourseFromDB,
+  getMyInstructorCourse,
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,

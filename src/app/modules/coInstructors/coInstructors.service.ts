@@ -1,4 +1,4 @@
-import { CoInstructor, Instructor, Prisma, User, UserStatus } from '@prisma/client';
+import { CoInstructor, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -9,13 +9,12 @@ import { coInstructorsSearchAbleFields } from './coInstructors.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
-const inviteCoInstructor = async (
-  inviterId: string,
-  payload: ICoInstructors,
-) => {
+const inviteCoInstructor = async (payload: ICoInstructors) => {
+  const { invitedById, coInstructorId, courseId } = payload;
+
   // Check course belongs to inviter
   const course = await prisma.course.findFirst({
-    where: { id: payload.courseId, instructorId: inviterId },
+    where: { id: courseId, instructorId: invitedById },
   });
   if (!course)
     throw new ApiError(
@@ -25,7 +24,7 @@ const inviteCoInstructor = async (
 
   // Check co-instructor exists
   const coInstructorUser = await prisma.user.findUnique({
-    where: { id: payload.coInstructorId },
+    where: { id: coInstructorId },
   });
   if (!coInstructorUser)
     throw new ApiError(httpStatus.NOT_FOUND, 'Co-Instructor user not found');
@@ -34,19 +33,23 @@ const inviteCoInstructor = async (
   const coInstructor = await prisma.coInstructor.create({
     data: payload,
   });
-
+  if (!coInstructor) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors creation fails !');
+  }
   return coInstructor;
 };
 
 const getAllFromDB = async (
   params: ICoInstructorFilterRequest,
   options: IPaginationOptions,
-  invitedById: string
+  invitedById: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CoInstructorWhereInput[] = [{isDeleted: false, invitedById}];
+  const andConditions: Prisma.CoInstructorWhereInput[] = [
+    { isDeleted: false, invitedById },
+  ];
 
   // Search across Employee and nested User fields
   if (searchTerm) {
@@ -55,8 +58,16 @@ const getAllFromDB = async (
         ...coInstructorsSearchAbleFields.map(field => ({
           [field]: { contains: searchTerm, mode: 'insensitive' },
         })),
-        { coInstructorUser: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { coInstructorUser: { email: { contains: searchTerm, mode: 'insensitive' } } },
+        {
+          coInstructorUser: {
+            name: { contains: searchTerm, mode: 'insensitive' },
+          },
+        },
+        {
+          coInstructorUser: {
+            email: { contains: searchTerm, mode: 'insensitive' },
+          },
+        },
       ],
     });
   }
@@ -95,6 +106,12 @@ const getAllFromDB = async (
           photoUrl: true,
         },
       },
+      course: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
     },
   });
 
@@ -114,7 +131,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<CoInstructor | null> => {
   const result = await prisma.coInstructor.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       coInstructorUser: {
         select: {
@@ -130,66 +147,89 @@ const getByIdFromDB = async (id: string): Promise<CoInstructor | null> => {
           status: true,
         },
       },
+      course: true,
     },
   });
 
+  if (!result) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors not found !');
+  }
   return result;
 };
 
 const getCoInstructorCourses = async (coInstructorId: string) => {
-  return prisma.coInstructor.findMany({
+  const result = await prisma.coInstructor.findMany({
     where: { coInstructorId, isActive: true },
-    include: { course: true, invitedBy: true },
+    include: {
+      course: true,
+      invitedBy: {
+        select: { id: true, name: true, email: true, photoUrl: true },
+      },
+    },
   });
+
+  if (!result) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors classes found !');
+  }
+  return result;
 };
 
 const updateIntoDB = async (
   id: string,
-  payload: {
-    instructor?: Partial<Instructor>;
-    user?: Partial<User>;
+  payload: Partial<CoInstructor>,
+): Promise<CoInstructor> => {
+  const coInstructor = await prisma.coInstructor.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!coInstructor) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
   }
-): Promise<Instructor> => {
-  const instructor = await prisma.instructor.findUniqueOrThrow({
+
+  const updated = await prisma.coInstructor.update({
     where: { id },
+    data: payload,
   });
-
-  const updated = await prisma.$transaction(async tx => {
-    // Update Instructor fields
-    const updatedInstructor = payload.instructor
-      ? await tx.instructor.update({
-          where: { id },
-          data: payload.instructor,
-        })
-      : instructor;
-
-    // Update nested User fields
-    if (payload.user) {
-      await tx.user.update({
-        where: { id: instructor.userId },
-        data: payload.user,
-      });
-    }
-
-    return updatedInstructor;
-  });
+  if (!updated) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors not updated !');
+  }
 
   return updated;
 };
 
-const revokeAccess = async (id: string): Promise<User> => {
-  const instructor = await prisma.instructor.findUniqueOrThrow({
+const revokeAccess = async (id: string): Promise<CoInstructor> => {
+  const coInstructor = await prisma.coInstructor.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!coInstructor) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
+  }
+
+  const result = await prisma.coInstructor.update({
     where: { id },
+    data: { isActive: false },
   });
+  if (!result) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors not revoked !');
+  }
 
-  const result = await prisma.$transaction(async tx => {
-    const deletedUser = await tx.user.update({
-      where: { id: instructor.userId },
-      data: { status: UserStatus.deleted, isDeleted: true },
-    });
+  return result;
+};
 
-    return deletedUser;
+const deleteIntoDB = async (id: string): Promise<CoInstructor> => {
+  const coInstructor = await prisma.coInstructor.findUnique({
+    where: { id, isDeleted: false },
   });
+  if (!coInstructor) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
+  }
+
+  const result = await prisma.coInstructor.update({
+    where: { id },
+    data: { isDeleted: true },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.CONFLICT, 'Co instructors not deleted !');
+  }
 
   return result;
 };
@@ -201,4 +241,5 @@ export const CoInstructorService = {
   getCoInstructorCourses,
   updateIntoDB,
   revokeAccess,
+  deleteIntoDB,
 };

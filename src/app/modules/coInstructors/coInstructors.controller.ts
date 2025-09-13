@@ -5,9 +5,8 @@ import pick from '../../utils/pick';
 import { coInstructorsFilterableFields } from './coInstructors.constant';
 import sendResponse from '../../utils/sendResponse';
 
-// Invite Co-Instructor
 const inviteCoInstructor = catchAsync(async (req, res) => {
-  const result = await CoInstructorService.inviteCoInstructor(req.user!.userId, req.body);
+  const result = await CoInstructorService.inviteCoInstructor(req.body);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -73,11 +72,22 @@ const revokeAccess = catchAsync(async (req, res) => {
   });
 });
 
+const deleteIntoDB = catchAsync(async (req, res) => {
+  const result = await CoInstructorService.deleteIntoDB(req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Co-Instructor access deleted !',
+    data: result,
+  });
+});
+
 export const CoInstructorController = {
   inviteCoInstructor,
   getAllFromDB,
   getByIdFromDB,
   getCoInstructorCourses,
   updateIntoDB,
-  revokeAccess
+  revokeAccess,
+  deleteIntoDB
 };

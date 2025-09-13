@@ -54,14 +54,25 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy: {
+    authorId?: string;
+    instructorId?: string;
+  },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.CourseWhereInput[] = [
-    { authorId: userId, isDeleted: false },
+    { isDeleted: false },
   ];
+  // Filter either by authorId, instructorId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.instructorId) {
+    andConditions.push({ instructorId: filterBy.instructorId });
+  }
+
 
   // Search across Package and nested User fields
   if (searchTerm) {

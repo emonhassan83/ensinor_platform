@@ -28,7 +28,7 @@ router.post(
 router.get('/', CourseController.getAllFromDB);
 
 router.get(
-  '/my-course',
+  '/author/my-course',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,
@@ -36,6 +36,17 @@ router.get(
     UserRole.instructor,
   ),
   CourseController.getMyCourseFromDB,
+);
+
+router.get(
+  '/instructor/my-course',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  CourseController.getMyInstructorCourse,
 );
 
 router.get('/:id', CourseController.getByIdFromDB);

@@ -39,10 +39,16 @@ router.put(
   CoInstructorController.updateIntoDB,
 );
 
+router.patch(
+  '/revoke/:id',
+  auth(UserRole.business_instructors, UserRole.instructor),
+  CoInstructorController.revokeAccess,
+);
+
 router.delete(
   '/:id',
   auth(UserRole.business_instructors, UserRole.instructor),
-  CoInstructorController.revokeAccess,
+  CoInstructorController.deleteIntoDB,
 );
 
 export const CoInstructorRoutes = router;

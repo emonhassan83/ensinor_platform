@@ -11,6 +11,7 @@ export type ICourseFilterRequest = {
 
 export type ICourse = {
   authorId: string;
+  instructorId: string;
   title: string;
   shortDescription: string;
   category: string;
