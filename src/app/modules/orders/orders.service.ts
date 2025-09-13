@@ -35,10 +35,9 @@ const createOrders = async (payload: IOrder) => {
 
   // ✅ Validate user
   const user = await prisma.user.findUnique({
-    where: { id: userId, status: UserStatus.active },
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
   });
-
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exist!');
   }
 
@@ -52,7 +51,6 @@ const createOrders = async (payload: IOrder) => {
   const entity = await config.model.findFirst({
     where: { id: reference, isDeleted: false },
   });
-
   if (!entity) {
     throw new ApiError(httpStatus.BAD_REQUEST, `Reference ${modelType} does not exist!`);
   }

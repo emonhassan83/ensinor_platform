@@ -9,7 +9,7 @@ router.post('/', ordersController.createOrders)
 
 router.patch(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin, UserRole.student),
+  auth(UserRole.super_admin, UserRole.company_admin),
   ordersController.updateOrders,
 )
 

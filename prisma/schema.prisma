@@ -79,7 +79,8 @@ model User {
   messagesReceived           Message[]            @relation("ReceivedMessages")
   chatParticipant            ChatParticipant[]
   book                       Book[]
-  order                      Order[]
+  userOrder                  Order[]              @relation("UserOrder")
+  authorOrder                Order[]              @relation("AuthorOrder")
   courseAuthor               Course[]             @relation("CourseAuthor")
   courseInstructor           Course[]             @relation("CourseInstructor")
   event                      Event[]
@@ -427,6 +428,7 @@ model Book {
 model Order {
   id             String         @id @default(uuid())
   userId         String
+  authorId       String
   modelType      OrderModelType
   bookId         String?
   courseId       String?
@@ -441,7 +443,8 @@ model Order {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  user          User            @relation(fields: [userId], references: [id])
+  user          User            @relation("UserOrder", fields: [userId], references: [id])
+  author        User            @relation("AuthorOrder", fields: [authorId], references: [id])
   affiliateSale AffiliateSale[]
 
   book         Book?         @relation(fields: [bookId], references: [id])

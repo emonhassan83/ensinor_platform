@@ -9,7 +9,7 @@ const createValidationSchema = z.object({
       .uuid('user id must be a valid UUID'),
     modelType: z.string({ required_error: 'Order modelType is required!' }),
     reference: z.string({ required_error: 'Order reference is required!' }),
-    paymentMethod: z.string({ required_error: 'Oder paymentMethod is required!' })
+    paymentMethod: z.string({ required_error: 'Oder paymentMethod is required!' }).optional()
   }),
 });
 
