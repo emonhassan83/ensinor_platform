@@ -53,6 +53,7 @@ import { ChatRoutes } from '../modules/chat/chat.routes';
 import { MessageRoutes } from '../modules/messages/messages.routes';
 import { ZoomRoutes } from '../modules/zoom/zoom.routes';
 import { MeetingAssignmentRoutes } from '../modules/meetingAssignment/meetingAssignment.routes';
+import { CoInstructorRoutes } from '../modules/coInstructors/coInstructors.routes';
 
 const router = express.Router();
 
@@ -84,6 +85,10 @@ const moduleRoutes = [
   {
     path: '/instructors',
     route: InstructorRoutes,
+  },
+  {
+    path: '/co-instructors',
+    route: CoInstructorRoutes,
   },
   {
     path: '/students',

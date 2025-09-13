@@ -52,6 +52,7 @@ model User {
   packageExpiry       DateTime?
   fcmToken            String?
   points              Int          @default(0)
+  balance             Float        @default(0.0)
   registerWith        RegisterWith
   lastActive          DateTime     @default(now())
   needsPasswordChange Boolean      @default(true)
@@ -79,7 +80,8 @@ model User {
   chatParticipant            ChatParticipant[]
   book                       Book[]
   order                      Order[]
-  course                     Course[]
+  courseAuthor               Course[]             @relation("CourseAuthor")
+  courseInstructor           Course[]             @relation("CourseInstructor")
   event                      Event[]
   eventBooking               EventBooking[]
   article                    Article[]
@@ -113,6 +115,8 @@ model User {
   studentRequest             CertificateRequest[] @relation("studentRequest")
   authorRequest              CertificateRequest[] @relation("authorRequest")
   resource                   Resource[]
+  coInstructorsInvited       CoInstructor[]       @relation("InvitedByRelation")
+  coInstructorRoles          CoInstructor[]       @relation("CoInstructorRelation")
 
   @@map("users")
 }
@@ -253,6 +257,7 @@ model Department {
   authorId  String
   name      String
   image     String
+  joined    Int      @default(0)
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -304,6 +309,33 @@ model BusinessInstructor {
   company User @relation("company", references: [id], fields: [companyId])
 
   @@map("business_instructors")
+}
+
+model CoInstructor {
+  id             String       @id @default(uuid())
+  courseId       String
+  invitedById    String
+  coInstructorId String
+  revenueShare   Float        @default(0.35)
+  permissions    Permission[]
+  isActive       Boolean      @default(true)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  course           Course @relation(fields: [courseId], references: [id])
+  invitedBy        User   @relation("InvitedByRelation", fields: [invitedById], references: [id])
+  coInstructorUser User   @relation("CoInstructorRelation", fields: [coInstructorId], references: [id])
+
+  @@map("co_instructors")
+}
+
+enum Permission {
+  add
+  edit
+  review
+  grade_assignment
 }
 
 model Employee {
@@ -429,6 +461,7 @@ enum OrderModelType {
 model Course {
   id               String        @id @default(uuid())
   authorId         String
+  instructorId     String
   title            String
   shortDescription String
   category         String
@@ -452,7 +485,8 @@ model Course {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  author User @relation(fields: [authorId], references: [id])
+  author     User @relation("CourseAuthor", fields: [authorId], references: [id])
+  instructor User @relation("CourseInstructor", fields: [instructorId], references: [id])
 
   // Many-to-many with CourseBundle via join table
   courseBundleCourses CourseBundleCourses[]
@@ -473,6 +507,7 @@ model Course {
   review             Review[]
   wishlist           Wishlist[]
   resource           Resource[]
+  coInstructor       CoInstructor[]
 
   @@map("courses")
 }
