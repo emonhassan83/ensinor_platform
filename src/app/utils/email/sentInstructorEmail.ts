@@ -15,15 +15,17 @@ export const sendInstructorRequestEmail = async (
 
       <p>Your account has been created and is currently <strong>under review by the super admin</strong>. Once your profile is approved, you will receive another email with full access.</p>
 
-      <h3>Your Login Details</h3>
-      <ul>
-        <li>Email: <strong>${email}</strong></li>
-        <li>Password: <strong>${password}</strong></li>
-      </ul>
+       <p style="color: #555;">Here are your login credentials:</p>
+        <div style="background:#f4f4f4;padding:15px;border-radius:5px;margin:15px 0;">
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Password:</strong> ${password}</p>
+        </div>
 
-      <p>Please keep your login credentials safe and do not share them with anyone.</p>
+        <p style="color:#555;">
+          👉 Please log in using the credentials above. For security, we highly recommend changing your password after your first login.
+        </p>
+        <p style="color:#555;">Once you log in, you will be able to complete your profile and begin your journey with us.</p>
 
-      <p>We appreciate your patience while we review your account. Thank you for joining our platform!</p>
         <p style="color: #555;">Cheers,<br/>Ensinor Team</p>
       </div>
     `,
@@ -43,13 +45,16 @@ export const sendInstructorInvitationEmail = async (
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
         <p>You have been invited by our <strong>Super Admin</strong> to join the Ensinor platform as an Instructor.</p>
 
-        <p>Your account has been created successfully. Please use the credentials below to log in:</p>
-        <ul>
-          <li>Email: <strong>${email}</strong></li>
-          <li>Password: <strong>${password}</strong></li>
-        </ul>
+        <p style="color: #555;">Here are your login credentials:</p>
+        <div style="background:#f4f4f4;padding:15px;border-radius:5px;margin:15px 0;">
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Password:</strong> ${password}</p>
+        </div>
 
-        <p>Once you log in, you will be able to complete your profile and begin your journey with us.</p>
+        <p style="color:#555;">
+          👉 Please log in using the credentials above. For security, we highly recommend changing your password after your first login.
+        </p>
+        <p style="color:#555;">Once you log in, you will be able to complete your profile and begin your journey with us.</p>
 
         <p>Welcome aboard!<br/>— Ensinor Team</p>
       </div>

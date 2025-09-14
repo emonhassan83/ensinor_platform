@@ -15,7 +15,7 @@ import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { authorId } = payload;
+  const { authorId, instructorId } = payload;
 
   const author = await prisma.user.findFirst({
     where: {
@@ -26,6 +26,17 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
+  const instructor = await prisma.user.findFirst({
+    where: {
+      id: instructorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!instructor) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
   }
 
   // upload to image

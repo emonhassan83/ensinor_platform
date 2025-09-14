@@ -14,8 +14,13 @@ router.post(
 );
 
 router.patch(
-  '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  '/status/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(OrderValidation.updateValidationSchema),
   ordersController.updateOrders,
 );

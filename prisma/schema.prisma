@@ -52,6 +52,7 @@ model User {
   packageExpiry       DateTime?
   fcmToken            String?
   points              Int          @default(0)
+  badges              String[]     @default([])
   balance             Float        @default(0.0)
   registerWith        RegisterWith
   lastActive          DateTime     @default(now())
@@ -438,7 +439,7 @@ model Order {
   paymentStatus  PaymentStatus  @default(unpaid)
   paymentMethod  PaymentMethod  @default(Stripe)
   transactionId  String?
-  documents      String // Array of document URLs or file paths
+  documents      String?
   isDeleted      Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -525,7 +526,9 @@ model CourseContent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  course Course @relation(fields: [courseId], references: [id])
+  course    Course           @relation(fields: [courseId], references: [id])
+  // Many-to-many relation with EnrolledCourse
+  watchedBy EnrolledCourse[] @relation("CourseLectureWatched")
 
   @@map("course_contents")
 }
@@ -629,7 +632,8 @@ model QuizAttempt {
   marksObtained Int      @default(0)
   totalMarks    Int      @default(0)
   grade         String?
-  correctRate   Float    @default(0.0) // % of correct answers
+  correctRate   Float    @default(0.0)
+  lastActivity  DateTime @default(now())
   isDeleted     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -642,20 +646,25 @@ model QuizAttempt {
 }
 
 model EnrolledCourse {
-  id            String       @id @default(uuid())
-  authorId      String
-  courseId      String
-  completedRate Int          @default(0)
-  courseMark    Int?         @default(0)
-  grade         CourseGrade?
-  learningTime  Int          @default(0) // in minutes
-  isComplete    Boolean      @default(false)
-  isDeleted     Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  authorId       String
+  courseId       String
+  completedRate  Int          @default(0)
+  courseMark     Int?         @default(0)
+  grade          CourseGrade?
+  learningTime   Int          @default(0) // in minutes
+  lectureWatched Int          @default(0)
+  lastActivity   DateTime     @default(now())
+  isComplete     Boolean      @default(false)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   author User   @relation(fields: [authorId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
+
+  // Many-to-many relation with CourseContent
+  watchedLectures CourseContent[] @relation("CourseLectureWatched")
 
   @@map("enrolled_courses")
 }

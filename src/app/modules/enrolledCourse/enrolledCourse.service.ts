@@ -1,29 +1,35 @@
-import { EnrolledCourse, Prisma, Quiz, QuizAttempt } from '@prisma/client';
+import { EnrolledCourse, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IEnrolledCourse, IEnrolledCourseFilterRequest } from './enrolledCourse.interface';
+import {
+  IEnrolledCourse,
+  IEnrolledCourseFilterRequest,
+} from './enrolledCourse.interface';
 import { enrolledCourseSearchAbleFields } from './enrolledCourse.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEnrolledCourse) => {
   const { authorId, courseId } = payload;
-
   const course = await prisma.course.findFirst({
     where: {
-      id: courseId
-    }
-  })
-  if (!course || course?.isDeleted) {
+      id: courseId,
+      isDeleted: false,
+    },
+  });
+  if (!course) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
   }
 
   const user = await prisma.user.findFirst({
     where: {
-      id: authorId
-    }
-  })
-  if (!user || user?.isDeleted) {
+      id: authorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Enroll course user not found!');
   }
 
@@ -32,7 +38,10 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Enroll course creation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Enroll course creation failed!',
+    );
   }
   return result;
 };
@@ -89,10 +98,17 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
 
-      include: {
-        author: true,
-        course: true
-      }
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          thumbnail: true,
+          category: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.enrolledCourse.count({
@@ -111,14 +127,21 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<EnrolledCourse | null> => {
   const result = await prisma.enrolledCourse.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
-      author: true,
-        course: true
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      course: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Enroll course not found!');
   }
 
@@ -130,9 +153,9 @@ const updateIntoDB = async (
   payload: Partial<IEnrolledCourse>,
 ): Promise<EnrolledCourse> => {
   const enrollCourse = await prisma.enrolledCourse.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!enrollCourse || enrollCourse?.isDeleted) {
+  if (!enrollCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Enroll course not found!');
   }
 
@@ -147,11 +170,30 @@ const updateIntoDB = async (
   return result;
 };
 
+const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
+  const enrollCourse = await prisma.enrolledCourse.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!enrollCourse) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Enroll course not found!');
+  }
+
+  const result = await prisma.enrolledCourse.update({
+    where: { id },
+    data: { isComplete: true },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Enroll course not updated!');
+  }
+
+  return result;
+};
+
 const deleteFromDB = async (id: string): Promise<EnrolledCourse> => {
   const enrollCourse = await prisma.enrolledCourse.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!enrollCourse || enrollCourse?.isDeleted) {
+  if (!enrollCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Enroll course not found!');
   }
 
@@ -173,5 +215,6 @@ export const EnrolledCourseService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  completeCourseIntoDB,
   deleteFromDB,
 };

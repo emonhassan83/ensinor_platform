@@ -31,6 +31,7 @@ export const sendEmployeeInvitationEmail = async (
           <p style="margin-top: 30px; color: #777; font-size: 13px; border-top: 1px solid #eee; padding-top: 15px;">
             This is an automated message. If you have any questions, please reach out to your company administrator.
           </p>
+           <p>Ensinor Team</p>
       </div>
     `,
   );

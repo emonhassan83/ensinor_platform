@@ -18,8 +18,12 @@ const insertIntoDB = catchAsync(async (req, res) => {
 const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const filterBy = {
+    authorId: req.query.authorId as string | undefined,
+    instructorId: req.query.instructorId as string | undefined,
+  };
 
-  const result = await CourseService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CourseService.getAllFromDB(filters, options, filterBy);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

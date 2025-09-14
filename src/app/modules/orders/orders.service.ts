@@ -3,7 +3,12 @@ import ApiError from '../../errors/ApiError';
 import { IOrder, IOrderFilterRequest } from './orders.interface';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { paginationHelpers } from '../../helpers/paginationHelper';
-import { OrderModelType, Prisma, UserStatus } from '@prisma/client';
+import {
+  OrderModelType,
+  OrderStatus,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { orderSearchAbleFields } from './orders.constants';
 import prisma from '../../utils/prisma';
 
@@ -57,7 +62,8 @@ const createOrders = async (payload: IOrder) => {
   let referenceId: string | undefined;
   if (modelType === OrderModelType.book) referenceId = payload.bookId;
   if (modelType === OrderModelType.course) referenceId = payload.courseId;
-  if (modelType === OrderModelType.courseBundle) referenceId = payload.courseBundleId;
+  if (modelType === OrderModelType.courseBundle)
+    referenceId = payload.courseBundleId;
 
   if (!referenceId) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Reference ID is required');
@@ -74,14 +80,18 @@ const createOrders = async (payload: IOrder) => {
     );
   }
 
-  // ✅ Special case for book documents
+  // ✅ Special case for book documents and assign author
   if (modelType === OrderModelType.book) {
     payload.documents = entity.file;
+  }
+  if (modelType === OrderModelType.course) {
+    payload.authorId = entity.instructorId;
+  } else {
+    payload.authorId = entity.authorId;
   }
 
   // ✅ Assign price & author
   payload.amount = entity[config.priceField];
-  payload.authorId = entity.authorId;
 
   // ✅ Increment popularity (atomic update)
   await config.model.update({
@@ -160,6 +170,36 @@ const getAllOrders = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      user: {
+        select: {
+          name: true,
+        },
+      },
+      author: {
+        select: {
+          name: true,
+        },
+      },
+      course: {
+        select: {
+          title: true,
+          category: true,
+        },
+      },
+      courseBundle: {
+        select: {
+          title: true,
+          category: true,
+        },
+      },
+      book: {
+        select: {
+          title: true,
+          category: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.order.count({
@@ -189,6 +229,18 @@ const getOrdersById = async (id: string) => {
           photoUrl: true,
         },
       },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          contactNo: true,
+          photoUrl: true,
+        },
+      },
+      course: true,
+      book: true,
+      courseBundle: true,
     },
   });
 
@@ -198,16 +250,19 @@ const getOrdersById = async (id: string) => {
   return order;
 };
 
-const updateOrders = async (id: string, payload: Partial<IOrder>) => {
+const updateOrders = async (id: string, payload: { status: OrderStatus }) => {
+  const { status } = payload;
+
   const order = await prisma.order.findUnique({
     where: { id, isDeleted: false },
   });
   if (!order) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Order not found');
   }
+
   const updated = await prisma.order.update({
     where: { id },
-    data: payload,
+    data: { status },
     include: {
       user: {
         select: {
@@ -228,7 +283,9 @@ const updateOrders = async (id: string, payload: Partial<IOrder>) => {
 };
 
 const deleteOrders = async (id: string) => {
-  const order = await prisma.order.findUnique({ where: { id, isDeleted: false } });
+  const order = await prisma.order.findUnique({
+    where: { id, isDeleted: false },
+  });
   if (!order) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Order already deleted!');
   }

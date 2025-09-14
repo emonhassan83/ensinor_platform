@@ -13,7 +13,7 @@ export interface IOrder {
   modelType: OrderModelType
   bookId?: string
   courseId?: string
-  courseBundleId: string
+  courseBundleId?: string
   amount: number
   paymentMethod: PaymentMethod
   documents?: string

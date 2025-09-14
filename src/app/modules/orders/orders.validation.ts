@@ -8,7 +8,7 @@ const createValidationSchema = z.object({
       .string({ required_error: 'User id is required' })
       .uuid('user id must be a valid UUID'),
     modelType: z.nativeEnum(OrderModelType),
-    bookId: z
+    referenceId: z
       .string({ required_error: 'Book id is required' })
       .uuid('book id must be a valid UUID')
       .optional(),

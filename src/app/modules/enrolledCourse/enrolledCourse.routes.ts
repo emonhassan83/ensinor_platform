@@ -9,26 +9,40 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(EnrolledCourseValidation.createValidationSchema),
   EnrolledCourseController.insertIntoDB,
 );
 
 router.get(
-  '/:quizId',
-  auth(UserRole.super_admin),
+  '/user/my-enrolled-courses',
+  auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.getByQuizIdFromDB,
 );
 
-router.get('/:id', EnrolledCourseController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  EnrolledCourseController.getByIdFromDB,
+);
+
+router.patch(
+  '/mark-complete/:id',
+  auth(UserRole.student, UserRole.employee),
+  EnrolledCourseController.completeCourseIntoDB,
+);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(EnrolledCourseValidation.updateValidationSchema),
   EnrolledCourseController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), EnrolledCourseController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  EnrolledCourseController.deleteFromDB,
+);
 
 export const EnrolledCourseRoutes = router;
