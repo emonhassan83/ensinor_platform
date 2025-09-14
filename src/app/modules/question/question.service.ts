@@ -16,9 +16,9 @@ const insertIntoDB = async (payload: IQuestion) => {
 
   // 1. Validate quiz existence
   const quiz = await prisma.quiz.findUnique({
-    where: { id: quizId },
+    where: { id: quizId, isDeleted: false },
   });
-  if (!quiz || quiz.isDeleted) {
+  if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz not found!');
   }
 
@@ -59,6 +59,15 @@ const insertIntoDB = async (payload: IQuestion) => {
       'Quiz question creation failed!',
     );
   }
+
+  // 4. Update quiz (increment by 1)
+  await prisma.quiz.update({
+    where: { id: quizId },
+    data: {
+      questions: { increment: 1 },
+      marks: { increment: 1 },
+    },
+  });
 
   return result;
 };
@@ -276,6 +285,15 @@ const deleteFromDB = async (id: string): Promise<Question> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz question not deleted!');
   }
+
+  // Update quiz (decrement by 1)
+  await prisma.quiz.update({
+    where: { id: question.quizId },
+    data: {
+      questions: { decrement: 1 },
+      marks: { decrement: 1 },
+    },
+  });
 
   return result;
 };

@@ -76,21 +76,21 @@ model User {
   payment                    Payment?
   reviewRef                  ReviewRef[]
   notification               Notification[]
-  messagesSent               Message[]            @relation("SentMessages")
-  messagesReceived           Message[]            @relation("ReceivedMessages")
+  messagesSent               Message[]              @relation("SentMessages")
+  messagesReceived           Message[]              @relation("ReceivedMessages")
   chatParticipant            ChatParticipant[]
   book                       Book[]
-  userOrder                  Order[]              @relation("UserOrder")
-  authorOrder                Order[]              @relation("AuthorOrder")
-  courseAuthor               Course[]             @relation("CourseAuthor")
-  courseInstructor           Course[]             @relation("CourseInstructor")
+  userOrder                  Order[]                @relation("UserOrder")
+  authorOrder                Order[]                @relation("AuthorOrder")
+  courseAuthor               Course[]               @relation("CourseAuthor")
+  courseInstructor           Course[]               @relation("CourseInstructor")
   event                      Event[]
   eventBooking               EventBooking[]
   article                    Article[]
   content                    Content[]
   batch                      Batch[]
-  createdCoupons             Coupon[]             @relation("CouponCreated")
-  usedCoupons                Coupon[]             @relation("CouponUsedBy")
+  createdCoupons             Coupon[]               @relation("CouponCreated")
+  usedCoupons                Coupon[]               @relation("CouponUsedBy")
   quizAttempt                QuizAttempt[]
   department                 Department[]
   invitation                 Invitation[]
@@ -99,26 +99,28 @@ model User {
   wishlist                   Wishlist[]
   withdrawRequest            WithdrawRequest[]
   gradingSystem              GradingSystem[]
-  bundlesAuthored            CourseBundle[]       @relation("BundleAuthor")
+  bundlesAuthored            CourseBundle[]         @relation("BundleAuthor")
   verification               Verification?
   companyRequest             CompanyRequest[]
   usersOnArticles            UsersOnArticles[]
   cv                         CV?
   zoomAccount                ZoomAccount[]
   promoCode                  PromoCode[]
-  usePromoCode               PromoCode[]          @relation("PromoCodeUsedBy")
+  usePromoCode               PromoCode[]            @relation("PromoCodeUsedBy")
   affiliate                  Affiliate[]
-  meetingAssignmentsAuthored MeetingAssignment[]  @relation("MeetingAssignmentsAuthored")
-  meetingAssignmentsJoined   MeetingAssignment[]  @relation("MeetingAssignmentsJoined")
+  meetingAssignmentsAuthored MeetingAssignment[]    @relation("MeetingAssignmentsAuthored")
+  meetingAssignmentsJoined   MeetingAssignment[]    @relation("MeetingAssignmentsJoined")
   review                     Review[]
-  companyBusinessInstructor  BusinessInstructor[] @relation("company")
-  companyEmployee            Employee[]           @relation("companyUser")
+  companyBusinessInstructor  BusinessInstructor[]   @relation("company")
+  companyEmployee            Employee[]             @relation("companyUser")
   quiz                       Quiz[]
-  studentRequest             CertificateRequest[] @relation("studentRequest")
-  authorRequest              CertificateRequest[] @relation("authorRequest")
+  studentRequest             CertificateRequest[]   @relation("studentRequest")
+  authorRequest              CertificateRequest[]   @relation("authorRequest")
   resource                   Resource[]
-  coInstructorsInvited       CoInstructor[]       @relation("InvitedByRelation")
-  coInstructorRoles          CoInstructor[]       @relation("CoInstructorRelation")
+  coInstructorsInvited       CoInstructor[]         @relation("InvitedByRelation")
+  coInstructorRoles          CoInstructor[]         @relation("CoInstructorRelation")
+  assignment                 Assignment[]
+  assignmentSubmission       AssignmentSubmission[]
 
   @@map("users")
 }
@@ -469,6 +471,7 @@ model Course {
   instructorId     String
   title            String
   shortDescription String
+  type             CourseType    @default(external)
   category         String
   level            CourseLevel
   language         String
@@ -513,8 +516,14 @@ model Course {
   wishlist           Wishlist[]
   resource           Resource[]
   coInstructor       CoInstructor[]
+  assignment         Assignment[]
 
   @@map("courses")
+}
+
+enum CourseType {
+  internal
+  external
 }
 
 model CourseContent {
@@ -667,6 +676,50 @@ model EnrolledCourse {
   watchedLectures CourseContent[] @relation("CourseLectureWatched")
 
   @@map("enrolled_courses")
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  authorId    String // Company Admin or Business Instructor
+  courseId    String
+  title       String
+  description String?
+  fileUrl     String? // e.g., PDF/DOC/ZIP link
+  deadline    DateTime?
+  attempt     Int       @default(0)
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  author User   @relation(fields: [authorId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  // Submissions relation (for trainees)
+  submissions AssignmentSubmission[]
+
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id           String   @id @default(uuid())
+  assignmentId String
+  userId       String
+  fileUrl      String?
+  grade        Int?
+  feedback     String?
+  submittedAt  DateTime @default(now())
+  isLate       Boolean  @default(false)
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+  trainee    User       @relation(fields: [userId], references: [id])
+
+  @@unique([assignmentId, userId])
+  @@map("assignment_submissions")
 }
 
 enum CourseGrade {

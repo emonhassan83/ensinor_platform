@@ -46,6 +46,85 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   return result;
 };
 
+const enrollCoursesBulk = async (
+  enrollments: { authorId: string; courseId: string }[]
+) => {
+  try {
+    if (enrollments.length === 0) {
+      return { success: false, message: "No enrollments provided" };
+    }
+
+    // ✅ Check all authors exist
+    const authorIds = [...new Set(enrollments.map((e) => e.authorId))];
+    const existingAuthors = await prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true },
+    });
+
+    const missingAuthors = authorIds.filter(
+      (id) => !existingAuthors.find((a) => a.id === id)
+    );
+    if (missingAuthors.length > 0) {
+      throw new Error(`Invalid author(s): ${missingAuthors.join(", ")}`);
+    }
+
+    // ✅ Check all courses exist
+    const courseIds = [...new Set(enrollments.map((e) => e.courseId))];
+    const existingCourses = await prisma.course.findMany({
+      where: { id: { in: courseIds } },
+      select: { id: true },
+    });
+
+    const missingCourses = courseIds.filter(
+      (id) => !existingCourses.find((c) => c.id === id)
+    );
+    if (missingCourses.length > 0) {
+      throw new Error(`Invalid course(s): ${missingCourses.join(", ")}`);
+    }
+
+    // ✅ Check for existing enrollments to avoid duplicates
+    const existingEnrollments = await prisma.enrolledCourse.findMany({
+      where: {
+        OR: enrollments.map((e) => ({
+          authorId: e.authorId,
+          courseId: e.courseId,
+        })),
+      },
+      select: { authorId: true, courseId: true },
+    });
+
+    const existingSet = new Set(
+      existingEnrollments.map((e) => `${e.authorId}-${e.courseId}`)
+    );
+
+    const filteredEnrollments = enrollments.filter(
+      (e) => !existingSet.has(`${e.authorId}-${e.courseId}`)
+    );
+
+    if (filteredEnrollments.length === 0) {
+      return { success: false, message: "All courses already enrolled" };
+    }
+
+    // ✅ Bulk insert
+    const created = await prisma.enrolledCourse.createMany({
+      data: filteredEnrollments.map((e) => ({
+        authorId: e.authorId,
+        courseId: e.courseId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return {
+      success: true,
+      message: "Enrollments created successfully",
+      count: created.count,
+    };
+  } catch (error: any) {
+    console.error("Error bulk enrolling:", error);
+    throw new Error(error.message || "Failed to enroll courses");
+  }
+};
+
 const getAllFromDB = async (
   params: IEnrolledCourseFilterRequest,
   options: IPaginationOptions,
@@ -290,6 +369,7 @@ const deleteFromDB = async (id: string): Promise<EnrolledCourse> => {
 
 export const EnrolledCourseService = {
   insertIntoDB,
+  enrollCoursesBulk,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

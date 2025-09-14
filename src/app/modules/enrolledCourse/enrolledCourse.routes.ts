@@ -14,6 +14,13 @@ router.post(
   EnrolledCourseController.insertIntoDB,
 );
 
+router.post(
+  '/bulk',
+  auth(UserRole.student, UserRole.employee),
+  validateRequest(EnrolledCourseValidation.bulkEnrollValidationSchema),
+  EnrolledCourseController.bulkInsertIntoDB,
+);
+
 router.get(
   '/my-enrolled-courses',
   auth(UserRole.student, UserRole.employee),

@@ -15,6 +15,16 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const bulkInsertIntoDB = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.enrollCoursesBulk(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Bulk enroll course insert successfully!',
+    data: result,
+  });
+});
+
 const getMyFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, enrolledCourseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -91,6 +101,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EnrolledCourseController = {
   insertIntoDB,
+  bulkInsertIntoDB,
   getMyFromDB,
   getByIdFromDB,
   updateIntoDB,

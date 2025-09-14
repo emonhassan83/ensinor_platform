@@ -1,3 +1,4 @@
+import { CourseType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -10,6 +11,7 @@ const createValidationSchema = z.object({
       .string({ required_error: 'instructor is required' })
       .uuid('instructor must be a valid UUID'),
     title: z.string({ required_error: 'Title is required!' }),
+    type: z.nativeEnum(CourseType).optional(),
     shortDescription: z.string({
       required_error: 'Short description is required!',
     }),
@@ -38,6 +40,7 @@ const updateValidationSchema = z.object({
     shortDescription: z
       .string({ required_error: 'Short description is required!' })
       .optional(),
+    type: z.nativeEnum(CourseType).optional(),
     category: z.string({ required_error: 'Category is required!' }).optional(),
     level: z.string({ required_error: 'Course level is required!' }).optional(),
     language: z
