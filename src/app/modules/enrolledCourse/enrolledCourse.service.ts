@@ -125,8 +125,8 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<EnrolledCourse | null> => {
-  const result = await prisma.enrolledCourse.findUnique({
+const getByIdFromDB = async (id: string) => {
+  const enrolledCourse = await prisma.enrolledCourse.findUnique({
     where: { id, isDeleted: false },
     include: {
       author: {
@@ -137,13 +137,22 @@ const getByIdFromDB = async (id: string): Promise<EnrolledCourse | null> => {
           photoUrl: true,
         },
       },
-      course: true,
+      watchedLectures: true,
+      course: { select: { lectures: true, courseContent: true } },
     },
   });
 
-  if (!result) {
+  if (!enrolledCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Enroll course not found!');
   }
+  const totalLectures = enrolledCourse.course.courseContent.length;
+  const watchedLectures = enrolledCourse.watchedLectures.length;
+
+  const result = {
+    ...enrolledCourse,
+    lectureWatched: watchedLectures,
+    totalLectures: totalLectures,
+  };
 
   return result;
 };
@@ -168,6 +177,75 @@ const updateIntoDB = async (
   }
 
   return result;
+};
+
+const watchLectureIntoDB = async (payload: {
+  enrolledCourseId: string;
+  lectureId: string;
+}): Promise<EnrolledCourse> => {
+  const { enrolledCourseId, lectureId } = payload;
+  // Fetch enrolled course
+  const enrolledCourse = await prisma.enrolledCourse.findUnique({
+    where: { id: enrolledCourseId },
+    include: {
+      watchedLectures: true,
+      course: {
+        select: { lectures: true, courseContent: true },
+      },
+    },
+  });
+
+  if (!enrolledCourse) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Enrolled course not found!');
+  }
+
+  // Check if lecture already watched
+  if (enrolledCourse.watchedLectures.some(l => l.id === lectureId)) {
+    // Already watched, just update lastActivity
+    const updated = await prisma.enrolledCourse.update({
+      where: { id: enrolledCourseId },
+      data: { lastActivity: new Date() },
+    });
+    return updated;
+  }
+
+  // Fetch lecture duration
+  const lecture = await prisma.courseContent.findUnique({
+    where: { id: lectureId },
+  });
+  if (!lecture) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Lecture not found!');
+  }
+
+  // Connect lecture to enrolledCourse
+  const updated = await prisma.enrolledCourse.update({
+    where: { id: enrolledCourseId },
+    data: {
+      watchedLectures: {
+        connect: { id: lectureId },
+      },
+      lectureWatched: { increment: 1 },
+      learningTime: { increment: Math.ceil(lecture.duration) }, // minutes
+      lastActivity: new Date(),
+    },
+  });
+
+  // Calculate completedRate
+  const totalLectures = enrolledCourse.course.courseContent.length;
+  const completedRate = Math.floor(
+    ((updated.lectureWatched) / totalLectures) * 100,
+  );
+
+  // Update completion status if all lectures watched
+  const finalUpdate = await prisma.enrolledCourse.update({
+    where: { id: enrolledCourseId },
+    data: {
+      completedRate: completedRate,
+      isComplete: completedRate === 100,
+    },
+  });
+
+  return finalUpdate;
 };
 
 const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
@@ -215,6 +293,7 @@ export const EnrolledCourseService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  watchLectureIntoDB,
   completeCourseIntoDB,
   deleteFromDB,
 };

@@ -15,11 +15,15 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByQuizIdFromDB = catchAsync(async (req, res) => {
+const getMyFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, enrolledCourseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await EnrolledCourseService.getAllFromDB(filters, options, req.params.quizId);
+  const result = await EnrolledCourseService.getAllFromDB(
+    filters,
+    options,
+    req.params.quizId,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -43,12 +47,22 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await EnrolledCourseService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Enroll course data updated!',
+    data: result,
+  });
+});
+
+const watchLecture = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.watchLectureIntoDB(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Enroll course watch successfully!',
     data: result,
   });
 });
@@ -77,9 +91,10 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EnrolledCourseController = {
   insertIntoDB,
-  getByQuizIdFromDB,
+  getMyFromDB,
   getByIdFromDB,
   updateIntoDB,
+  watchLecture,
   completeCourseIntoDB,
   deleteFromDB,
 };

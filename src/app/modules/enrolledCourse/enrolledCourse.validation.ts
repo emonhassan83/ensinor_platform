@@ -12,6 +12,18 @@ const createValidationSchema = z.object({
   }),
 });
 
+// Create validation
+const watchLectureValidationSchema = z.object({
+  body: z.object({
+    enrolledCourseId: z
+      .string({ required_error: 'Enrolled CourseId is required' })
+      .uuid('Enrolled Course id must be a valid UUID'),
+    lectureId: z
+      .string({ required_error: 'lecture id is required' })
+      .uuid('lecture id must be a valid UUID'),
+  }),
+});
+
 // Update validation
 const updateValidationSchema = z.object({
   body: z.object({
@@ -35,5 +47,6 @@ const updateValidationSchema = z.object({
 
 export const EnrolledCourseValidation = {
   createValidationSchema,
+  watchLectureValidationSchema,
   updateValidationSchema,
 };

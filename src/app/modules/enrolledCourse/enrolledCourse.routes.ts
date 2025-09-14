@@ -15,9 +15,9 @@ router.post(
 );
 
 router.get(
-  '/user/my-enrolled-courses',
+  '/my-enrolled-courses',
   auth(UserRole.student, UserRole.employee),
-  EnrolledCourseController.getByQuizIdFromDB,
+  EnrolledCourseController.getMyFromDB,
 );
 
 router.get(
@@ -30,6 +30,13 @@ router.patch(
   '/mark-complete/:id',
   auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.completeCourseIntoDB,
+);
+
+router.put(
+  '/watch-lecture',
+  auth(UserRole.student, UserRole.employee),
+  validateRequest(EnrolledCourseValidation.watchLectureValidationSchema),
+  EnrolledCourseController.watchLecture,
 );
 
 router.put(
