@@ -14,9 +14,8 @@ const upload = multer({ storage });
 router.post(
   '/',
   auth(
-    UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.instructor,
+    UserRole.student,
+    UserRole.employee,
   ),
   upload.single('file'),
   parseData(),
@@ -35,7 +34,7 @@ router.get(
 );
 
 router.get(
-  '/course/:courseId',
+  '/assignment/:assignmentId',
   auth(
     UserRole.company_admin,
     UserRole.business_instructors,
@@ -49,9 +48,6 @@ router.get(
 router.get(
   '/user/my-assignment',
   auth(
-    UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.instructor,
     UserRole.employee,
     UserRole.student,
   ),
@@ -76,6 +72,8 @@ router.put(
     UserRole.company_admin,
     UserRole.business_instructors,
     UserRole.instructor,
+    UserRole.employee,
+    UserRole.student,
   ),
   upload.single('file'),
   parseData(),
@@ -89,6 +87,8 @@ router.delete(
     UserRole.company_admin,
     UserRole.business_instructors,
     UserRole.instructor,
+    UserRole.employee,
+    UserRole.student,
   ),
   AssignmentSubmissionController.deleteFromDB,
 );

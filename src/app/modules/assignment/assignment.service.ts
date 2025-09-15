@@ -114,6 +114,7 @@ const getAllFromDB = async (
     include: {
       course: {
         select: {
+          id: true,
           title: true,
           thumbnail: true,
         },
@@ -149,6 +150,7 @@ const getByIdFromDB = async (id: string): Promise<Assignment | null> => {
       },
       course: {
         select: {
+          id: true,
           title: true,
           thumbnail: true,
         },

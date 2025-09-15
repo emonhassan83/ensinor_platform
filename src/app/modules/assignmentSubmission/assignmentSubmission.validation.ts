@@ -21,8 +21,13 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     grade: z.nativeEnum(CourseGrade).optional(),
+    marksObtained: z
+      .number({
+        required_error: 'Assignment submission marksObtained is required!',
+      })
+      .optional(),
     feedback: z
-      .date({ required_error: 'Assignment submission feedback is required!' })
+      .string({ required_error: 'Assignment submission feedback is required!' })
       .optional(),
   }),
 });

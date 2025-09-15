@@ -704,25 +704,26 @@ model Assignment {
 }
 
 model AssignmentSubmission {
-  id           String   @id @default(uuid())
-  assignmentId String
-  authorId     String
-  userId       String
-  fileUrl      String?
-  grade        CourseGrade?
-  feedback     String?
-  submittedAt  DateTime @default(now())
-  isLate       Boolean  @default(false)
-  isDeleted    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String       @id @default(uuid())
+  assignmentId  String
+  authorId      String
+  userId        String
+  fileUrl       String?
+  grade         CourseGrade?
+  marksObtained Int          @default(0)
+  totalMarks    Int          @default(0)
+  feedback      String?
+  submittedAt   DateTime     @default(now())
+  isLate        Boolean      @default(false)
+  isDeleted     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   // Relations
   assignment Assignment @relation(fields: [assignmentId], references: [id])
   user       User       @relation("assignmentSubmissionUser", fields: [userId], references: [id])
   author     User       @relation("assignmentAuthorUser", fields: [authorId], references: [id])
 
-  @@unique([assignmentId, userId])
   @@map("assignment_submissions")
 }
 

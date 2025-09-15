@@ -1,5 +1,5 @@
 import httpStatus from 'http-status';
-import { Assignment, AssignmentSubmission, Batch, Prisma, UserStatus } from '@prisma/client';
+import { AssignmentSubmission, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -13,6 +13,8 @@ import { uploadToS3 } from '../../utils/s3';
 
 const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
   const { assignmentId, userId } = payload;
+
+  // 1. Validate user
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
@@ -24,6 +26,7 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
+  // 2. Validate assignment
   const assignment = await prisma.assignment.findFirst({
     where: {
       id: assignmentId,
@@ -34,24 +37,39 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
-  // assign author id
-  assignment.authorId = payload.authorId;
-
-  // upload to image
+  // 3. upload to image
+  let fileUrl: string | undefined;
   if (file) {
-    payload.fileUrl = (await uploadToS3({
+    fileUrl = (await uploadToS3({
       file,
       fileName: `images/assignment/${Math.floor(100000 + Math.random() * 900000)}`,
     })) as string;
   }
 
-  const result = await prisma.assignmentSubmission.create({
-    data: payload,
-  });
+  // 4. Check deadline
+  const isLate = assignment.deadline ? new Date() > assignment.deadline : false;
 
+  // 5. Create submission (or update if already exists)
+  const result = await prisma.assignmentSubmission.create({
+    data: {
+      ...payload,
+      authorId: assignment.authorId,
+      totalMarks: assignment.marks,
+      fileUrl,
+      submittedAt: new Date(),
+      isLate,
+    },
+  });
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Assignment submission failed!');
   }
+
+  // 6. Increment global attempt only if it's a fresh submission
+  await prisma.assignment.update({
+    where: { id: assignment.id },
+    data: { attempt: { increment: 1 } },
+  });
+
   return result;
 };
 
@@ -63,7 +81,9 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.AssignmentSubmissionWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.AssignmentSubmissionWhereInput[] = [
+    { isDeleted: false },
+  ];
   // Filter either by authorId or userId
   if (filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
@@ -133,7 +153,9 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<AssignmentSubmission | null> => {
+const getByIdFromDB = async (
+  id: string,
+): Promise<AssignmentSubmission | null> => {
   const result = await prisma.assignmentSubmission.findUnique({
     where: { id },
     include: {
@@ -150,7 +172,10 @@ const getByIdFromDB = async (id: string): Promise<AssignmentSubmission | null> =
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Assignment submission not found!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Oops! Assignment submission not found!',
+    );
   }
 
   return result;
@@ -165,7 +190,10 @@ const updateIntoDB = async (
     where: { id, isDeleted: false },
   });
   if (!assignmentSubmission) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Assignment submission not found!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Assignment submission not found!',
+    );
   }
 
   // upload to image
@@ -181,7 +209,10 @@ const updateIntoDB = async (
     data: payload,
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Assignment submission not updated!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Assignment submission not updated!',
+    );
   }
 
   return result;
@@ -192,15 +223,27 @@ const deleteFromDB = async (id: string): Promise<AssignmentSubmission> => {
     where: { id, isDeleted: false },
   });
   if (!assignmentSubmission) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Assignment submission not found!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Assignment submission not found!',
+    );
   }
 
   const result = await prisma.assignmentSubmission.delete({
     where: { id },
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Assignment submission not deleted!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Assignment submission not deleted!',
+    );
   }
+
+  // Increment global attempt only if it's a fresh submission
+  await prisma.assignment.update({
+    where: { id: assignmentSubmission.assignmentId },
+    data: { attempt: { decrement: 1 } },
+  });
 
   return result;
 };
