@@ -2,10 +2,10 @@ import { z } from 'zod';
 
 const createValidationSchema = z.object({
   body: z.object({
-    user: z
+    userId: z
       .string({ required_error: 'User is required' })
       .uuid('receiver must be a valid UUID'),
-    package: z
+    packageId: z
       .string({ required_error: 'Package is required' })
       .uuid('receiver must be a valid UUID'),
   }),

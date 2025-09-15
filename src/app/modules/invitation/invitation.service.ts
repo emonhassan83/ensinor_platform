@@ -115,6 +115,14 @@ const insertIntoDB = async (payload: IInvitation) => {
     return { user: newUser, employee: newEmployee };
   });
 
+  // after invitation here increment the department size by one
+  await prisma.department.update({
+    where: { id: department.id },
+    data: {
+      joined: { increment: 1 },
+    },
+  });
+
   return result;
 };
 

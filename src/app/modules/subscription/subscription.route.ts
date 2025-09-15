@@ -9,39 +9,33 @@ const router = Router()
 
 router.post(
   '/',
-  auth(UserRole.company_admin, UserRole.student),
+  auth(UserRole.company_admin, UserRole.instructor),
   validateRequest(SubscriptionValidation.createValidationSchema),
   subscriptionController.createSubscription,
 )
 
 router.patch(
   '/:id',
-  auth(UserRole.company_admin, UserRole.student),
+  auth(UserRole.company_admin, UserRole.instructor),
   subscriptionController.updateSubscription,
 )
 
 router.delete(
   '/:id',
-  auth(UserRole.company_admin, UserRole.student),
+  auth(UserRole.company_admin, UserRole.instructor),
   subscriptionController.deleteSubscription,
 )
 
 router.get(
   '/my-subscriptions',
-  auth(UserRole.student),
+  auth(UserRole.company_admin, UserRole.instructor),
   subscriptionController.getMySubscription,
 )
 
 router.get(
   '/:id',
-  auth(UserRole.company_admin, UserRole.student),
+  auth(UserRole.company_admin, UserRole.instructor),
   subscriptionController.getSubscriptionById,
 )
-
-// router.get(
-//   '/',
-//   auth(UserRole.company_admin, UserRole.student),
-//   subscriptionController.getAllSubscription,
-// )
 
 export const SubscriptionRoutes = router

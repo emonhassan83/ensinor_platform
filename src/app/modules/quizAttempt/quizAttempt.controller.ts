@@ -19,12 +19,48 @@ const getByQuizIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, quizAttemptFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await QuizAttemptService.getAllFromDB(filters, options, req.params.quizId);
+  const result = await QuizAttemptService.getAllFromDB(filters, options, {
+    quizId: req.params.quizId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Quiz attempt by quizId data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByAuthorQuizFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, quizAttemptFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await QuizAttemptService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Get by author quiz attempts data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getMyAttemptFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, quizAttemptFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await QuizAttemptService.getAllFromDB(filters, options, {
+    userId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My quiz attempt data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -41,10 +77,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await QuizAttemptService.updateIntoDB(
-    req.params.id,
-    req.body
-  );
+  const result = await QuizAttemptService.updateIntoDB(req.params.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -66,6 +99,8 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const QuizAttemptController = {
   insertIntoDB,
   getByQuizIdFromDB,
+  getMyAttemptFromDB,
+  getByAuthorQuizFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

@@ -1,53 +1,68 @@
-import { Prisma, Quiz, QuizAttempt } from '@prisma/client';
+import { Prisma, Quiz, QuizAttempt, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IQuizAttempt, IQuizAttemptFilterRequest } from './quizAttempt.interface';
+import {
+  IQuizAttempt,
+  IQuizAttemptFilterRequest,
+} from './quizAttempt.interface';
 import { quizAttemptSearchAbleFields } from './quizAttempt.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
 const insertIntoDB = async (payload: IQuizAttempt) => {
   const { quizId, userId } = payload;
-
   const quiz = await prisma.quiz.findFirst({
     where: {
-      id: quizId
-    }
-  })
-  if (!quiz || quiz?.isDeleted) {
+      id: quizId,
+      isDeleted: false,
+    },
+  });
+  if (!quiz) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz not found!');
   }
 
   const user = await prisma.user.findFirst({
     where: {
-      id: userId
-    }
-  })
-  if (!user || user?.isDeleted) {
+      id: userId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt user not found!');
   }
 
   const result = await prisma.quizAttempt.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt creation failed!');
   }
+
+  // here updated some fields
+
   return result;
 };
 
 const getAllFromDB = async (
   params: IQuizAttemptFilterRequest,
   options: IPaginationOptions,
-  quizId?: string,
+  filterBy: { userId?: string; quizId?: string; authorId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.QuizAttemptWhereInput[] = [
-    { quizId, isDeleted: false },
-  ];
+  const andConditions: Prisma.QuizAttemptWhereInput[] = [{ isDeleted: false }];
+  // Filter either by authorId or userId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.userId) {
+    andConditions.push({ userId: filterBy.userId });
+  }
+  if (filterBy.quizId) {
+    andConditions.push({ quizId: filterBy.quizId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -89,10 +104,10 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
 
-      include: {
-        user: true,
-        quiz: true
-      }
+    include: {
+      user: true,
+      quiz: true,
+    },
   });
 
   const total = await prisma.quizAttempt.count({
@@ -114,7 +129,7 @@ const getByIdFromDB = async (id: string): Promise<QuizAttempt | null> => {
     where: { id },
     include: {
       user: true,
-        quiz: true
+      quiz: true,
     },
   });
 

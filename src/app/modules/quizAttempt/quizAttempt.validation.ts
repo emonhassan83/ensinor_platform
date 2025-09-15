@@ -9,21 +9,6 @@ const createValidationSchema = z.object({
     userId: z
       .string({ required_error: 'User id is required' })
       .uuid('user id must be a valid UUID'),
-    timeTaken: z
-      .string({ required_error: 'Quiz attempt timeTaken is required!' })
-      .optional(),
-    marksObtained: z
-      .number({ required_error: 'Quiz attempt marksObtained is required!' })
-      .optional(),
-    totalMarks: z
-      .number({ required_error: 'Quiz attempt totalMarks is required!' })
-      .optional(),
-    grade: z
-      .string({ required_error: 'Quiz attempt grade is required!' })
-      .optional(),
-    correctRate: z
-      .number({ required_error: 'Quiz attempt correctRate is required!' })
-      .optional(),
   }),
 });
 
@@ -35,9 +20,6 @@ const updateValidationSchema = z.object({
       .optional(),
     marksObtained: z
       .number({ required_error: 'Quiz attempt marksObtained is required!' })
-      .optional(),
-    totalMarks: z
-      .number({ required_error: 'Quiz attempt totalMarks is required!' })
       .optional(),
     grade: z
       .string({ required_error: 'Quiz attempt grade is required!' })

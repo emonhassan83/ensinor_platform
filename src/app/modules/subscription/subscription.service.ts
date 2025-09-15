@@ -2,7 +2,12 @@ import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import cron from 'node-cron';
 import prisma from '../../utils/prisma';
-import { PaymentStatus, Prisma } from '@prisma/client';
+import {
+  PaymentStatus,
+  Prisma,
+  SubscriptionStatus,
+  UserStatus,
+} from '@prisma/client';
 import {
   ISubscription,
   ISubscriptionFilterRequest,
@@ -109,8 +114,8 @@ const createSubscription = async (payload: ISubscription) => {
     where: {
       userId: payload.userId,
       packageId: payload.packageId,
-      paymentStatus: 'unpaid',
-      status: 'pending',
+      paymentStatus: PaymentStatus.unpaid,
+      status: SubscriptionStatus.pending,
     },
   });
 
@@ -119,18 +124,24 @@ const createSubscription = async (payload: ISubscription) => {
   }
 
   // 2) find user
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user || user.isDeleted)
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
-  if (user.status === 'blocked')
-    throw new ApiError(httpStatus.FORBIDDEN, 'Your account is blocked!');
+  const user = await prisma.user.findFirst({
+    where: { id: payload.userId, status: UserStatus.active, isDeleted: false },
+  });
+  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
 
   // 3) find package
-  const pkg = await prisma.package.findUnique({
-    where: { id: payload.packageId },
+  const pkg = await prisma.package.findFirst({
+    where: { id: payload.packageId, isDeleted: false },
   });
-  if (!pkg || pkg.isDeleted)
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Package not found');
+  if (!pkg) throw new ApiError(httpStatus.BAD_REQUEST, 'Package not found');
+
+  // another validation
+  if (pkg.audience !== user.role) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'This subscription not allow for you!',
+    );
+  }
 
   // 4) Determine amount & billing cycle expiry
   const amount = pkg.price;
@@ -167,19 +178,19 @@ const createSubscription = async (payload: ISubscription) => {
       },
     });
 
-    // compute finalExpiryDate if user already had packageExpiry in future
-    let finalExpiryDate = expiredAt;
-    if (user.packageExpiry && new Date(user.packageExpiry) > now) {
-      const additionalMs = expiredAt.getTime() - now.getTime();
-      finalExpiryDate = new Date(
-        new Date(user.packageExpiry).getTime() + additionalMs,
-      );
-    }
+    // // compute finalExpiryDate if user already had packageExpiry in future
+    // let finalExpiryDate = expiredAt;
+    // if (user.packageExpiry && new Date(user.packageExpiry) > now) {
+    //   const additionalMs = expiredAt.getTime() - now.getTime();
+    //   finalExpiryDate = new Date(
+    //     new Date(user.packageExpiry).getTime() + additionalMs,
+    //   );
+    // }
 
-    await tx.user.update({
-      where: { id: user.id },
-      data: { packageExpiry: finalExpiryDate },
-    });
+    // await tx.user.update({
+    //   where: { id: user.id },
+    //   data: { packageExpiry: finalExpiryDate },
+    // });
 
     return created;
   });
@@ -239,6 +250,14 @@ const getAllSubscription = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      package: {
+        select: {
+          title: true,
+          billingCycle: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.subscription.count({

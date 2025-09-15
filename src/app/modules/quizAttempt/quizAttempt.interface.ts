@@ -7,6 +7,7 @@ export type IQuizAttemptFilterRequest = {
 export type IQuizAttempt = {
   quizId: string;
   userId: string;
+  authorId: string;
   timeTaken?: string;
   marksObtained?: number;
   totalMarks?: number;

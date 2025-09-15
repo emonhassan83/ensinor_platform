@@ -85,13 +85,15 @@ model User {
   courseAuthor               Course[]               @relation("CourseAuthor")
   courseInstructor           Course[]               @relation("CourseInstructor")
   event                      Event[]
-  eventBooking               EventBooking[]
+  userEventBooking           EventBooking[]         @relation("userEventBooking")
+  authorEventBooking         EventBooking[]         @relation("authorEventBooking")
   article                    Article[]
   content                    Content[]
   batch                      Batch[]
   createdCoupons             Coupon[]               @relation("CouponCreated")
   usedCoupons                Coupon[]               @relation("CouponUsedBy")
-  quizAttempt                QuizAttempt[]
+  quizAttemptUser            QuizAttempt[]          @relation("quizAttemptUser")
+  quizAuthor                 QuizAttempt[]          @relation("quizAuthor")
   department                 Department[]
   invitation                 Invitation[]
   enrolledCourse             EnrolledCourse[]
@@ -638,6 +640,7 @@ model QuizAttempt {
   id            String   @id @default(uuid())
   quizId        String
   userId        String
+  authorId      String
   timeTaken     String? // e.g. "15m", "00:12:45"
   marksObtained Int      @default(0)
   totalMarks    Int      @default(0)
@@ -649,8 +652,9 @@ model QuizAttempt {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  quiz Quiz @relation(fields: [quizId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  quiz   Quiz @relation(fields: [quizId], references: [id])
+  user   User @relation("quizAttemptUser", fields: [userId], references: [id])
+  author User @relation("quizAuthor", fields: [authorId], references: [id])
 
   @@map("quiz_attempts")
 }
@@ -858,6 +862,7 @@ model EventBooking {
   id            String        @id @default(uuid())
   eventId       String
   userId        String
+  authorId      String
   name          String
   phone         String
   email         String
@@ -874,8 +879,9 @@ model EventBooking {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  event Event @relation(fields: [eventId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
+  event  Event @relation(fields: [eventId], references: [id])
+  user   User  @relation("userEventBooking", fields: [userId], references: [id])
+  author User  @relation("authorEventBooking", fields: [authorId], references: [id])
 
   @@map("event_bookings")
 }
