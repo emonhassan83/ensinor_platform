@@ -55,6 +55,7 @@ import { ZoomRoutes } from '../modules/zoom/zoom.routes';
 import { MeetingAssignmentRoutes } from '../modules/meetingAssignment/meetingAssignment.routes';
 import { CoInstructorRoutes } from '../modules/coInstructors/coInstructors.routes';
 import { AssignmentRoutes } from '../modules/assignment/assignment.routes';
+import { AssignmentSubmissionRoutes } from '../modules/assignmentSubmission/assignmentSubmission.routes';
 
 const router = express.Router();
 
@@ -142,6 +143,10 @@ const moduleRoutes = [
   {
     path: '/assignments',
     route: AssignmentRoutes,
+  },
+  {
+    path: '/assignment-submission',
+    route: AssignmentSubmissionRoutes,
   },
   {
     path: '/certificate-requests',

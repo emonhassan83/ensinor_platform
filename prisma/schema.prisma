@@ -120,7 +120,8 @@ model User {
   coInstructorsInvited       CoInstructor[]         @relation("InvitedByRelation")
   coInstructorRoles          CoInstructor[]         @relation("CoInstructorRelation")
   assignment                 Assignment[]
-  assignmentSubmission       AssignmentSubmission[]
+  assignmentAuthor           AssignmentSubmission[] @relation("assignmentAuthorUser")
+  assignmentSubmission       AssignmentSubmission[] @relation("assignmentSubmissionUser")
 
   @@map("users")
 }
@@ -685,6 +686,7 @@ model Assignment {
   title       String
   description String?
   fileUrl     String? // e.g., PDF/DOC/ZIP link
+  marks       Int
   deadline    DateTime?
   attempt     Int       @default(0)
   isDeleted   Boolean   @default(false)
@@ -704,9 +706,10 @@ model Assignment {
 model AssignmentSubmission {
   id           String   @id @default(uuid())
   assignmentId String
+  authorId     String
   userId       String
   fileUrl      String?
-  grade        Int?
+  grade        CourseGrade?
   feedback     String?
   submittedAt  DateTime @default(now())
   isLate       Boolean  @default(false)
@@ -716,7 +719,8 @@ model AssignmentSubmission {
 
   // Relations
   assignment Assignment @relation(fields: [assignmentId], references: [id])
-  trainee    User       @relation(fields: [userId], references: [id])
+  user       User       @relation("assignmentSubmissionUser", fields: [userId], references: [id])
+  author     User       @relation("assignmentAuthorUser", fields: [authorId], references: [id])
 
   @@unique([assignmentId, userId])
   @@map("assignment_submissions")

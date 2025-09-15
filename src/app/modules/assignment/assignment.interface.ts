@@ -9,5 +9,6 @@ export type IAssignment = {
   title: string;
   description: string;
   fileUrl?: string;
+  marks: number;
   deadline?: Date;
 };

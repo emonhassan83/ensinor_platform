@@ -16,6 +16,7 @@ const createValidationSchema = z.object({
     fileUrl: z
       .string({ required_error: 'Assignment fileUrl is required!' })
       .optional(),
+    marks: z.string({ required_error: 'Assignment marks is required!' }),
     deadline: z
       .date({ required_error: 'Assignment deadline is required!' })
       .optional(),
@@ -33,6 +34,9 @@ const updateValidationSchema = z.object({
       .optional(),
     fileUrl: z
       .string({ required_error: 'Assignment fileUrl is required!' })
+      .optional(),
+    marks: z
+      .string({ required_error: 'Assignment marks is required!' })
       .optional(),
     deadline: z
       .date({ required_error: 'Assignment deadline is required!' })
