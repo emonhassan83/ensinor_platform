@@ -33,13 +33,23 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
   }
 
   const result = await prisma.quizAttempt.create({
-    data: payload,
+    data: {
+      ...payload,
+      authorId: quiz.authorId,
+      totalMarks: quiz.marks ?? undefined,
+    },
   });
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt creation failed!');
   }
 
-  // here updated some fields
+  // here updated total attempt fields
+  await prisma.quiz.update({
+    where: { id: quiz.id },
+    data: {
+      totalAttempt: { increment: 1 },
+    },
+  });
 
   return result;
 };
@@ -126,14 +136,14 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<QuizAttempt | null> => {
   const result = await prisma.quizAttempt.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       user: true,
       quiz: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Quiz Attempt not found!');
   }
 
@@ -145,9 +155,9 @@ const updateIntoDB = async (
   payload: Partial<IQuizAttempt>,
 ): Promise<QuizAttempt> => {
   const quiz = await prisma.quizAttempt.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!quiz || quiz?.isDeleted) {
+  if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
   }
 
@@ -164,9 +174,9 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string): Promise<QuizAttempt> => {
   const quiz = await prisma.quizAttempt.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!quiz || quiz?.isDeleted) {
+  if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
   }
 
@@ -179,6 +189,14 @@ const deleteFromDB = async (id: string): Promise<QuizAttempt> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not deleted!');
   }
+
+  // here updated total attempt fields
+  await prisma.quiz.update({
+    where: { id: quiz.id },
+    data: {
+      totalAttempt: { decrement: 1 },
+    },
+  });
 
   return result;
 };

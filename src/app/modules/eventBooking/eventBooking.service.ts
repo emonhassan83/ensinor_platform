@@ -1,4 +1,4 @@
-import { Book, Course, Event, EventBooking, Package, Prisma } from '@prisma/client';
+import { EventBooking, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -8,27 +8,26 @@ import {
 import { eventBookingSearchAbleFields } from './eventBooking.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
-import { uploadToS3 } from '../../utils/s3';
 
 const insertIntoDB = async (payload: IEventBooking) => {
   const { eventId, userId } = payload;
 
   const event = await prisma.event.findFirst({
-    where: {id: eventId}
-  })
-  if (!event || event?.isDeleted) {
-     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found!'); 
+    where: { id: eventId, isDeleted: false },
+  });
+  if (!event) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event not found!');
   }
 
   const user = await prisma.user.findFirst({
-    where: {id: userId}
-  })
-  if (!user || event?.isDeleted) {
-     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!'); 
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
   const result = await prisma.eventBooking.create({
-    data: payload,
+    data: { ...payload, authorId: event.authorId, amount: event.price },
   });
 
   if (!result) {
@@ -37,6 +36,15 @@ const insertIntoDB = async (payload: IEventBooking) => {
       'Event booking creation failed!',
     );
   }
+
+  // event registered increment by one
+  await prisma.event.update({
+    where: { id: event.id },
+    data: {
+      registered: { increment: 1 },
+    },
+  });
+
   return result;
 };
 
@@ -132,7 +140,7 @@ const getByIdFromDB = async (id: string): Promise<EventBooking | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<IEventBooking>
+  payload: Partial<IEventBooking>,
 ): Promise<EventBooking> => {
   const event = await prisma.eventBooking.findUnique({
     where: { id },

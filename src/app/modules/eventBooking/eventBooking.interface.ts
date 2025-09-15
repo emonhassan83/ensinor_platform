@@ -9,6 +9,7 @@ export type IEventBookingFilterRequest = {
 export type IEventBooking = {
   eventId: string;
   userId: string;
+  authorId: string;
   name: string;
   phone: string;
   email: string;
