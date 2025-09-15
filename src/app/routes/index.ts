@@ -54,6 +54,7 @@ import { MessageRoutes } from '../modules/messages/messages.routes';
 import { ZoomRoutes } from '../modules/zoom/zoom.routes';
 import { MeetingAssignmentRoutes } from '../modules/meetingAssignment/meetingAssignment.routes';
 import { CoInstructorRoutes } from '../modules/coInstructors/coInstructors.routes';
+import { AssignmentRoutes } from '../modules/assignment/assignment.routes';
 
 const router = express.Router();
 
@@ -137,6 +138,10 @@ const moduleRoutes = [
   {
     path: '/enrolled-courses',
     route: EnrolledCourseRoutes,
+  },
+  {
+    path: '/assignments',
+    route: AssignmentRoutes,
   },
   {
     path: '/certificate-requests',
