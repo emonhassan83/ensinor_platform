@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { assignmentFilterableFields } from './assignment.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await AssignmentService.insertIntoDB(req.body);
+  const result = await AssignmentService.insertIntoDB(req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -60,7 +60,11 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await AssignmentService.updateIntoDB(req.params.id, req.body);
+  const result = await AssignmentService.updateIntoDB(
+    req.params.id,
+    req.body,
+    req.file,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

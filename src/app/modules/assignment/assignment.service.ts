@@ -3,7 +3,6 @@ import {
   Assignment,
   Batch,
   Prisma,
-  UserRole,
   UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
@@ -12,8 +11,9 @@ import { IAssignment, IAssignmentFilterRequest } from './assignment.interface';
 import { assignmentSearchAbleFields } from './assignment.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: IAssignment) => {
+const insertIntoDB = async (payload: IAssignment, file: any) => {
   const { authorId, courseId } = payload;
   const author = await prisma.user.findFirst({
     where: {
@@ -35,6 +35,14 @@ const insertIntoDB = async (payload: IAssignment) => {
   });
   if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+  }
+
+  // upload to image
+  if (file) {
+    payload.fileUrl = (await uploadToS3({
+      file,
+      fileName: `images/assignment/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
   }
 
   const result = await prisma.assignment.create({
@@ -159,12 +167,21 @@ const getByIdFromDB = async (id: string): Promise<Assignment | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<IAssignment>,
+  file: any,
 ): Promise<Assignment> => {
   const assignment = await prisma.assignment.findUnique({
     where: { id, isDeleted: false },
   });
   if (!assignment) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Assignment not found!');
+  }
+
+  // upload to image
+  if (file) {
+    payload.fileUrl = (await uploadToS3({
+      file,
+      fileName: `images/assignment/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
   }
 
   const result = await prisma.assignment.update({

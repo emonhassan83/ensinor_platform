@@ -4,8 +4,12 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { AssignmentValidation } from './assignment.validation';
+import multer, { memoryStorage } from 'multer';
+import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
+const storage = memoryStorage();
+const upload = multer({ storage });
 
 router.post(
   '/',
@@ -14,6 +18,8 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  upload.single('file'),
+  parseData(),
   validateRequest(AssignmentValidation.createValidationSchema),
   AssignmentController.insertIntoDB,
 );
@@ -35,7 +41,7 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
     UserRole.employee,
-    UserRole.student
+    UserRole.student,
   ),
   AssignmentController.getAllCourseAssignment,
 );
@@ -47,7 +53,7 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
     UserRole.employee,
-    UserRole.student
+    UserRole.student,
   ),
   AssignmentController.getByIdFromDB,
 );
@@ -59,6 +65,8 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  upload.single('file'),
+  parseData(),
   validateRequest(AssignmentValidation.updateValidationSchema),
   AssignmentController.updateIntoDB,
 );
