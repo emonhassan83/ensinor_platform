@@ -15,16 +15,35 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getAllFromDB = catchAsync(async (req, res) => {
+const getByAuthorFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, eventBookingFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await EventBookingService.getAllFromDB(filters, options);
+  const result = await EventBookingService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Events booking data fetched!',
+    message: 'My events booking data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByUserFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, eventBookingFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await EventBookingService.getAllFromDB(filters, options, {
+    userId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My events booking data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -43,7 +62,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await EventBookingService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -65,7 +84,8 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EventBookingController = {
   insertIntoDB,
-  getAllFromDB,
+  getByAuthorFromDB,
+  getByUserFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

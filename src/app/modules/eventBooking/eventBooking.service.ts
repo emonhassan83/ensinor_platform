@@ -8,6 +8,7 @@ import {
 import { eventBookingSearchAbleFields } from './eventBooking.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEventBooking) => {
   const { eventId, userId } = payload;
@@ -51,14 +52,19 @@ const insertIntoDB = async (payload: IEventBooking) => {
 const getAllFromDB = async (
   params: IEventBookingFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy: { authorId?: string; userId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.EventBookingWhereInput[] = [
-    { userId, isDeleted: false },
-  ];
+  const andConditions: Prisma.EventBookingWhereInput[] = [{ isDeleted: false }];
+  // Filter either by authorId or userId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.userId) {
+    andConditions.push({ userId: filterBy.userId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -99,6 +105,18 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      event: {
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          location: true,
+          createdAt: true,
+          registered: true,
+        },
+      },
+    },
   });
 
   const total = await prisma.eventBooking.count({
@@ -117,9 +135,17 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<EventBooking | null> => {
   const result = await prisma.eventBooking.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      author: {
         select: {
           id: true,
           name: true,
@@ -131,7 +157,7 @@ const getByIdFromDB = async (id: string): Promise<EventBooking | null> => {
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Event booking not found!');
   }
 
@@ -143,9 +169,9 @@ const updateIntoDB = async (
   payload: Partial<IEventBooking>,
 ): Promise<EventBooking> => {
   const event = await prisma.eventBooking.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!event || event?.isDeleted) {
+  if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event booking not found!');
   }
 
@@ -162,9 +188,9 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string): Promise<EventBooking> => {
   const event = await prisma.eventBooking.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!event || event?.isDeleted) {
+  if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event booking not found!');
   }
 

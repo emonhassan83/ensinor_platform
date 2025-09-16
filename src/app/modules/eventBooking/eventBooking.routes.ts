@@ -9,31 +9,79 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
   validateRequest(EventValidation.createValidationSchema),
   EventBookingController.insertIntoDB,
 );
 
-router.get('/', EventBookingController.getAllFromDB);
-
 router.get(
-  '/my-event-booking',
-  auth(UserRole.super_admin),
-  EventBookingController.getAllFromDB,
+  '/author/my-event-booking',
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  EventBookingController.getByAuthorFromDB,
 );
 
-router.get('/:id', EventBookingController.getByIdFromDB);
+router.get(
+  '/user/my-event-booking',
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  EventBookingController.getByUserFromDB,
+);
+
+router.get(
+  '/:id',
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  EventBookingController.getByIdFromDB,
+);
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin),
+    auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
   validateRequest(EventValidation.updateValidationSchema),
   EventBookingController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
   EventBookingController.deleteFromDB,
 );
 

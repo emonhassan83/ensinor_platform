@@ -3,83 +3,51 @@ import { z } from 'zod';
 // Create validation
 const createValidationSchema = z.object({
   body: z.object({
-    authorId: z
-      .string({ required_error: 'Author is required' })
-      .uuid('author must be a valid UUID'),
-    title: z.string({ required_error: 'Title is required!' }),
-    slogan: z.string({
-      required_error: 'Short slogan is required!',
+    eventId: z
+      .string({ required_error: 'Event is required' })
+      .uuid('event must be a valid UUID'),
+    userId: z
+      .string({ required_error: 'User is required' })
+      .uuid('user must be a valid UUID'),
+    name: z.string({ required_error: 'name is required!' }),
+    phone: z.string({
+      required_error: 'Event booking phone is required!',
     }),
-    type: z.string({ required_error: 'Type is required!' }),
-    thumbnail: z
-      .string({ required_error: 'Event thumbnail is required!' })
-      .optional(),
-    organizedBy: z.string({ required_error: 'Event organizedBy is required!' }),
-    price: z
-      .number({ required_error: 'Price is required!' })
-      .int('Price must be an integer')
-      .nonnegative('Price must be a positive number'),
-    location: z.string({ required_error: 'Event location is required!' }),
-    date: z.number({ required_error: 'Event date is required!' }),
-    startTime: z.string({ required_error: 'Event startTime is required!' }),
-    endTime: z.string({ required_error: 'Event endTime is required!' }),
-    description: z.string({
-      required_error: 'Event description is required!',
+    email: z.string({ required_error: 'Event booking email is required!' }),
+    organization: z.string({
+      required_error: 'Event booking organization is required!',
     }),
-    speakerSlogan: z.boolean({
-      required_error: 'Event speakerSlogan is required!',
+    profession: z.string({
+      required_error: 'Event booking profession is required!',
     }),
-    scheduleSlogan: z.boolean({
-      required_error: 'Event scheduleSlogan is required!',
-    }),
+    city: z.string({ required_error: 'Event booking city is required!' }),
+    country: z.string({ required_error: 'Event booking country is required!' }),
   }),
 });
 
 // Update validation
 const updateValidationSchema = z.object({
   body: z.object({
-    title: z.string({ required_error: 'Title is required!' }).optional(),
-    slogan: z
+    name: z.string({ required_error: 'name is required!' }).optional(),
+    phone: z
       .string({
-        required_error: 'Short slogan is required!',
+        required_error: 'Event booking phone is required!',
       })
       .optional(),
-    type: z.string({ required_error: 'Type is required!' }).optional(),
-    thumbnail: z
-      .string({ required_error: 'Event thumbnail is required!' })
+    email: z
+      .string({ required_error: 'Event booking email is required!' })
       .optional(),
-    organizedBy: z
-      .string({ required_error: 'Event organizedBy is required!' })
+    organization: z
+      .string({ required_error: 'Event booking organization is required!' })
       .optional(),
-    price: z
-      .number({ required_error: 'Price is required!' })
-      .int('Price must be an integer')
-      .nonnegative('Price must be a positive number')
+    profession: z
+      .string({ required_error: 'Event booking profession is required!' })
       .optional(),
-    location: z
-      .string({ required_error: 'Event location is required!' })
+    city: z
+      .string({ required_error: 'Event booking city is required!' })
       .optional(),
-    date: z.number({ required_error: 'Event date is required!' }).optional(),
-    startTime: z
-      .string({ required_error: 'Event startTime is required!' })
-      .optional(),
-    endTime: z
-      .string({ required_error: 'Event endTime is required!' })
-      .optional(),
-    description: z
-      .string({
-        required_error: 'Event description is required!',
-      })
-      .optional(),
-    speakerSlogan: z
-      .boolean({
-        required_error: 'Event speakerSlogan is required!',
-      })
-      .optional(),
-    scheduleSlogan: z
-      .boolean({
-        required_error: 'Event scheduleSlogan is required!',
-      })
+    country: z
+      .string({ required_error: 'Event booking country is required!' })
       .optional(),
   }),
 });
