@@ -4,6 +4,7 @@ import sendResponse from '../../utils/sendResponse';
 import { PaymentService } from './payment.service';
 import pick from '../../utils/pick';
 import { paymentFilterableFields } from './payment.constants';
+import config from '../../config';
 
 const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentService.insertIntoDB(req?.body);
@@ -15,6 +16,21 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
+const confirmPayment = catchAsync(async (req: Request, res: Response) => {
+  const result = await PaymentService.confirmPayment(req.query)
+
+   res.redirect(
+    `${config.payment_success_url}`,
+  )
+  
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    data: result,
+    message: 'payment initiate successfully',
+  })
+})
 
 const getAllIntoDB = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, paymentFilterableFields);
@@ -100,12 +116,25 @@ const deleteIntoDB = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const refundPayment = catchAsync(async (req, res) => {
+  const result = await PaymentService.refundPayment(req.body)
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Payment refund successfully!',
+    data: result,
+  })
+})
+
 export const PaymentController = {
   insertIntoDB,
+  confirmPayment,
   getAllIntoDB,
   getByAuthorIntoDB,
   getMyAllIntoDB,
   getByIdIntoDB,
   updateIntoDB,
-  deleteIntoDB
+  deleteIntoDB,
+  refundPayment
 };

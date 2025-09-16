@@ -13,6 +13,8 @@ router.post(
   PaymentController.insertIntoDB,
 );
 
+router.get('/confirm-payment', PaymentController.confirmPayment);
+
 router.patch(
   '/status/:id',
   auth(
@@ -53,5 +55,7 @@ router.get(
   auth(UserRole.super_admin, UserRole.company_admin, UserRole.student),
   PaymentController.getByIdIntoDB,
 );
+
+router.patch('/refound-payment', PaymentController.refundPayment);
 
 export const PaymentRoutes = router;
