@@ -74,7 +74,8 @@ model User {
   instructor                 Instructor?
   student                    Student?
   subscription               Subscription?
-  payment                    Payment?
+  paymentUserAccount         Payment[]              @relation("PaymentUserAccount")
+  PaymentAuthorAccount       Payment[]              @relation("PaymentAuthorAccount")
   reviewRef                  ReviewRef[]
   notification               Notification[]
   messagesSent               Message[]              @relation("SentMessages")
@@ -1073,24 +1074,27 @@ enum SubscriptionStatus {
 }
 
 model Payment {
-  id              String           @id @default(uuid())
-  userId          String           @unique
-  orderId         String?
-  subscriptionId  String?
-  modelType       PaymentModelType
-  transactionId   String           @unique
-  amount          Float            @default(0.00)
-  commission      Float            @default(0.00)
-  status          PaymentStatus    @default(unpaid)
-  paymentMethod   String
-  paymentIntentId String?
-  isPaid          Boolean          @default(false)
-  isSellerPaid    Boolean          @default(false)
-  isDeleted       Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                String           @id @default(uuid())
+  userId            String
+  authorId          String
+  orderId           String?
+  subscriptionId    String?
+  modelType         PaymentModelType
+  transactionId     String           @unique
+  amount            Float            @default(0.00)
+  adminCommission   Float            @default(0.00)
+  instructorEarning Float            @default(0.00)
+  status            PaymentStatus    @default(unpaid)
+  paymentMethod     PaymentMethod
+  paymentIntentId   String?
+  isPaid            Boolean          @default(false)
+  isSellerPaid      Boolean          @default(false)
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  account      User          @relation(references: [id], fields: [userId])
+  account      User          @relation("PaymentUserAccount", references: [id], fields: [userId])
+  author       User          @relation("PaymentAuthorAccount", references: [id], fields: [authorId])
   order        Order?        @relation(fields: [orderId], references: [id])
   subscription Subscription? @relation(fields: [subscriptionId], references: [id])
 

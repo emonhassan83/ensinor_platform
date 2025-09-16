@@ -58,6 +58,7 @@ import { AssignmentRoutes } from '../modules/assignment/assignment.routes';
 import { AssignmentSubmissionRoutes } from '../modules/assignmentSubmission/assignmentSubmission.routes';
 import { StripeRoute } from '../modules/stripe/stripe.route';
 import { BankDetailsRoutes } from '../modules/bankDetails/bankDetails.route';
+import { PaymentRoutes } from '../modules/payment/payment.route';
 
 const router = express.Router();
 
@@ -237,6 +238,10 @@ const moduleRoutes = [
   {
     path: '/subscriptions',
     route: SubscriptionRoutes,
+  },
+  {
+    path: '/payments',
+    route: PaymentRoutes,
   },
   {
     path: '/stripe',
