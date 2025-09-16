@@ -15,6 +15,16 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const completeAttemptIntoDB = catchAsync(async (req, res) => {
+  const result = await QuizAttemptService.completeAttemptIntoDB(req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz attempt completed successfully!',
+    data: result,
+  });
+});
+
 const getByQuizIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, quizAttemptFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -98,6 +108,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const QuizAttemptController = {
   insertIntoDB,
+  completeAttemptIntoDB,
   getByQuizIdFromDB,
   getMyAttemptFromDB,
   getByAuthorQuizFromDB,

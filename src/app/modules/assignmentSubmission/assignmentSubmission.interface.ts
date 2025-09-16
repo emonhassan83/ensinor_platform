@@ -1,4 +1,4 @@
-import { CourseGrade } from "@prisma/client";
+import { CourseGrade } from '@prisma/client';
 
 export type IAssignmentSubmissionFilterRequest = {
   searchTerm?: string | undefined;
@@ -13,4 +13,5 @@ export type IAssignmentSubmission = {
   marksObtained?: number;
   totalMarks?: number;
   feedback?: string;
+  isReSubmission?: boolean;
 };

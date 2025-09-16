@@ -14,6 +14,12 @@ router.post(
   QuizAttemptController.insertIntoDB,
 );
 
+router.patch(
+  '/completed/:id',
+  auth(UserRole.student, UserRole.employee),
+  QuizAttemptController.completeAttemptIntoDB,
+);
+
 router.get(
   '/quiz/:quizId',
   auth(

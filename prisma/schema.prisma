@@ -647,6 +647,7 @@ model QuizAttempt {
   grade         String?
   correctRate   Float    @default(0.0)
   lastActivity  DateTime @default(now())
+  isCompleted   Boolean  @default(false)
   isDeleted     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -708,20 +709,21 @@ model Assignment {
 }
 
 model AssignmentSubmission {
-  id            String       @id @default(uuid())
-  assignmentId  String
-  authorId      String
-  userId        String
-  fileUrl       String?
-  grade         CourseGrade?
-  marksObtained Int          @default(0)
-  totalMarks    Int          @default(0)
-  feedback      String?
-  submittedAt   DateTime     @default(now())
-  isLate        Boolean      @default(false)
-  isDeleted     Boolean      @default(false)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  assignmentId   String
+  authorId       String
+  userId         String
+  fileUrl        String?
+  grade          CourseGrade?
+  marksObtained  Int          @default(0)
+  totalMarks     Int          @default(0)
+  feedback       String?
+  submittedAt    DateTime     @default(now())
+  isLate         Boolean      @default(false)
+  isReSubmission Boolean      @default(false)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   // Relations
   assignment Assignment @relation(fields: [assignmentId], references: [id])

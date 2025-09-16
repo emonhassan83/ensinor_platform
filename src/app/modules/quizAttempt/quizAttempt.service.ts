@@ -11,25 +11,34 @@ import ApiError from '../../errors/ApiError';
 
 const insertIntoDB = async (payload: IQuizAttempt) => {
   const { quizId, userId } = payload;
+  // 1. Validate quiz
   const quiz = await prisma.quiz.findFirst({
-    where: {
-      id: quizId,
-      isDeleted: false,
-    },
+    where: { id: quizId, isDeleted: false },
   });
   if (!quiz) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz not found!');
   }
 
+  // 2. Validate user
   const user = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
   });
   if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt user not found!');
+  }
+
+  // 3. Check if user already has an attempt for this quiz
+  const existingAttempt = await prisma.quizAttempt.findFirst({
+    where: { quizId, userId, isDeleted: false },
+  });
+  if (existingAttempt) {
+    if (existingAttempt.isCompleted) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Quiz attempt already completed!',
+      );
+    }
+    return existingAttempt;
   }
 
   const result = await prisma.quizAttempt.create({
@@ -43,15 +52,42 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt creation failed!');
   }
 
-  // here updated total attempt fields
+  return result;
+};
+
+const completeAttemptIntoDB = async (attemptId: string) => {
+  // 1. Find attempt
+  const attempt = await prisma.quizAttempt.findFirst({
+    where: { id: attemptId, isDeleted: false },
+  });
+  if (!attempt) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
+  }
+  if (attempt.isCompleted) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Quiz attempt already completed!',
+    );
+  }
+
+  // 2. Update attempt -> mark as completed
+  const updated = await prisma.quizAttempt.update({
+    where: { id: attempt.id },
+    data: {
+      isCompleted: true,
+      lastActivity: new Date(),
+    },
+  });
+
+  // 3. Increment quiz totalAttempt
   await prisma.quiz.update({
-    where: { id: quiz.id },
+    where: { id: attempt.quizId },
     data: {
       totalAttempt: { increment: 1 },
     },
   });
 
-  return result;
+  return updated;
 };
 
 const getAllFromDB = async (
@@ -203,6 +239,7 @@ const deleteFromDB = async (id: string): Promise<QuizAttempt> => {
 
 export const QuizAttemptService = {
   insertIntoDB,
+  completeAttemptIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

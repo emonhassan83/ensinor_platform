@@ -13,4 +13,5 @@ export type IQuizAttempt = {
   totalMarks?: number;
   grade?: string;
   correctRate?: number;
+  isCompleted?: boolean;
 };
