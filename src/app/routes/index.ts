@@ -57,6 +57,7 @@ import { CoInstructorRoutes } from '../modules/coInstructors/coInstructors.route
 import { AssignmentRoutes } from '../modules/assignment/assignment.routes';
 import { AssignmentSubmissionRoutes } from '../modules/assignmentSubmission/assignmentSubmission.routes';
 import { StripeRoute } from '../modules/stripe/stripe.route';
+import { BankDetailsRoutes } from '../modules/bankDetails/bankDetails.route';
 
 const router = express.Router();
 
@@ -240,6 +241,10 @@ const moduleRoutes = [
   {
     path: '/stripe',
     route: StripeRoute,
+  },
+  {
+    path: '/bank-details',
+    route: BankDetailsRoutes,
   },
   {
     path: '/uploads',

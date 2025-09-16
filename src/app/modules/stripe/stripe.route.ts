@@ -1,13 +1,18 @@
 import { Router } from 'express';
-import auth from '../../middleware/auth';
 import { stripeController } from './stripe.controller';
-import { USER_ROLE } from '../user/user.constant';
+import auth from '../../middlewares/auth';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
 router.patch(
   '/connect',
-  auth(USER_ROLE.vendor),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   stripeController.stripLinkAccount,
 );
 router.get('/oauth/callback', stripeController?.handleStripeOAuth);
