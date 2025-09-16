@@ -59,6 +59,7 @@ model User {
   needsPasswordChange Boolean      @default(true)
   passwordChangedAt   DateTime     @default(now())
   expireAt            DateTime?
+  stripeAccountId     String?
   status              UserStatus   @default(pending)
   avgRating           Float        @default(0.0)
   ratingCount         Int          @default(0)
@@ -124,6 +125,7 @@ model User {
   assignment                 Assignment[]
   assignmentAuthor           AssignmentSubmission[] @relation("assignmentAuthorUser")
   assignmentSubmission       AssignmentSubmission[] @relation("assignmentSubmissionUser")
+  bankDetail                 BankDetail?
 
   @@map("users")
 }
@@ -401,6 +403,24 @@ model Student {
   user User @relation(references: [id], fields: [userId])
 
   @@map("students")
+}
+
+model BankDetail {
+  id             String   @id @default(uuid())
+  authorId       String   @unique
+  accountNumber  String
+  routingNumber  String?
+  bankName       String
+  bankHolderName String
+  bankAddress    String
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("bank_details")
 }
 
 // Book Related Models
