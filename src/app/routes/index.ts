@@ -56,6 +56,7 @@ import { MeetingAssignmentRoutes } from '../modules/meetingAssignment/meetingAss
 import { CoInstructorRoutes } from '../modules/coInstructors/coInstructors.routes';
 import { AssignmentRoutes } from '../modules/assignment/assignment.routes';
 import { AssignmentSubmissionRoutes } from '../modules/assignmentSubmission/assignmentSubmission.routes';
+import { StripeRoute } from '../modules/stripe/stripe.route';
 
 const router = express.Router();
 
@@ -235,6 +236,10 @@ const moduleRoutes = [
   {
     path: '/subscriptions',
     route: SubscriptionRoutes,
+  },
+  {
+    path: '/stripe',
+    route: StripeRoute,
   },
   {
     path: '/uploads',
