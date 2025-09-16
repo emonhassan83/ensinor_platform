@@ -8,6 +8,7 @@ export type IAssignmentSubmission = {
   assignmentId: string;
   authorId: string;
   userId: string;
+  submittedText: string;
   fileUrl: string;
   grade?: CourseGrade;
   marksObtained?: number;

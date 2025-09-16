@@ -73,6 +73,63 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
   return result;
 };
 
+const resubmitAssignmentIntoDB = async (
+  submissionId: string,
+  payload: { userId: string; submittedText?: string },
+  file?: any,
+) => {
+  const { userId, submittedText } = payload;
+
+  // 1. Validate user
+  const user = await prisma.user.findFirst({
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  // 2. Find submission
+  const existingSubmission = await prisma.assignmentSubmission.findFirst({
+    where: { id: submissionId, userId, isDeleted: false },
+    include: { assignment: true },
+  });
+
+  if (!existingSubmission) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Submission not found!');
+  }
+
+  const assignment = existingSubmission.assignment;
+
+  // 3. Upload new file (if provided)
+  let fileUrl: string | undefined;
+  if (file) {
+    fileUrl = (await uploadToS3({
+      file,
+      fileName: `images/assignment/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
+  // 4. Check deadline
+  const isLate = assignment.deadline ? new Date() > assignment.deadline : false;
+
+  // 5. Update submission
+  const updatedSubmission = await prisma.assignmentSubmission.update({
+    where: { id: existingSubmission.id },
+    data: {
+      fileUrl: fileUrl ?? existingSubmission.fileUrl,
+      submittedText: submittedText ?? existingSubmission.submittedText,
+      submittedAt: new Date(),
+      isLate,
+      isReSubmission: true,
+      marksObtained: 0,
+      grade: null,
+      feedback: null,
+    },
+  });
+
+  return updatedSubmission;
+};
+
 const getAllFromDB = async (
   params: IAssignmentSubmissionFilterRequest,
   options: IPaginationOptions,
@@ -250,6 +307,7 @@ const deleteFromDB = async (id: string): Promise<AssignmentSubmission> => {
 
 export const AssignmentSubmissionService = {
   insertIntoDB,
+  resubmitAssignmentIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

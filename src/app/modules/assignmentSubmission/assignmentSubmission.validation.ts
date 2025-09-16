@@ -10,9 +10,25 @@ const createValidationSchema = z.object({
     userId: z
       .string({ required_error: 'user is required' })
       .uuid('user must be a valid UUID'),
-    grade: z.nativeEnum(CourseGrade).optional(),
-    feedback: z
-      .date({ required_error: 'Assignment submission feedback is required!' })
+    submittedText: z
+      .string({
+        required_error: 'Assignment submission submittedText is required!',
+      })
+      .optional(),
+  }),
+});
+
+const resubmitValidationSchema = z.object({
+  body: z.object({
+    submittedText: z
+      .string({
+        required_error: 'Assignment submission submittedText is required!',
+      })
+      .optional(),
+    filefileUrl: z
+      .string({
+        required_error: 'Assignment submission fileUrl is required!',
+      })
       .optional(),
   }),
 });
@@ -34,5 +50,6 @@ const updateValidationSchema = z.object({
 
 export const AssignmentSubmissionValidation = {
   createValidationSchema,
+  resubmitValidationSchema,
   updateValidationSchema,
 };

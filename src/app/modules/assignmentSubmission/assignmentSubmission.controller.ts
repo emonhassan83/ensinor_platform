@@ -6,11 +6,28 @@ import sendResponse from '../../utils/sendResponse';
 import { assignmentSubmissionFilterableFields } from './assignmentSubmission.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await AssignmentSubmissionService.insertIntoDB(req.body, req.file);
+  const result = await AssignmentSubmissionService.insertIntoDB(
+    req.body,
+    req.file,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Assignment submission insert successfully!',
+    message: 'Assignment submission successfully!',
+    data: result,
+  });
+});
+
+const resubmitAssignmentIntoDB = catchAsync(async (req, res) => {
+  const result = await AssignmentSubmissionService.resubmitAssignmentIntoDB(
+    req.params.id,
+    req.body,
+    req.file,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Assignment re-submission successfully!',
     data: result,
   });
 });
@@ -19,9 +36,13 @@ const getAuthorAssignmentSubmission = catchAsync(async (req, res) => {
   const filters = pick(req.query, assignmentSubmissionFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AssignmentSubmissionService.getAllFromDB(filters, options, {
-    authorId: req.user!.userId,
-  });
+  const result = await AssignmentSubmissionService.getAllFromDB(
+    filters,
+    options,
+    {
+      authorId: req.user!.userId,
+    },
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -36,9 +57,13 @@ const getCourseAssignmentSubmission = catchAsync(async (req, res) => {
   const filters = pick(req.query, assignmentSubmissionFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AssignmentSubmissionService.getAllFromDB(filters, options, {
-    assignmentId: req.params.assignmentId,
-  });
+  const result = await AssignmentSubmissionService.getAllFromDB(
+    filters,
+    options,
+    {
+      assignmentId: req.params.assignmentId,
+    },
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -53,9 +78,13 @@ const getMyAssignmentSubmission = catchAsync(async (req, res) => {
   const filters = pick(req.query, assignmentSubmissionFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AssignmentSubmissionService.getAllFromDB(filters, options, {
-   userId: req.user!.userId,
-  });
+  const result = await AssignmentSubmissionService.getAllFromDB(
+    filters,
+    options,
+    {
+      userId: req.user!.userId,
+    },
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -102,6 +131,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const AssignmentSubmissionController = {
   insertIntoDB,
+  resubmitAssignmentIntoDB,
   getAuthorAssignmentSubmission,
   getCourseAssignmentSubmission,
   getMyAssignmentSubmission,

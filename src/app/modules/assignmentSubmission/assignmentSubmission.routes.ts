@@ -13,14 +13,20 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(
-    UserRole.student,
-    UserRole.employee,
-  ),
+  auth(UserRole.student, UserRole.employee),
   upload.single('file'),
   parseData(),
   validateRequest(AssignmentSubmissionValidation.createValidationSchema),
   AssignmentSubmissionController.insertIntoDB,
+);
+
+router.put(
+  '/re-submission/:id',
+  auth(UserRole.student, UserRole.employee),
+  upload.single('file'),
+  parseData(),
+  validateRequest(AssignmentSubmissionValidation.resubmitValidationSchema),
+  AssignmentSubmissionController.resubmitAssignmentIntoDB,
 );
 
 router.get(
@@ -47,10 +53,7 @@ router.get(
 
 router.get(
   '/user/my-assignment',
-  auth(
-    UserRole.employee,
-    UserRole.student,
-  ),
+  auth(UserRole.employee, UserRole.student),
   AssignmentSubmissionController.getMyAssignmentSubmission,
 );
 
