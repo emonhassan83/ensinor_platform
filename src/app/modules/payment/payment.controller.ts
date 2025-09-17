@@ -7,8 +7,7 @@ import { paymentFilterableFields } from './payment.constants';
 import config from '../../config';
 
 const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.insertIntoDB(req?.body);
-
+  const result = await PaymentService.initiatePayment(req?.body);
   sendResponse(res, {
     statusCode: 201,
     success: true,
