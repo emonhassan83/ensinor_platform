@@ -34,7 +34,7 @@ router.delete(
 );
 
 router.get(
-  '/author/my-payments',
+  '/author/my-payment',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,
@@ -45,10 +45,12 @@ router.get(
 );
 
 router.get(
-  '/user/my-Payment',
+  '/user/my-payment',
   auth(UserRole.student),
   PaymentController.getMyAllIntoDB,
 );
+
+router.get('/', auth(UserRole.super_admin), PaymentController.getAllIntoDB);
 
 router.get(
   '/:id',

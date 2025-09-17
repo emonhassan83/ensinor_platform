@@ -29,13 +29,6 @@ model Verification {
   @@map("verifications")
 }
 
-enum RegisterWith {
-  google
-  linkedIn
-  facebook
-  credentials
-}
-
 // User model: Core authentication and common profile info for all roles
 model User {
   id                  String       @id @default(uuid())
@@ -193,12 +186,6 @@ model MeetingAssignment {
   @@map("meeting_assignments")
 }
 
-enum AssignmentModelType {
-  course
-  event
-  user
-}
-
 model SuperAdmin {
   id        String   @id @unique @default(uuid())
   userId    String   @unique
@@ -342,13 +329,6 @@ model CoInstructor {
   @@map("co_instructors")
 }
 
-enum Permission {
-  add
-  edit
-  review
-  grade_assignment
-}
-
 model Employee {
   id           String   @id @unique @default(uuid())
   userId       String   @unique
@@ -424,7 +404,6 @@ model BankDetail {
   @@map("bank_details")
 }
 
-// Book Related Models
 model Book {
   id            String     @id @default(uuid())
   authorId      String
@@ -442,50 +421,15 @@ model Book {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  author    User        @relation(fields: [authorId], references: [id]) // FK relation to User table
-  order     Order[]
-  coupon    Coupon[]
-  promoCode PromoCode[]
-  wishlist  Wishlist[]
-  resource  Resource[]
+  author        User            @relation(fields: [authorId], references: [id]) // FK relation to User table
+  order         Order[]
+  coupon        Coupon[]
+  promoCode     PromoCode[]
+  wishlist      Wishlist[]
+  resource      Resource[]
+  affiliateLink AffiliateLink[]
 
   @@map("books")
-}
-
-model Order {
-  id             String         @id @default(uuid())
-  userId         String
-  authorId       String
-  modelType      OrderModelType
-  bookId         String?
-  courseId       String?
-  courseBundleId String?
-  amount         Float
-  status         OrderStatus    @default(pending)
-  paymentStatus  PaymentStatus  @default(unpaid)
-  paymentMethod  PaymentMethod  @default(Stripe)
-  transactionId  String?
-  documents      String?
-  isDeleted      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  user          User            @relation("UserOrder", fields: [userId], references: [id])
-  author        User            @relation("AuthorOrder", fields: [authorId], references: [id])
-  affiliateSale AffiliateSale[]
-
-  book         Book?         @relation(fields: [bookId], references: [id])
-  course       Course?       @relation(fields: [courseId], references: [id])
-  courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
-  payment      Payment[]
-
-  @@map("orders")
-}
-
-enum OrderModelType {
-  book
-  course
-  courseBundle
 }
 
 // Course Related Models
@@ -545,11 +489,6 @@ model Course {
   @@map("courses")
 }
 
-enum CourseType {
-  internal
-  external
-}
-
 model CourseContent {
   id        String   @id @default(uuid())
   courseId  String
@@ -605,6 +544,36 @@ model CourseBundleCourses {
   @@map("course_bundle_courses")
 }
 
+model Order {
+  id             String         @id @default(uuid())
+  userId         String
+  authorId       String
+  modelType      OrderModelType
+  bookId         String?
+  courseId       String?
+  courseBundleId String?
+  amount         Float
+  status         OrderStatus    @default(pending)
+  paymentStatus  PaymentStatus  @default(unpaid)
+  paymentMethod  PaymentMethod  @default(Stripe)
+  transactionId  String?
+  documents      String?
+  isDeleted      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user          User            @relation("UserOrder", fields: [userId], references: [id])
+  author        User            @relation("AuthorOrder", fields: [authorId], references: [id])
+  affiliateSale AffiliateSale[]
+
+  book         Book?         @relation(fields: [bookId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
+  courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
+  payment      Payment[]
+
+  @@map("orders")
+}
+
 model Quiz {
   id           String   @id @default(uuid())
   authorId     String
@@ -636,8 +605,9 @@ model Question {
   updatedAt DateTime @updatedAt
 
   // Relations
-  quiz    Quiz      @relation(fields: [quizId], references: [id])
-  options Options[]
+  quiz       Quiz         @relation(fields: [quizId], references: [id])
+  options    Options[]
+  quizAnswer QuizAnswer[]
 
   @@map("questions")
 }
@@ -652,7 +622,8 @@ model Options {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  question Question @relation(fields: [questionId], references: [id])
+  question   Question     @relation(fields: [questionId], references: [id])
+  quizAnswer QuizAnswer[]
 
   @@map("options")
 }
@@ -674,11 +645,28 @@ model QuizAttempt {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  quiz   Quiz @relation(fields: [quizId], references: [id])
-  user   User @relation("quizAttemptUser", fields: [userId], references: [id])
-  author User @relation("quizAuthor", fields: [authorId], references: [id])
+  quiz       Quiz         @relation(fields: [quizId], references: [id])
+  user       User         @relation("quizAttemptUser", fields: [userId], references: [id])
+  author     User         @relation("quizAuthor", fields: [authorId], references: [id])
+  quizAnswer QuizAnswer[]
 
   @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id         String   @id @default(uuid())
+  attemptId  String
+  questionId String
+  optionId   String
+  isCorrect  Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  attempt  QuizAttempt @relation(fields: [attemptId], references: [id])
+  question Question    @relation(fields: [questionId], references: [id])
+  option   Options     @relation(fields: [optionId], references: [id])
+
+  @@map("quiz_answers")
 }
 
 model EnrolledCourse {
@@ -753,22 +741,6 @@ model AssignmentSubmission {
   author     User       @relation("assignmentAuthorUser", fields: [authorId], references: [id])
 
   @@map("assignment_submissions")
-}
-
-enum CourseGrade {
-  A_PLUS
-  A
-  A_MINUS
-  B_PLUS
-  B
-  B_MINUS
-  C_PLUS
-  C
-  C_MINUS
-  D_PLUS
-  D
-  D_MINUS
-  F
 }
 
 model CertificateRequest {
@@ -847,6 +819,7 @@ model Event {
   coupon            Coupon[]
   promoCode         PromoCode[]
   resource          Resource[]
+  affiliateLink     AffiliateLink[]
 
   @@map("events")
 }
@@ -986,16 +959,21 @@ model Affiliate {
 }
 
 model AffiliateLink {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   affiliateId String
-  courseId    String
-  link        String   @unique
-  clicks      Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  modelType   AffiliateModel
+  bookId      String?
+  courseId    String?
+  eventId     String?
+  link        String         @unique
+  clicks      Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   affiliate Affiliate @relation(fields: [affiliateId], references: [id])
-  course    Course    @relation(fields: [courseId], references: [id])
+  course    Course?   @relation(fields: [courseId], references: [id])
+  book      Book?     @relation(fields: [bookId], references: [id])
+  event     Event?    @relation(fields: [eventId], references: [id])
 
   @@map("affiliate_links")
 }
@@ -1055,22 +1033,6 @@ model Subscription {
   payment Payment[]
 
   @@map("subscriptions")
-}
-
-enum SubscriptionType {
-  basic
-  standard
-  premium
-  non_profits
-  most_popular
-  full_power
-}
-
-enum SubscriptionStatus {
-  pending
-  active
-  cancelled
-  expired
 }
 
 model Payment {
@@ -1166,12 +1128,6 @@ model WithdrawRequest {
   user User @relation(fields: [userId], references: [id])
 
   @@map("withdraw_requests")
-}
-
-enum PaymentMethod {
-  Stripe
-  PayPal
-  BankTransfer
 }
 
 model CV {
@@ -1295,11 +1251,6 @@ model ChatParticipant {
   @@map("chat_participants")
 }
 
-enum ChatType {
-  private
-  group
-}
-
 model Message {
   id         String   @id @default(uuid())
   senderId   String
@@ -1337,11 +1288,6 @@ model Wishlist {
   @@map("wishlists")
 }
 
-enum WishListModelType {
-  course
-  book
-}
-
 model Resource {
   id        String            @id @default(uuid())
   name      String
@@ -1360,12 +1306,6 @@ model Resource {
   event  Event?  @relation(fields: [eventId], references: [id])
 
   @@map("resources")
-}
-
-enum ResourceModelType {
-  course
-  event
-  book
 }
 
 model GradingSystem {
@@ -1511,6 +1451,46 @@ model NewsletterSubscriber {
   @@map("newsletter_subscribers")
 }
 
+enum RegisterWith {
+  google
+  linkedIn
+  facebook
+  credentials
+}
+
+enum CourseType {
+  internal
+  external
+}
+
+enum OrderModelType {
+  book
+  course
+  courseBundle
+}
+
+enum AssignmentModelType {
+  course
+  event
+  user
+}
+
+enum CourseGrade {
+  A_PLUS
+  A
+  A_MINUS
+  B_PLUS
+  B
+  B_MINUS
+  C_PLUS
+  C
+  C_MINUS
+  D_PLUS
+  D
+  D_MINUS
+  F
+}
+
 enum NewsletterCategory {
   promo
   coupon
@@ -1582,6 +1562,13 @@ enum UserStatus {
   deleted
 }
 
+enum Permission {
+  add
+  edit
+  review
+  grade_assignment
+}
+
 enum CoursesStatus {
   pending
   approved
@@ -1626,6 +1613,12 @@ enum CouponModel {
   books
 }
 
+enum AffiliateModel {
+  courses
+  events
+  books
+}
+
 enum PaymentStatus {
   unpaid
   paid
@@ -1636,4 +1629,42 @@ enum PaymentStatus {
 enum ChatStatus {
   accepted
   blocked
+}
+
+enum SubscriptionType {
+  basic
+  standard
+  premium
+  non_profits
+  most_popular
+  full_power
+}
+
+enum SubscriptionStatus {
+  pending
+  active
+  cancelled
+  expired
+}
+
+enum PaymentMethod {
+  Stripe
+  PayPal
+  BankTransfer
+}
+
+enum ChatType {
+  private
+  group
+}
+
+enum WishListModelType {
+  course
+  book
+}
+
+enum ResourceModelType {
+  course
+  event
+  book
 }

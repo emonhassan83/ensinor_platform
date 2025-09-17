@@ -59,6 +59,7 @@ import { AssignmentSubmissionRoutes } from '../modules/assignmentSubmission/assi
 import { StripeRoute } from '../modules/stripe/stripe.route';
 import { BankDetailsRoutes } from '../modules/bankDetails/bankDetails.route';
 import { PaymentRoutes } from '../modules/payment/payment.route';
+import { QuizAnswerRoutes } from '../modules/quizAnswer/quizAnswer.routes';
 
 const router = express.Router();
 
@@ -140,6 +141,10 @@ const moduleRoutes = [
     route: QuizAttemptRoutes,
   },
   {
+    path: '/quiz-answers',
+    route: QuizAnswerRoutes,
+  },
+  {
     path: '/enrolled-courses',
     route: EnrolledCourseRoutes,
   },
@@ -180,6 +185,18 @@ const moduleRoutes = [
     route: OrdersRoutes,
   },
   {
+    path: '/packages',
+    route: PackageRoutes,
+  },
+  {
+    path: '/subscriptions',
+    route: SubscriptionRoutes,
+  },
+  {
+    path: '/payments',
+    route: PaymentRoutes,
+  },
+  {
     path: '/coupons',
     route: CouponRoutes,
   },
@@ -208,6 +225,10 @@ const moduleRoutes = [
     route: ReviewRefRoutes,
   },
   {
+    path: '/bank-details',
+    route: BankDetailsRoutes,
+  },
+  {
     path: '/withdraw-requests',
     route: WithdrawRequestRoutes,
   },
@@ -232,24 +253,8 @@ const moduleRoutes = [
     route: GradingSystemRoutes,
   },
   {
-    path: '/packages',
-    route: PackageRoutes,
-  },
-  {
-    path: '/subscriptions',
-    route: SubscriptionRoutes,
-  },
-  {
-    path: '/payments',
-    route: PaymentRoutes,
-  },
-  {
     path: '/stripe',
     route: StripeRoute,
-  },
-  {
-    path: '/bank-details',
-    route: BankDetailsRoutes,
   },
   {
     path: '/uploads',

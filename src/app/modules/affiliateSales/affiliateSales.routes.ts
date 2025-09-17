@@ -21,13 +21,12 @@ router.get(
 );
 
 router.get(
-  '/user/my-affiliateSale',
+  '/user/my-affiliate-sale',
   auth(UserRole.super_admin),
   AffiliateSaleController.getMyAffiliateFromDB,
 );
 
 router.get('/:id', AffiliateSaleController.getByIdFromDB);
-
 
 router.delete(
   '/:id',
