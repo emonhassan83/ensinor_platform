@@ -60,6 +60,7 @@ import { StripeRoute } from '../modules/stripe/stripe.route';
 import { BankDetailsRoutes } from '../modules/bankDetails/bankDetails.route';
 import { PaymentRoutes } from '../modules/payment/payment.route';
 import { QuizAnswerRoutes } from '../modules/quizAnswer/quizAnswer.routes';
+import { MetaRoutes } from '../modules/meta/meta.route';
 
 const router = express.Router();
 
@@ -307,6 +308,10 @@ const moduleRoutes = [
   {
     path: '/resource',
     route: ResourceRoutes,
+  },
+  {
+    path: '/meta',
+    route: MetaRoutes,
   },
 ];
 

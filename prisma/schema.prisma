@@ -219,6 +219,8 @@ model Company {
   employee     Int      @default(0)
   instructor   Int      @default(0)
   size         Int      @default(0)
+  courses      Int      @default(0)
+  completed    Int      @default(0)
   isActive     Boolean  @default(false)
   isDeleted    Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -363,6 +365,8 @@ model Instructor {
   website     String?
   avgRating   Float    @default(0.0)
   ratingCount Int      @default(0)
+  courses     Int      @default(0)
+  enrolled    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -372,14 +376,17 @@ model Instructor {
 }
 
 model Student {
-  id         String   @id @unique @default(uuid())
-  userId     String   @unique
-  interests  String[]
-  university String?
-  session    String?
-  subjects   String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              String   @id @unique @default(uuid())
+  userId          String   @unique
+  interests       String[]
+  university      String?
+  session         String?
+  subjects        String
+  courseEnrolled  Int      @default(0)
+  courseCompleted Int      @default(0)
+  progress        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user User @relation(references: [id], fields: [userId])
 
@@ -414,7 +421,7 @@ model Book {
   price         Float
   thumbnail     String?
   file          String
-  popularity    Int        @default(0)
+  sales         Int        @default(0)
   publishedDate String?
   status        BookStatus @default(inReview)
   isDeleted     Boolean    @default(false)
@@ -439,6 +446,7 @@ model Course {
   instructorId     String
   title            String
   shortDescription String
+  company          CompanyType
   type             CourseType    @default(external)
   category         String
   level            CourseLevel
@@ -452,7 +460,7 @@ model Course {
   duration         Int           @default(0)
   hasCertificate   Boolean       @default(false)
   isFreeCourse     Boolean       @default(false)
-  popularity       Int           @default(0)
+  enrollments      Int           @default(0)
   totalCompleted   Int           @default(0)
   status           CoursesStatus @default(pending)
   avgRating        Float         @default(0.0)
@@ -670,19 +678,21 @@ model QuizAnswer {
 }
 
 model EnrolledCourse {
-  id             String       @id @default(uuid())
+  id             String         @id @default(uuid())
   authorId       String
   courseId       String
-  completedRate  Int          @default(0)
-  courseMark     Int?         @default(0)
+  type           EnrollmentType
+  courseCategory String
+  completedRate  Int            @default(0)
+  courseMark     Int?           @default(0)
   grade          CourseGrade?
-  learningTime   Int          @default(0) // in minutes
-  lectureWatched Int          @default(0)
-  lastActivity   DateTime     @default(now())
-  isComplete     Boolean      @default(false)
-  isDeleted      Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  learningTime   Int            @default(0) // in minutes
+  lectureWatched Int            @default(0)
+  lastActivity   DateTime       @default(now())
+  isComplete     Boolean        @default(false)
+  isDeleted      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   author User   @relation(fields: [authorId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
@@ -791,11 +801,12 @@ model Certificate {
 
 //* Event Related Models
 model Event {
-  id             String   @id @default(uuid())
+  id             String      @id @default(uuid())
   authorId       String
   title          String
   slogan         String
   type           String
+  company        CompanyType
   thumbnail      String
   organizedBy    String
   price          Int
@@ -806,10 +817,10 @@ model Event {
   description    String
   speakerSlogan  String
   scheduleSlogan String
-  registered     Int      @default(0)
-  isDeleted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  registered     Int         @default(0)
+  isDeleted      Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   author            User                @relation(fields: [authorId], references: [id])
   eventBooking      EventBooking[]
@@ -1042,6 +1053,8 @@ model Payment {
   orderId           String?
   subscriptionId    String?
   modelType         PaymentModelType
+  type              PaymentType
+  company           CompanyType
   transactionId     String           @unique
   amount            Float            @default(0.00)
   adminCommission   Float            @default(0.00)
@@ -1538,6 +1551,24 @@ enum PackageBillingCycle {
 enum PaymentModelType {
   order
   subscription
+}
+
+enum PaymentType {
+  course
+  book
+  event
+  instructor_subscription
+  company_subscription
+}
+
+enum EnrollmentType {
+  business
+  platform
+}
+
+enum CompanyType {
+  business
+  platform
 }
 
 enum ReviewModelType {
