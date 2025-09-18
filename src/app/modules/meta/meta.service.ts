@@ -11,6 +11,11 @@ import { startOfYear, endOfYear } from 'date-fns';
 import prisma from '../../utils/prisma';
 import { months } from './meta.utils';
 
+type SubscriptionOverviewParams = {
+  paymentType: PaymentType;
+  year: number;
+};
+
 const getEarningOverview = async (year: number) => {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -363,6 +368,36 @@ const getContentGrowth = async (year: number) => {
   });
 };
 
+const getSubscriptionOverview = async ({
+  paymentType,
+  year,
+}: SubscriptionOverviewParams) => {
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      type: paymentType,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    select: { amount: true, createdAt: true },
+  });
+
+  return months.map((month, index) => {
+    const monthAmount = payments
+      .filter((p) => p.createdAt.getMonth() === index)
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+      month: month.slice(0, 3),
+      amount: Math.round(monthAmount),
+    };
+  });
+};
+
 const superAdminMetaDashboard = async (
   user: any,
   query: Record<string, unknown>,
@@ -562,10 +597,44 @@ const superAdminUserAnalysis = async (
   };
 };
 
+const superAdminSubscriptionAnalysis = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  const { earning_year } = query;
+  if (user?.role !== UserRole.super_admin) {
+    throw new Error('Invalid user role!');
+  }
+
+  // --- Breakdown (reusable)
+  const salesBreakdown = await getRevenueBreakdown();
+
+ const selectedYear = earning_year
+    ? parseInt(earning_year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  const instructorSubscription = await getSubscriptionOverview({
+    paymentType: PaymentType.instructor_subscription,
+    year: selectedYear,
+  });
+
+  const businessSubscription = await getSubscriptionOverview({
+    paymentType: PaymentType.company_subscription,
+    year: selectedYear,
+  });
+
+  return {
+    salesBreakdown,
+    instructorSubscription,
+    businessSubscription
+  };
+};
+
 export const MetaService = {
   superAdminMetaDashboard,
   superAdminRevenueAnalysis,
   superAdminEnrollmentAnalysis,
   superAdminContentAnalysis,
-  superAdminUserAnalysis
+  superAdminUserAnalysis,
+  superAdminSubscriptionAnalysis
 };

@@ -35,6 +35,11 @@ const modelConfig: Record<
     priceField: 'price',
     popularityField: 'popularity',
   },
+  [OrderModelType.event]: {
+    model: prisma.event,
+    priceField: 'price',
+    popularityField: 'popularity',
+  },
 };
 
 const createOrders = async (payload: IOrder) => {
