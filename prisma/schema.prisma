@@ -770,12 +770,6 @@ model CertificateRequest {
   @@map("certificate_requests")
 }
 
-enum CertificateRequestStatus {
-  pending
-  completed
-  denied
-}
-
 model Certificate {
   id           String   @id @default(uuid())
   authorId     String
@@ -1569,6 +1563,12 @@ enum EnrollmentType {
 enum CompanyType {
   business
   platform
+}
+
+enum CertificateRequestStatus {
+  pending
+  completed
+  denied
 }
 
 enum ReviewModelType {

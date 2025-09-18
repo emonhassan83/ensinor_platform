@@ -47,7 +47,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
 };
 
 const enrollCoursesBulk = async (
-  enrollments: { authorId: string; courseId: string }[]
+  enrollments: { authorId: string; courseId: string; type: string; courseCategory: string }[]
 ) => {
   try {
     if (enrollments.length === 0) {
@@ -60,7 +60,6 @@ const enrollCoursesBulk = async (
       where: { id: { in: authorIds } },
       select: { id: true },
     });
-
     const missingAuthors = authorIds.filter(
       (id) => !existingAuthors.find((a) => a.id === id)
     );
@@ -74,7 +73,6 @@ const enrollCoursesBulk = async (
       where: { id: { in: courseIds } },
       select: { id: true },
     });
-
     const missingCourses = courseIds.filter(
       (id) => !existingCourses.find((c) => c.id === id)
     );
@@ -105,11 +103,13 @@ const enrollCoursesBulk = async (
       return { success: false, message: "All courses already enrolled" };
     }
 
-    // ✅ Bulk insert
+    // ✅ Bulk insert with type & courseCategory
     const created = await prisma.enrolledCourse.createMany({
       data: filteredEnrollments.map((e) => ({
         authorId: e.authorId,
         courseId: e.courseId,
+        type: e.type as any, // cast to enum if needed
+        courseCategory: e.courseCategory,
       })),
       skipDuplicates: true,
     });
@@ -124,6 +124,7 @@ const enrollCoursesBulk = async (
     throw new Error(error.message || "Failed to enroll courses");
   }
 };
+
 
 const getAllFromDB = async (
   params: IEnrolledCourseFilterRequest,

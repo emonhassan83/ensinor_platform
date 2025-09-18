@@ -26,7 +26,7 @@ const superAdminRevenueAnalysis = catchAsync(async (req, res) => {
 });
 
 const superAdminEnrolmentAnalysis = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.superAdminEnrollmentAnalysis(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

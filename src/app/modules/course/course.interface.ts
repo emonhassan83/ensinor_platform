@@ -1,4 +1,4 @@
-import { CourseLevel, CoursesStatus, CourseType } from '@prisma/client';
+import { CompanyType, CourseLevel, CoursesStatus, CourseType } from '@prisma/client';
 
 export type ICourseFilterRequest = {
   searchTerm?: string | undefined;
@@ -15,6 +15,7 @@ export type ICourse = {
   instructorId: string;
   title: string;
   shortDescription: string;
+  company: CompanyType;
   type?: CourseType;
   category: string;
   level: CourseLevel;

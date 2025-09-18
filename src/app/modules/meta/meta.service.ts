@@ -3,6 +3,8 @@ import {
   PaymentModelType,
   PaymentType,
   CoursesStatus,
+  PaymentStatus,
+  CourseType,
 } from '@prisma/client';
 import { startOfYear, endOfYear } from 'date-fns';
 import prisma from '../../utils/prisma';
@@ -36,7 +38,7 @@ const getEarningOverview = async (year: number) => {
     where: {
       type: PaymentType.course,
       createdAt: { gte: yearStart, lte: yearEnd },
-      status: 'paid',
+      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
     },
@@ -49,7 +51,7 @@ const getEarningOverview = async (year: number) => {
     where: {
       type: PaymentType.book,
       createdAt: { gte: yearStart, lte: yearEnd },
-      status: 'paid',
+      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
     },
@@ -62,7 +64,7 @@ const getEarningOverview = async (year: number) => {
     where: {
       type: PaymentType.event,
       createdAt: { gte: yearStart, lte: yearEnd },
-      status: 'paid',
+      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
     },
@@ -75,7 +77,7 @@ const getEarningOverview = async (year: number) => {
     where: {
       modelType: PaymentModelType.subscription,
       createdAt: { gte: yearStart, lte: yearEnd },
-      status: 'paid',
+      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
     },
@@ -95,6 +97,7 @@ const getMostEnrolledCourses = async () => {
     where: {
       isDeleted: false,
       status: CoursesStatus.approved,
+      type: CourseType.external,
     },
     orderBy: {
       enrollments: 'desc', // sort by enrollments
@@ -110,6 +113,11 @@ const getMostEnrolledCourses = async () => {
       totalCompleted: true,
       avgRating: true,
       ratingCount: true,
+      instructor: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
@@ -129,6 +137,123 @@ const getMostEnrolledCourses = async () => {
       completionRate, // add field
     };
   });
+};
+
+const getRevenueBreakdown = async () => {
+  const [courseSaleAgg, eventSaleAgg, bookSaleAgg, subscriptionSaleAgg] =
+    await Promise.all([
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+         status: PaymentStatus.paid,
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.course,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: PaymentStatus.paid,
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.event,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: PaymentStatus.paid,
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.book,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: PaymentStatus.paid,
+          isPaid: true,
+          isDeleted: false,
+          modelType: PaymentModelType.subscription, // subs
+        },
+      }),
+    ]);
+
+  const courseSale = Math.round(courseSaleAgg._sum.amount ?? 0);
+  const eventSale = Math.round(eventSaleAgg._sum.amount ?? 0);
+  const bookSale = Math.round(bookSaleAgg._sum.amount ?? 0);
+  const subscriptionSale = Math.round(subscriptionSaleAgg._sum.amount ?? 0);
+
+  return {
+    courseSale,
+    eventSale,
+    bookSale,
+    subscriptionSale,
+  };
+};
+
+const getEnrolledTrends = async (year: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const isCurrentYear = year === currentYear;
+
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  const filteredMonths = isCurrentYear
+    ? months.slice(0, now.getMonth() + 1)
+    : months;
+
+  // 🔹 Fetch enrollment data grouped by month & type
+  const grouped = await prisma.enrolledCourse.groupBy({
+    by: ['type'],
+    _count: { id: true },
+    where: {
+      createdAt: { gte: yearStart, lte: yearEnd },
+      isDeleted: false,
+    },
+  });
+
+  // 🔹 Get detailed per month data with join for Course Price
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: {
+      createdAt: { gte: yearStart, lte: yearEnd },
+      isDeleted: false,
+    },
+    select: {
+      type: true,
+      createdAt: true,
+      course: {
+        select: { price: true },
+      },
+    },
+  });
+
+  // Helper to map data into chart-friendly format
+  const buildTrend = (type: 'platform' | 'business') =>
+    filteredMonths.map((month, index) => {
+      const monthData = enrolledCourses.filter(
+        e => e.type === type && new Date(e.createdAt).getMonth() === index,
+      );
+
+      const enrolled = monthData.length;
+      const enrolledAmount = monthData.reduce(
+        (sum, e) => sum + (e.course?.price ?? 0),
+        0,
+      );
+
+      return {
+        month,
+        enrolled,
+        enrolledAmount,
+      };
+    });
+
+  return {
+    platform: buildTrend('platform'),
+    business: buildTrend('business'),
+  };
 };
 
 const superAdminMetaDashboard = async (
@@ -157,7 +282,7 @@ const superAdminMetaDashboard = async (
       amount: true,
     },
     where: {
-      status: 'paid',
+      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
     },
@@ -167,10 +292,6 @@ const superAdminMetaDashboard = async (
   // Extract the correct year from the query parameters
   const selectedEarningYear = earning_year
     ? parseInt(earning_year as string, 10) || new Date().getFullYear()
-    : new Date().getFullYear();
-
-  const selectedUserYear = user_year
-    ? parseInt(user_year as string, 10) || new Date().getFullYear()
     : new Date().getFullYear();
 
   // Fetch charts
@@ -196,51 +317,19 @@ const superAdminRevenueAnalysis = async (
     throw new Error('Invalid user role!');
   }
 
-  // --- Breakdown by Sale Type ---
-  const [courseSaleAgg, eventSaleAgg, bookSaleAgg, subscriptionSaleAgg] =
-    await Promise.all([
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: 'paid',
-          isPaid: true,
-          isDeleted: false,
-          type: PaymentType.course,
-        },
-      }),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: 'paid',
-          isPaid: true,
-          isDeleted: false,
-          type: PaymentType.event,
-        },
-      }),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: 'paid',
-          isPaid: true,
-          isDeleted: false,
-          type: PaymentType.book,
-        },
-      }),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: 'paid',
-          isPaid: true,
-          isDeleted: false,
-          modelType: PaymentModelType.subscription, // subs
-        },
-      }),
-    ]);
+  // --- Total Revenue ---
+  const totalRevenueAgg = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: {
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+  });
+  const totalRevenue = Math.round(totalRevenueAgg._sum.amount ?? 0);
 
-  const courseSale = Math.round(courseSaleAgg._sum.amount ?? 0);
-  const eventSale = Math.round(eventSaleAgg._sum.amount ?? 0);
-  const bookSale = Math.round(bookSaleAgg._sum.amount ?? 0);
-  const subscriptionSale = Math.round(subscriptionSaleAgg._sum.amount ?? 0);
+  // --- Breakdown (reusable)
+  const salesBreakdown = await getRevenueBreakdown();
 
   // --- Selected Year for Chart ---
   const selectedEarningYear = earning_year
@@ -250,16 +339,64 @@ const superAdminRevenueAnalysis = async (
   // --- Monthly Earning Overview ---
   const earningOverview = await getEarningOverview(selectedEarningYear);
 
+  // --- Earning Chart (percentage) ---
+  let earningChart = {
+    course: 0,
+    event: 0,
+    book: 0,
+    subscription: 0,
+  };
+
+  if (totalRevenue > 0) {
+    earningChart = {
+      course: Number(
+        ((salesBreakdown.courseSale / totalRevenue) * 100).toFixed(2),
+      ),
+      event: Number(
+        ((salesBreakdown.eventSale / totalRevenue) * 100).toFixed(2),
+      ),
+      book: Number(((salesBreakdown.bookSale / totalRevenue) * 100).toFixed(2)),
+      subscription: Number(
+        ((salesBreakdown.subscriptionSale / totalRevenue) * 100).toFixed(2),
+      ),
+    };
+  }
+
   return {
-    courseSale,
-    eventSale,
-    bookSale,
-    subscriptionSale,
+    salesBreakdown,
     earningOverview,
+    earningChart,
+  };
+};
+
+const superAdminEnrollmentAnalysis = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  const { earning_year } = query;
+  if (user?.role !== UserRole.super_admin) {
+    throw new Error('Invalid user role!');
+  }
+
+  // --- Breakdown (reusable)
+  const salesBreakdown = await getRevenueBreakdown();
+
+  // --- Selected Year for Chart ---
+  const selectedEarningYear = earning_year
+    ? parseInt(earning_year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  // --- Monthly Earning Overview ---
+  const enrolledTrends = await getEnrolledTrends(selectedEarningYear);
+
+  return {
+    salesBreakdown,
+    enrolledTrends,
   };
 };
 
 export const MetaService = {
   superAdminMetaDashboard,
   superAdminRevenueAnalysis,
+  superAdminEnrollmentAnalysis,
 };
