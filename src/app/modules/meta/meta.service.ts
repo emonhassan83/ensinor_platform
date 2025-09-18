@@ -5,6 +5,7 @@ import {
   CoursesStatus,
   PaymentStatus,
   CourseType,
+  OrderModelType,
 } from '@prisma/client';
 import { startOfYear, endOfYear } from 'date-fns';
 import prisma from '../../utils/prisma';
@@ -145,7 +146,7 @@ const getRevenueBreakdown = async () => {
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: {
-         status: PaymentStatus.paid,
+          status: PaymentStatus.paid,
           isPaid: true,
           isDeleted: false,
           type: PaymentType.course,
@@ -254,6 +255,112 @@ const getEnrolledTrends = async (year: number) => {
     platform: buildTrend('platform'),
     business: buildTrend('business'),
   };
+};
+
+// 1️⃣ Course Category Analysis
+ const getCourseCategory = async (year: number) => {
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  // Fetch enrolled courses for the year
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: {
+      createdAt: { gte: yearStart, lte: yearEnd },
+      isDeleted: false,
+    },
+    select: {
+      courseCategory: true,
+      id: true,
+    },
+  });
+
+  const totalEnrollments = enrolledCourses.length;
+  if (totalEnrollments === 0) return {};
+
+  // Group by category and calculate percentages
+  const categoryCount: Record<string, number> = {};
+  enrolledCourses.forEach((ec) => {
+    categoryCount[ec.courseCategory] = (categoryCount[ec.courseCategory] || 0) + 1;
+  });
+
+  const categoryPercentage: Record<string, number> = {};
+  Object.entries(categoryCount).forEach(([category, count]) => {
+    categoryPercentage[category] = Math.round((count / totalEnrollments) * 100);
+  });
+
+  return categoryPercentage;
+};
+
+// 2️⃣ Content Growth Analysis (monthly count based on Order.modelType)
+const getContentGrowth = async (year: number) => {
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  const orders = await prisma.order.findMany({
+    where: {
+      createdAt: { gte: yearStart, lte: yearEnd },
+      isDeleted: false,
+    },
+    select: {
+      createdAt: true,
+      modelType: true,
+    },
+  });
+
+  // Initialize result structure
+  const growth: Record<string, { month: string; count: number }[]> = {
+    course: [],
+    book: [],
+    event: [],
+  };
+
+  for (let i = 0; i < 12; i++) {
+    const monthOrders = orders.filter((o) => o.createdAt.getMonth() === i);
+
+    growth.course.push({
+      month: months[i].slice(0, 3),
+      count: monthOrders.filter((o) => o.modelType === OrderModelType.course).length,
+    });
+
+    growth.book.push({
+      month: months[i].slice(0, 3),
+      count: monthOrders.filter((o) => o.modelType === OrderModelType.book).length,
+    });
+
+    growth.event.push({
+      month: months[i].slice(0, 3),
+      count: monthOrders.filter((o) => o.modelType === OrderModelType.event).length,
+    });
+  }
+
+  return growth;
+};
+
+ const getUserOverviewByRole = async (role: UserRole, year: number) => {
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  // Fetch users of the given role for the selected year
+  const users = await prisma.user.findMany({
+    where: {
+      role,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      isDeleted: false,
+    },
+    select: { createdAt: true },
+  });
+
+  // Map counts per month
+  return months.map((month, index) => {
+    const count = users.filter(
+      (u) => u.createdAt.getMonth() === index
+    ).length;
+
+    return {
+      month: month.slice(0, 3),
+      count,
+    };
+  });
 };
 
 const superAdminMetaDashboard = async (
@@ -395,8 +502,70 @@ const superAdminEnrollmentAnalysis = async (
   };
 };
 
+const superAdminContentAnalysis = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  const { earning_year } = query;
+  if (user?.role !== UserRole.super_admin) {
+    throw new Error('Invalid user role!');
+  }
+
+  // --- Breakdown (reusable)
+  const salesBreakdown = await getRevenueBreakdown();
+
+  // --- Selected Year for Chart ---
+  const selectedEarningYear = earning_year
+    ? parseInt(earning_year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  // --- Monthly Content Growth Overview ---
+  const courseCategory = await getCourseCategory(selectedEarningYear);
+
+  // --- Monthly Content Growth Overview ---
+  const contentGrowth = await getContentGrowth(selectedEarningYear);
+
+  return {
+    salesBreakdown,
+    courseCategory,
+    contentGrowth,
+  };
+};
+
+const superAdminUserAnalysis = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  const { earning_year } = query;
+  if (user?.role !== UserRole.super_admin) {
+    throw new Error('Invalid user role!');
+  }
+
+  // --- Breakdown (reusable)
+  const salesBreakdown = await getRevenueBreakdown();
+
+  // --- Selected Year for Chart ---
+  const selectedYear = earning_year
+    ? parseInt(earning_year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  // --- Monthly User  Overview ---
+  const studentOverview = await getUserOverviewByRole(UserRole.student, selectedYear);
+  const instructorOverview = await getUserOverviewByRole(UserRole.instructor, selectedYear);
+  const businessOverview = await getUserOverviewByRole(UserRole.company_admin, selectedYear);
+
+  return {
+    salesBreakdown,
+    studentOverview,
+    instructorOverview,
+    businessOverview
+  };
+};
+
 export const MetaService = {
   superAdminMetaDashboard,
   superAdminRevenueAnalysis,
   superAdminEnrollmentAnalysis,
+  superAdminContentAnalysis,
+  superAdminUserAnalysis
 };

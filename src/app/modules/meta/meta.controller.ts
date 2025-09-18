@@ -37,7 +37,7 @@ const superAdminEnrolmentAnalysis = catchAsync(async (req, res) => {
 });
 
 const superAdminContentAnalysis = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.superAdminContentAnalysis(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -48,7 +48,7 @@ const superAdminContentAnalysis = catchAsync(async (req, res) => {
 });
 
 const superAdminUserAnalysis = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.superAdminUserAnalysis(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

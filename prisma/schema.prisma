@@ -560,6 +560,7 @@ model Order {
   bookId         String?
   courseId       String?
   courseBundleId String?
+  eventId        String?
   amount         Float
   status         OrderStatus    @default(pending)
   paymentStatus  PaymentStatus  @default(unpaid)
@@ -577,6 +578,7 @@ model Order {
   book         Book?         @relation(fields: [bookId], references: [id])
   course       Course?       @relation(fields: [courseId], references: [id])
   courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
+  event        Event?        @relation(fields: [eventId], references: [id])
   payment      Payment[]
 
   @@map("orders")
@@ -825,6 +827,7 @@ model Event {
   promoCode         PromoCode[]
   resource          Resource[]
   affiliateLink     AffiliateLink[]
+  order             Order[]
 
   @@map("events")
 }
@@ -1474,6 +1477,7 @@ enum OrderModelType {
   book
   course
   courseBundle
+  event
 }
 
 enum AssignmentModelType {
