@@ -108,7 +108,7 @@ model User {
   meetingAssignmentsAuthored MeetingAssignment[]    @relation("MeetingAssignmentsAuthored")
   meetingAssignmentsJoined   MeetingAssignment[]    @relation("MeetingAssignmentsJoined")
   review                     Review[]
-  companyBusinessInstructor  BusinessInstructor[]   @relation("company")
+  companyBusinessInstructor  BusinessInstructor[]   @relation("companyAuthor")
   companyEmployee            Employee[]             @relation("companyUser")
   quiz                       Quiz[]
   studentRequest             CertificateRequest[]   @relation("studentRequest")
@@ -226,7 +226,12 @@ model Company {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  author CompanyAdmin @relation(references: [id], fields: [userId])
+  author             CompanyAdmin         @relation(references: [id], fields: [userId])
+  course             Course[]
+  courseBundle       CourseBundle[]
+  event              Event[]
+  businessInstructor BusinessInstructor[]
+  employees           Employee[]
 
   @@map("companies")
 }
@@ -290,6 +295,8 @@ model Invitation {
 model BusinessInstructor {
   id          String   @id @unique @default(uuid())
   userId      String   @unique
+  authorId    String   @unique
+  companyId   String
   designation String
   university  String?
   session     String?
@@ -301,12 +308,12 @@ model BusinessInstructor {
   website     String?
   avgRating   Float    @default(0.0)
   ratingCount Int      @default(0)
-  companyId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user    User @relation(references: [id], fields: [userId])
-  company User @relation("company", references: [id], fields: [companyId])
+  user    User    @relation(references: [id], fields: [userId])
+  author  User    @relation("companyAuthor", references: [id], fields: [authorId])
+  company Company @relation(references: [id], fields: [companyId])
 
   @@map("business_instructors")
 }
@@ -334,17 +341,19 @@ model CoInstructor {
 model Employee {
   id           String   @id @unique @default(uuid())
   userId       String   @unique
+  authorId     String
+  companyId    String
   interests    String[] @default([])
   university   String?
   session      String?
   subjects     String?
-  companyId    String
   departmentId String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   user       User       @relation(references: [id], fields: [userId])
-  company    User       @relation("companyUser", references: [id], fields: [companyId])
+  author     User       @relation("companyUser", references: [id], fields: [authorId])
+  company    Company    @relation(references: [id], fields: [companyId])
   department Department @relation(references: [id], fields: [departmentId])
 
   @@map("employees")
@@ -442,7 +451,8 @@ model Book {
 // Course Related Models
 model Course {
   id               String        @id @default(uuid())
-  authorId         String
+  authorId         String?
+  companyId        String?
   instructorId     String
   title            String
   shortDescription String
@@ -469,8 +479,9 @@ model Course {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  author     User @relation("CourseAuthor", fields: [authorId], references: [id])
-  instructor User @relation("CourseInstructor", fields: [instructorId], references: [id])
+  author     User?    @relation("CourseAuthor", fields: [authorId], references: [id])
+  instructor User?    @relation("CourseInstructor", fields: [instructorId], references: [id])
+  companies  Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many with CourseBundle via join table
   courseBundleCourses CourseBundleCourses[]
@@ -493,6 +504,7 @@ model Course {
   resource           Resource[]
   coInstructor       CoInstructor[]
   assignment         Assignment[]
+  userId             String?
 
   @@map("courses")
 }
@@ -515,7 +527,8 @@ model CourseContent {
 
 model CourseBundle {
   id             String     @id @default(uuid())
-  authorId       String
+  authorId       String?
+  companyId      String?
   title          String
   category       String
   price          Int
@@ -531,7 +544,8 @@ model CourseBundle {
   updatedAt      DateTime   @updatedAt
 
   // Relations
-  author User @relation("BundleAuthor", fields: [authorId], references: [id])
+  author  User?    @relation("BundleAuthor", fields: [authorId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
@@ -798,7 +812,8 @@ model Certificate {
 //* Event Related Models
 model Event {
   id             String      @id @default(uuid())
-  authorId       String
+  authorId       String?
+  companyId      String?
   title          String
   slogan         String
   type           String
@@ -818,7 +833,9 @@ model Event {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  author            User                @relation(fields: [authorId], references: [id])
+  author    User?    @relation(fields: [authorId], references: [id])
+  companies Company? @relation(fields: [companyId], references: [id])
+
   eventBooking      EventBooking[]
   eventSchedule     EventSchedule[]
   eventSpeaker      EventSpeaker[]

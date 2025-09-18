@@ -39,9 +39,8 @@ const courseReports = catchAsync(async (req, res) => {
 });
 
 const revenueReports = catchAsync(async (req, res) => {
-  const filters = pick(req.query, courseSearchableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ReportsService.revenueReports(filters, options);
+  const result = await ReportsService.revenueReports(options);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -77,19 +76,56 @@ const eventReports = catchAsync(async (req, res) => {
   });
 });
 
-// const superAdminSubscriptionAnalysis = catchAsync(async (req, res) => {
-//   const result = await ReportsService.superAdminSubscriptionAnalysis(
-//     req.user,
-//     req.query,
-//   );
+const courseCompletionReports = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseSearchableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const result = await ReportsService.courseReports(
+    filters,
+    options,
+    req.params.companyId,
+  );
 
-//   sendResponse(res, {
-//     statusCode: httpStatus.OK,
-//     success: true,
-//     message: 'Admin subscription analysis retrieval successfully!',
-//     data: result,
-//   });
-// });
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Company completion reports retrieval successfully!',
+    data: result,
+  });
+});
+
+const quizReports = catchAsync(async (req, res) => {
+  const filters = pick(req.query, eventSearchableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const result = await ReportsService.quizReports(
+    filters,
+    options,
+    req.params.companyId,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Company quiz reports retrieval successfully!',
+    data: result,
+  });
+});
+
+const attendanceReports = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseSearchableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const result = await ReportsService.eventReports(
+    filters,
+    options,
+    req.params.companyId,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Company attendance reports retrieval successfully!',
+    data: result,
+  });
+});
 
 export const ReportsController = {
   studentReports,
@@ -97,4 +133,7 @@ export const ReportsController = {
   revenueReports,
   businessReports,
   eventReports,
+  courseCompletionReports,
+  quizReports,
+  attendanceReports,
 };

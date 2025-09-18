@@ -18,7 +18,7 @@ router.get(
 );
 
 router.get(
-  'revenue-reports',
+  '/revenue-reports',
   auth(UserRole.super_admin),
   ReportsController.revenueReports,
 );
@@ -33,6 +33,24 @@ router.get(
   '/events-reports',
   auth(UserRole.super_admin),
   ReportsController.eventReports,
+);
+
+router.get(
+  '/course-completion-reports/:companyId',
+  auth(UserRole.super_admin),
+  ReportsController.courseCompletionReports,
+);
+
+router.get(
+  '/quiz-reports/:companyId',
+  auth(UserRole.super_admin),
+  ReportsController.quizReports,
+);
+
+router.get(
+  '/attendance-reports/:companyId',
+  auth(UserRole.super_admin),
+  ReportsController.attendanceReports,
 );
 
 export const ReportsRoutes = router;
