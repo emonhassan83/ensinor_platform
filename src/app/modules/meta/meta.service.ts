@@ -1,36 +1,154 @@
-import { UserRole } from '@prisma/client';
+import {
+  UserRole,
+  PaymentModelType,
+  PaymentType,
+  CoursesStatus,
+} from '@prisma/client';
 import { startOfYear, endOfYear } from 'date-fns';
 import prisma from '../../utils/prisma';
+import { months } from './meta.utils';
 
-const superAdminMetaData = async (
+const getEarningOverview = async (year: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const isCurrentYear = year === currentYear;
+
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  const filteredMonths = isCurrentYear
+    ? months.slice(0, now.getMonth() + 1)
+    : months;
+
+  // Helper: map grouped data into chart format
+  const mapMonthly = (data: any[]) =>
+    filteredMonths.map((month, index) => {
+      const row = data.find(m => new Date(m.createdAt).getMonth() === index);
+      return {
+        month,
+        amount: row?._sum.amount ?? 0,
+      };
+    });
+
+  // 1️⃣ Course Overview
+  const courseData = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      type: PaymentType.course,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { amount: true },
+  });
+
+  // 2️⃣ Book Overview
+  const bookData = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      type: PaymentType.book,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { amount: true },
+  });
+
+  // 2️⃣ Event Overview
+  const eventData = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      type: PaymentType.event,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { amount: true },
+  });
+
+  // 3️⃣ Subscription Overview (based on PaymentModelType.subscription)
+  const subscriptionData = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      modelType: PaymentModelType.subscription,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { amount: true },
+  });
+
+  return {
+    courseEarningOverview: mapMonthly(courseData),
+    bookEarningOverview: mapMonthly(bookData),
+    eventEarningOverview: mapMonthly(eventData),
+    subscriptionEarningOverview: mapMonthly(subscriptionData),
+  };
+};
+
+const getMostEnrolledCourses = async () => {
+  const courses = await prisma.course.findMany({
+    where: {
+      isDeleted: false,
+      status: CoursesStatus.approved,
+    },
+    orderBy: {
+      enrollments: 'desc', // sort by enrollments
+    },
+    take: 5, // only top 5
+    select: {
+      id: true,
+      title: true,
+      thumbnail: true,
+      category: true,
+      price: true,
+      enrollments: true,
+      totalCompleted: true,
+      avgRating: true,
+      ratingCount: true,
+    },
+  });
+
+  if (!courses || courses.length === 0) {
+    return []; // always return array
+  }
+
+  // Calculate completionRate for each course
+  return courses.map(course => {
+    const completionRate =
+      course.enrollments > 0
+        ? Math.round((course.totalCompleted / course.enrollments) * 100)
+        : 0;
+
+    return {
+      ...course,
+      completionRate, // add field
+    };
+  });
+};
+
+const superAdminMetaDashboard = async (
   user: any,
   query: Record<string, unknown>,
 ) => {
   const { earning_year, user_year } = query;
-  
+
   if (user?.role !== UserRole.super_admin) {
     throw new Error('Invalid user role!');
   }
 
   const totalStudentCount = await prisma.user.count({
-    where: {
-      role: UserRole.student,
-      isDeleted: false,
-    },
+    where: { role: UserRole.student, isDeleted: false },
   });
-
   const totalInstructorCount = await prisma.user.count({
-    where: {
-      role: UserRole.instructor,
-      isDeleted: false,
-    },
+    where: { role: UserRole.instructor, isDeleted: false },
   });
-
   const totalCompanyCount = await prisma.user.count({
-    where: {
-      role: UserRole.instructor,
-      isDeleted: false,
-    },
+    where: { role: UserRole.instructor, isDeleted: false },
   });
 
   // **Total Revenue**
@@ -44,7 +162,6 @@ const superAdminMetaData = async (
       isDeleted: false,
     },
   });
-
   const revenue = Math.round(totalRevenue._sum.amount ?? 0);
 
   // Extract the correct year from the query parameters
@@ -56,126 +173,93 @@ const superAdminMetaData = async (
     ? parseInt(user_year as string, 10) || new Date().getFullYear()
     : new Date().getFullYear();
 
-  // // **Fetch charts**
-  // const earningOverview = await getEarningOverview(selectedEarningYear);
-  // const userOverview = await getUserOverview(selectedUserYear);
+  // Fetch charts
+  const earningOverview = await getEarningOverview(selectedEarningYear);
+  const mostEnrolledCourses = await getMostEnrolledCourses();
 
   return {
     totalStudentCount,
     totalInstructorCount,
     totalCompanyCount,
     totalRevenue: revenue,
-    // earningOverview,
-    // userOverview,
+    earningOverview,
+    mostEnrolledCourses,
   };
 };
 
-// const getEarningOverview = async (year: number) => {
-//   const now = new Date();
-//   const currentYear = now.getFullYear();
-//   const isCurrentYear = year === currentYear;
+const superAdminRevenueAnalysis = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  const { earning_year } = query;
+  if (user?.role !== UserRole.super_admin) {
+    throw new Error('Invalid user role!');
+  }
 
-//   const yearStart = startOfYear(new Date(year, 0, 1));
-//   const yearEnd = endOfYear(new Date(year, 11, 31));
+  // --- Breakdown by Sale Type ---
+  const [courseSaleAgg, eventSaleAgg, bookSaleAgg, subscriptionSaleAgg] =
+    await Promise.all([
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'paid',
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.course,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'paid',
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.event,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'paid',
+          isPaid: true,
+          isDeleted: false,
+          type: PaymentType.book,
+        },
+      }),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'paid',
+          isPaid: true,
+          isDeleted: false,
+          modelType: PaymentModelType.subscription, // subs
+        },
+      }),
+    ]);
 
-//   const monthlyRevenue = await Payment.aggregate([
-//     {
-//       $match: {
-//         createdAt: { $gte: yearStart, $lte: yearEnd },
-//         status: 'paid',
-//         isPaid: true,
-//       },
-//     },
-//     {
-//       $group: {
-//         _id: { $month: '$createdAt' },
-//         amount: { $sum: '$amount' },
-//       },
-//     },
-//     {
-//       $sort: { _id: 1 },
-//     },
-//   ]);
+  const courseSale = Math.round(courseSaleAgg._sum.amount ?? 0);
+  const eventSale = Math.round(eventSaleAgg._sum.amount ?? 0);
+  const bookSale = Math.round(bookSaleAgg._sum.amount ?? 0);
+  const subscriptionSale = Math.round(subscriptionSaleAgg._sum.amount ?? 0);
 
-//   const months = [
-//     'January',
-//     'February',
-//     'March',
-//     'April',
-//     'May',
-//     'June',
-//     'July',
-//     'August',
-//     'September',
-//     'October',
-//     'November',
-//     'December',
-//   ];
+  // --- Selected Year for Chart ---
+  const selectedEarningYear = earning_year
+    ? parseInt(earning_year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
 
-//   // If the requested year is the current year, limit to the current month
-//   const filteredMonths = isCurrentYear
-//     ? months.slice(0, now.getMonth() + 1)
-//     : months;
+  // --- Monthly Earning Overview ---
+  const earningOverview = await getEarningOverview(selectedEarningYear);
 
-//   const barChartData = filteredMonths.map((month, index) => {
-//     const data = monthlyRevenue.find((m: any) => m._id === index + 1);
-//     return { month, amount: data ? Math.round(data.amount) : 0 };
-//   });
-
-//   return barChartData;
-// };
-
-// const getUserOverview = async (year: number) => {
-//   const now = new Date();
-//   const currentYear = now.getFullYear();
-//   const isCurrentYear = year === currentYear;
-
-//   const yearStart = startOfYear(new Date(year, 0, 1));
-//   const yearEnd = endOfYear(new Date(year, 11, 31));
-
-//   // Aggregate Monthly User Registrations
-//   const monthlyUsers = await User.aggregate([
-//     {
-//       $match: {
-//         createdAt: { $gte: yearStart, $lte: yearEnd },
-//       },
-//     },
-//     {
-//       $group: {
-//         _id: { $month: '$createdAt' },
-//         count: { $sum: 1 },
-//       },
-//     },
-//     { $sort: { _id: 1 } },
-//   ]);
-
-//   const months = [
-//     'January',
-//     'February',
-//     'March',
-//     'April',
-//     'May',
-//     'June',
-//     'July',
-//     'August',
-//     'September',
-//     'October',
-//     'November',
-//     'December',
-//   ];
-
-//   const filteredMonths = isCurrentYear
-//     ? months.slice(0, now.getMonth() + 1)
-//     : months;
-
-//   const userOverview = filteredMonths.map((month, index) => {
-//     const data = monthlyUsers.find((m: any) => m._id === index + 1);
-//     return { month, count: data ? data.count : 0 };
-//   });
-
-//   return userOverview;
-// };
+  return {
+    courseSale,
+    eventSale,
+    bookSale,
+    subscriptionSale,
+    earningOverview,
+  };
+};
 
 export const MetaService = {
-  superAdminMetaData,
+  superAdminMetaDashboard,
+  superAdminRevenueAnalysis,
 };

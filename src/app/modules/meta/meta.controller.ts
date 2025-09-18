@@ -3,19 +3,74 @@ import httpStatus from 'http-status';
 import sendResponse from '../../utils/sendResponse';
 import { MetaService } from './meta.service';
 
-const superAdminMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+const superAdminMetaDashboard = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Admin meta dashboard data retrieval successfully!',
+    data: result,
+  });
+});
+
+const superAdminRevenueAnalysis = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminRevenueAnalysis(req.user, req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Admin revenue analysis retrieval successfully!',
+    data: result,
+  });
+});
+
+const superAdminEnrolmentAnalysis = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Admin enrolment analysis retrieval successfully!',
+    data: result,
+  });
+});
+
+const superAdminContentAnalysis = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Admin content analysis retrieval successfully!',
+    data: result,
+  });
+});
+
+const superAdminUserAnalysis = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Admin user analysis retrieval successfully!',
+    data: result,
+  });
+});
+
+const superAdminSubscriptionAnalysis = catchAsync(async (req, res) => {
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Admin subscription analysis retrieval successfully!',
     data: result,
   });
 });
 
 const companyAdminMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -26,7 +81,7 @@ const companyAdminMetaData = catchAsync(async (req, res) => {
 });
 
 const businessInstructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -37,7 +92,7 @@ const businessInstructorMetaData = catchAsync(async (req, res) => {
 });
 
 const employeeMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -48,7 +103,7 @@ const employeeMetaData = catchAsync(async (req, res) => {
 });
 
 const instructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -59,7 +114,7 @@ const instructorMetaData = catchAsync(async (req, res) => {
 });
 
 const coInstructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -69,7 +124,7 @@ const coInstructorMetaData = catchAsync(async (req, res) => {
   });
 });
 const studentMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaData(req.user, req.query);
+  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -80,7 +135,12 @@ const studentMetaData = catchAsync(async (req, res) => {
 });
 
 export const MetaController = {
-  superAdminMetaData,
+  superAdminMetaDashboard,
+  superAdminRevenueAnalysis,
+  superAdminEnrolmentAnalysis,
+  superAdminContentAnalysis,
+  superAdminUserAnalysis,
+  superAdminSubscriptionAnalysis,
   companyAdminMetaData,
   businessInstructorMetaData,
   employeeMetaData,

@@ -6,9 +6,39 @@ import { UserRole } from '@prisma/client';
 const router = express.Router();
 
 router.get(
-  '/super-admin',
+  '/super-admin/dashboard-analysis',
   auth(UserRole.super_admin),
-  MetaController.superAdminMetaData,
+  MetaController.superAdminMetaDashboard,
+);
+
+router.get(
+  '/super-admin/revenue-analysis',
+  auth(UserRole.super_admin),
+  MetaController.superAdminRevenueAnalysis,
+);
+
+router.get(
+  '/super-admin/enrolment-analysis',
+  auth(UserRole.super_admin),
+  MetaController.superAdminEnrolmentAnalysis,
+);
+
+router.get(
+  '/super-admin/content-analysis',
+  auth(UserRole.super_admin),
+  MetaController.superAdminContentAnalysis,
+);
+
+router.get(
+  '/super-admin/user-analysis',
+  auth(UserRole.super_admin),
+  MetaController.superAdminUserAnalysis,
+);
+
+router.get(
+  '/super-admin/subscription-analysis',
+  auth(UserRole.super_admin),
+  MetaController.superAdminSubscriptionAnalysis,
 );
 
 router.get(

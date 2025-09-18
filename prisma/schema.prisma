@@ -806,7 +806,7 @@ model Event {
   title          String
   slogan         String
   type           String
-  company        CompanyType
+  company        CompanyType @default(platform)
   thumbnail      String
   organizedBy    String
   price          Int
