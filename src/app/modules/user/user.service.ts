@@ -179,7 +179,7 @@ const createBusinessInstructor = async (
       isDeleted: false,
     },
   });
-  if (!company || company?.isDeleted) {
+  if (!company) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company not found or deleted!');
   }
 
@@ -220,6 +220,7 @@ const createBusinessInstructor = async (
     await transactionClient.businessInstructor.create({
       data: {
         userId: userData.id,
+        authorId: businessInstructor.authorId,
         companyId: company.id,
         designation: businessInstructor.designation,
       },
@@ -263,6 +264,7 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
     await transactionClient.employee.create({
       data: {
         userId: user.id,
+        authorId: payload.employee.author,
         companyId: payload.employee.company,
         departmentId: payload.employee.department,
       },

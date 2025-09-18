@@ -70,7 +70,7 @@ const getAllFromDB = async (
           photoUrl: true,
         },
       },
-      company: {
+      author: {
         select: {
           id: true,
           name: true,
@@ -120,7 +120,7 @@ const getByIdFromDB = async (
           status: true,
         },
       },
-      company: {
+      author: {
         select: {
           id: true,
           name: true,
@@ -132,13 +132,9 @@ const getByIdFromDB = async (
           city: true,
           country: true,
           status: true,
-          companyAdmin: {
-            select: {
-              company: true,
-            },
-          },
         },
       },
+      company: true,
     },
   });
 
@@ -151,7 +147,7 @@ const updateIntoDB = async (
     businessInstructor?: Partial<BusinessInstructor>;
     user?: Partial<User>;
   },
-  file: any
+  file: any,
 ): Promise<BusinessInstructor> => {
   const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
     where: { id },

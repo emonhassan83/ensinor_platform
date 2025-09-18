@@ -28,7 +28,11 @@ const insertIntoDB = async (payload: IEventBooking) => {
   }
 
   const result = await prisma.eventBooking.create({
-    data: { ...payload, authorId: event.authorId, amount: event.price },
+    data: {
+      ...payload,
+      ...(event.authorId ? { authorId: event.authorId } : {}),
+      amount: event.price,
+    },
   });
 
   if (!result) {

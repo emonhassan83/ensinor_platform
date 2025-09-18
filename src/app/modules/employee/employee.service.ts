@@ -52,17 +52,17 @@ const getAllFromDB = async (
           photoUrl: true,
         },
       },
-      company: {
+      author: {
         select: {
           id: true,
           name: true,
           email: true,
           photoUrl: true,
-          companyAdmin: {
-            select: {
-              company: true,
-            },
-          },
+        },
+      },
+      company: {
+        select: {
+          name: true,
         },
       },
     },
@@ -110,19 +110,15 @@ const getByIdFromDB = async (id: string): Promise<Employee | null> => {
           status: true,
         },
       },
-      company: {
+      author: {
         select: {
           id: true,
           name: true,
           email: true,
           photoUrl: true,
-          companyAdmin: {
-            select: {
-              company: true,
-            },
-          },
         },
       },
+      company: true,
     },
   });
 

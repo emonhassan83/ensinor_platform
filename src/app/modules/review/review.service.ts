@@ -66,17 +66,17 @@ const insertIntoDB = async (payload: IReview) => {
     0,
   );
 
-  const authorAvgRating = totalRatings
-    ? totalWeightedRating / totalRatings
-    : 0;
+  const authorAvgRating = totalRatings ? totalWeightedRating / totalRatings : 0;
 
-  await prisma.user.update({
-    where: { id: authorIdOfCourse },
-    data: {
-      avgRating: parseFloat(authorAvgRating.toFixed(1)),
-      ratingCount: totalRatings,
-    },
-  });
+  if (authorIdOfCourse) {
+    await prisma.user.update({
+      where: { id: authorIdOfCourse },
+      data: {
+        avgRating: parseFloat(authorAvgRating.toFixed(1)),
+        ratingCount: totalRatings,
+      },
+    });
+  }
 
   return review;
 };

@@ -7,6 +7,7 @@ export type IInvitationFilterRequest = {
 
 export type IInvitation = {
   userId: string;
+  companyId: string;
   departmentId: string;
   name: string;
   groupName?: string;
@@ -15,6 +16,7 @@ export type IInvitation = {
 
 export type IGroupInvitation = {
   userId: string;
+  companyId: string;
   departmentId: string;
   name?: string;
   groupName: string;

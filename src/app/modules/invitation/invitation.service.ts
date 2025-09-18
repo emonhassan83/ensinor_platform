@@ -21,7 +21,7 @@ import { hashedPassword } from '../user/user.utils';
 import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 
 const insertIntoDB = async (payload: IInvitation) => {
-  const { userId, departmentId, name, email } = payload;
+  const { userId, departmentId, companyId, name, email } = payload;
 
   // 1. Check if inviter (company admin) exists
   const inviter = await prisma.user.findFirst({
@@ -98,7 +98,8 @@ const insertIntoDB = async (payload: IInvitation) => {
     const newEmployee = await tx.employee.create({
       data: {
         userId: newUser.id,
-        companyId: inviter.id,
+        authorId: inviter.id,
+        companyId: companyId,
         departmentId: departmentId,
       },
     });
@@ -127,7 +128,7 @@ const insertIntoDB = async (payload: IInvitation) => {
 };
 
 const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
-  const { userId, departmentId, emails, groupName } = payload;
+  const { userId,companyId, departmentId, emails, groupName } = payload;
 
   // 1. Validate inviter
   const inviter = await prisma.user.findFirst({
@@ -193,7 +194,8 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       const employee = await tx.employee.create({
         data: {
           userId: user.id,
-          companyId: inviter.id,
+          authorId: inviter.id,
+          companyId: companyId,
           departmentId,
         },
       });

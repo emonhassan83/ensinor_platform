@@ -10,6 +10,8 @@ import {
 import { startOfYear, endOfYear } from 'date-fns';
 import prisma from '../../utils/prisma';
 import { months } from './meta.utils';
+import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 type SubscriptionOverviewParams = {
   paymentType: PaymentType;
@@ -263,7 +265,7 @@ const getEnrolledTrends = async (year: number) => {
 };
 
 // 1️⃣ Course Category Analysis
- const getCourseCategory = async (year: number) => {
+const getCourseCategory = async (year: number) => {
   const yearStart = startOfYear(new Date(year, 0, 1));
   const yearEnd = endOfYear(new Date(year, 11, 31));
 
@@ -284,8 +286,9 @@ const getEnrolledTrends = async (year: number) => {
 
   // Group by category and calculate percentages
   const categoryCount: Record<string, number> = {};
-  enrolledCourses.forEach((ec) => {
-    categoryCount[ec.courseCategory] = (categoryCount[ec.courseCategory] || 0) + 1;
+  enrolledCourses.forEach(ec => {
+    categoryCount[ec.courseCategory] =
+      (categoryCount[ec.courseCategory] || 0) + 1;
   });
 
   const categoryPercentage: Record<string, number> = {};
@@ -320,28 +323,31 @@ const getContentGrowth = async (year: number) => {
   };
 
   for (let i = 0; i < 12; i++) {
-    const monthOrders = orders.filter((o) => o.createdAt.getMonth() === i);
+    const monthOrders = orders.filter(o => o.createdAt.getMonth() === i);
 
     growth.course.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter((o) => o.modelType === OrderModelType.course).length,
+      count: monthOrders.filter(o => o.modelType === OrderModelType.course)
+        .length,
     });
 
     growth.book.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter((o) => o.modelType === OrderModelType.book).length,
+      count: monthOrders.filter(o => o.modelType === OrderModelType.book)
+        .length,
     });
 
     growth.event.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter((o) => o.modelType === OrderModelType.event).length,
+      count: monthOrders.filter(o => o.modelType === OrderModelType.event)
+        .length,
     });
   }
 
   return growth;
 };
 
- const getUserOverviewByRole = async (role: UserRole, year: number) => {
+const getUserOverviewByRole = async (role: UserRole, year: number) => {
   const yearStart = startOfYear(new Date(year, 0, 1));
   const yearEnd = endOfYear(new Date(year, 11, 31));
 
@@ -357,9 +363,7 @@ const getContentGrowth = async (year: number) => {
 
   // Map counts per month
   return months.map((month, index) => {
-    const count = users.filter(
-      (u) => u.createdAt.getMonth() === index
-    ).length;
+    const count = users.filter(u => u.createdAt.getMonth() === index).length;
 
     return {
       month: month.slice(0, 3),
@@ -388,7 +392,7 @@ const getSubscriptionOverview = async ({
 
   return months.map((month, index) => {
     const monthAmount = payments
-      .filter((p) => p.createdAt.getMonth() === index)
+      .filter(p => p.createdAt.getMonth() === index)
       .reduce((sum, p) => sum + p.amount, 0);
 
     return {
@@ -585,15 +589,24 @@ const superAdminUserAnalysis = async (
     : new Date().getFullYear();
 
   // --- Monthly User  Overview ---
-  const studentOverview = await getUserOverviewByRole(UserRole.student, selectedYear);
-  const instructorOverview = await getUserOverviewByRole(UserRole.instructor, selectedYear);
-  const businessOverview = await getUserOverviewByRole(UserRole.company_admin, selectedYear);
+  const studentOverview = await getUserOverviewByRole(
+    UserRole.student,
+    selectedYear,
+  );
+  const instructorOverview = await getUserOverviewByRole(
+    UserRole.instructor,
+    selectedYear,
+  );
+  const businessOverview = await getUserOverviewByRole(
+    UserRole.company_admin,
+    selectedYear,
+  );
 
   return {
     salesBreakdown,
     studentOverview,
     instructorOverview,
-    businessOverview
+    businessOverview,
   };
 };
 
@@ -609,7 +622,7 @@ const superAdminSubscriptionAnalysis = async (
   // --- Breakdown (reusable)
   const salesBreakdown = await getRevenueBreakdown();
 
- const selectedYear = earning_year
+  const selectedYear = earning_year
     ? parseInt(earning_year as string, 10) || new Date().getFullYear()
     : new Date().getFullYear();
 
@@ -626,7 +639,173 @@ const superAdminSubscriptionAnalysis = async (
   return {
     salesBreakdown,
     instructorSubscription,
-    businessSubscription
+    businessSubscription,
+  };
+};
+
+const companyAdminMetaData = async (user: any) => {
+  if (user?.role !== UserRole.company_admin) {
+    throw new Error('Invalid user role!');
+  }
+
+  const company = await prisma.company.findFirst({
+    where: { userId: user.id, isDeleted: false },
+  });
+  if (!company) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company not found !');
+  }
+
+  const totalCourseCount = await prisma.course.count({
+    where: {
+      companyId: company.id,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
+  });
+  const enrolledCoursesCount = await prisma.enrolledCourse.count({
+    where: {
+      course: {
+        companyId: company.id,
+        isDeleted: false,
+        status: CoursesStatus.approved,
+      },
+      isDeleted: false,
+    },
+  });
+
+  // --- Revenue ---
+  const totalRevenue = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: {
+      status: PaymentStatus.paid,
+      isPaid: true,
+      isDeleted: false,
+      authorId: company.id,
+    },
+  });
+  const revenue = Math.round(totalRevenue._sum.amount ?? 0);
+
+  // --- Dates ---
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // --- Upcoming events ---
+  const upcomingEvents = await prisma.event.findMany({
+    where: {
+      companyId: company.id,
+      isDeleted: false,
+      date: { gte: today.toISOString() }, // date string compare
+    },
+    orderBy: { date: 'asc' },
+    take: 10,
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+    },
+  });
+
+  const totalUpcomingEventCount = await prisma.event.count({
+    where: {
+      companyId: company.id,
+      isDeleted: false,
+      date: { gte: today.toISOString() },
+    },
+  });
+
+  // --- Recent course activity (completed this month) ---
+  const recentCourseActivity = await prisma.enrolledCourse.findMany({
+    where: {
+      isComplete: true,
+      isDeleted: false,
+      updatedAt: { gte: startOfMonth },
+      course: { companyId: company.id },
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 10,
+    select: {
+      updatedAt: true,
+      author: { select: { id: true, name: true, email: true } },
+      course: { select: { id: true, title: true } },
+    },
+  });
+
+  const thisMonthCompletedCount = await prisma.enrolledCourse.count({
+    where: {
+      isComplete: true,
+      isDeleted: false,
+      updatedAt: { gte: startOfMonth },
+      course: { companyId: company.id },
+    },
+  });
+
+  return {
+    totalCourseCount,
+    enrolledCoursesCount,
+    totalRevenue: revenue,
+    totalUpcomingEventCount,
+    thisMonthCompletedCount,
+    recentCourseActivity: recentCourseActivity.map(a => ({
+      courseName: a.course.title,
+      studentName: a.author.name,
+      completedAt: a.updatedAt,
+    })),
+    upcomingEvents: upcomingEvents.map(e => ({
+      title: e.title,
+      type: e.type,
+      date: e.date,
+      time: `${e.startTime} - ${e.endTime}`,
+    })),
+  };
+};
+
+const businessInstructorMetaData = async (user: any) => {
+  if (user?.role !== UserRole.business_instructors) {
+    throw new Error('Invalid user role!');
+  }
+
+  const company = await prisma.company.findFirst({
+    where: { userId: user.id, isDeleted: false },
+  });
+  if (!company) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company not found !');
+  }
+
+  const totalCourseCount = await prisma.course.count({
+    where: {
+      companyId: company.id,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
+  });
+  const totalInstructorCount = await prisma.user.count({
+    where: { role: UserRole.instructor, isDeleted: false },
+  });
+  const totalCompanyCount = await prisma.user.count({
+    where: { role: UserRole.instructor, isDeleted: false },
+  });
+
+  // **Total Revenue**
+  const totalRevenue = await prisma.payment.aggregate({
+    _sum: {
+      amount: true,
+    },
+    where: {
+      status: PaymentStatus.paid,
+      isPaid: true,
+      isDeleted: false,
+    },
+  });
+  const revenue = Math.round(totalRevenue._sum.amount ?? 0);
+
+  return {
+    totalCourseCount,
+    totalInstructorCount,
+    totalCompanyCount,
+    totalRevenue: revenue,
   };
 };
 
@@ -636,5 +815,7 @@ export const MetaService = {
   superAdminEnrollmentAnalysis,
   superAdminContentAnalysis,
   superAdminUserAnalysis,
-  superAdminSubscriptionAnalysis
+  superAdminSubscriptionAnalysis,
+  companyAdminMetaData,
+  businessInstructorMetaData,
 };

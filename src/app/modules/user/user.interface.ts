@@ -59,6 +59,7 @@ export type IBusinessInstructor = {
     bio: string;
   };
   businessInstructor: {
+    authorId: string;
     company: string;
     designation: string;
   };
@@ -77,6 +78,7 @@ export type IEmployee = {
     photoUrl?: string;
   };
   employee: {
+    author: string;
     company: string;
     department: string;
   };

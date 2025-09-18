@@ -70,24 +70,24 @@ const superAdminSubscriptionAnalysis = catchAsync(async (req, res) => {
 });
 
 const companyAdminMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.companyAdminMetaData(req.user);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Company admin meta data retrieval successfully!',
     data: result,
   });
 });
 
 const businessInstructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.businessInstructorMetaData(req.user);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
-    data: result,
+    message: 'Business Instructor meta data retrieval successfully!',
+    data: result
   });
 });
 
@@ -97,7 +97,7 @@ const employeeMetaData = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Employee meta data retrieval successfully!',
     data: result,
   });
 });
@@ -108,7 +108,7 @@ const instructorMetaData = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Instructor meta data retrieval successfully!',
     data: result,
   });
 });
@@ -119,7 +119,7 @@ const coInstructorMetaData = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Co-Instructor meta data retrieval successfully!',
     data: result,
   });
 });
@@ -129,7 +129,7 @@ const studentMetaData = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Meta data retrieval successfully!',
+    message: 'Student meta data retrieval successfully!',
     data: result,
   });
 });
