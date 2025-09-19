@@ -91,7 +91,8 @@ model User {
   quizAuthor                 QuizAttempt[]          @relation("quizAuthor")
   department                 Department[]
   invitation                 Invitation[]
-  enrolledCourse             EnrolledCourse[]
+  enrolledCourseUser         EnrolledCourse[]       @relation("EnrolledUser")
+  enrolledCourseAuthor       EnrolledCourse[]       @relation("CourseAuthor")
   certificate                Certificate[]
   wishlist                   Wishlist[]
   withdrawRequest            WithdrawRequest[]
@@ -231,7 +232,8 @@ model Company {
   courseBundle       CourseBundle[]
   event              Event[]
   businessInstructor BusinessInstructor[]
-  employees           Employee[]
+  employees          Employee[]
+  payment            Payment[]
 
   @@map("companies")
 }
@@ -695,6 +697,7 @@ model QuizAnswer {
 
 model EnrolledCourse {
   id             String         @id @default(uuid())
+  userId         String
   authorId       String
   courseId       String
   type           EnrollmentType
@@ -710,7 +713,8 @@ model EnrolledCourse {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  author User   @relation(fields: [authorId], references: [id])
+  user   User   @relation("EnrolledUser", fields: [userId], references: [id])
+  author User   @relation("CourseAuthor", fields: [authorId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
 
   // Many-to-many relation with CourseContent
@@ -1064,6 +1068,7 @@ model Payment {
   id                String           @id @default(uuid())
   userId            String
   authorId          String
+  companyId         String?
   orderId           String?
   subscriptionId    String?
   modelType         PaymentModelType
@@ -1086,6 +1091,7 @@ model Payment {
   author       User          @relation("PaymentAuthorAccount", references: [id], fields: [authorId])
   order        Order?        @relation(fields: [orderId], references: [id])
   subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+  companies    Company?      @relation(fields: [companyId], references: [id])
 
   @@map("payments")
 }

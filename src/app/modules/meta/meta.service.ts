@@ -409,7 +409,7 @@ const superAdminMetaDashboard = async (
   const { earning_year, user_year } = query;
 
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   const totalStudentCount = await prisma.user.count({
@@ -460,7 +460,7 @@ const superAdminRevenueAnalysis = async (
 ) => {
   const { earning_year } = query;
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   // --- Total Revenue ---
@@ -521,7 +521,7 @@ const superAdminEnrollmentAnalysis = async (
 ) => {
   const { earning_year } = query;
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   // --- Breakdown (reusable)
@@ -547,7 +547,7 @@ const superAdminContentAnalysis = async (
 ) => {
   const { earning_year } = query;
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   // --- Breakdown (reusable)
@@ -577,7 +577,7 @@ const superAdminUserAnalysis = async (
 ) => {
   const { earning_year } = query;
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   // --- Breakdown (reusable)
@@ -616,7 +616,7 @@ const superAdminSubscriptionAnalysis = async (
 ) => {
   const { earning_year } = query;
   if (user?.role !== UserRole.super_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   // --- Breakdown (reusable)
@@ -645,7 +645,7 @@ const superAdminSubscriptionAnalysis = async (
 
 const companyAdminMetaData = async (user: any) => {
   if (user?.role !== UserRole.company_admin) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   const company = await prisma.company.findFirst({
@@ -666,7 +666,6 @@ const companyAdminMetaData = async (user: any) => {
     where: {
       course: {
         companyId: company.id,
-        isDeleted: false,
         status: CoursesStatus.approved,
       },
       isDeleted: false,
@@ -764,7 +763,7 @@ const companyAdminMetaData = async (user: any) => {
 
 const businessInstructorMetaData = async (user: any) => {
   if (user?.role !== UserRole.business_instructors) {
-    throw new Error('Invalid user role!');
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
   const company = await prisma.company.findFirst({
@@ -776,36 +775,227 @@ const businessInstructorMetaData = async (user: any) => {
 
   const totalCourseCount = await prisma.course.count({
     where: {
+      authorId: user?.userId,
       companyId: company.id,
       status: CoursesStatus.approved,
       isDeleted: false,
     },
   });
-  const totalInstructorCount = await prisma.user.count({
-    where: { role: UserRole.instructor, isDeleted: false },
-  });
-  const totalCompanyCount = await prisma.user.count({
-    where: { role: UserRole.instructor, isDeleted: false },
+
+  const enrolledCoursesCount = await prisma.enrolledCourse.count({
+    where: {
+      course: {
+        authorId: user?.userId,
+        companyId: company.id,
+        status: CoursesStatus.approved,
+      },
+      isDeleted: false,
+    },
   });
 
-  // **Total Revenue**
+  // --- Revenue ---
   const totalRevenue = await prisma.payment.aggregate({
-    _sum: {
-      amount: true,
-    },
+    _sum: { amount: true },
     where: {
       status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
+      authorId: user.id,
+      companyId: company.id,
     },
   });
   const revenue = Math.round(totalRevenue._sum.amount ?? 0);
 
+  // --- Dates ---
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // --- Upcoming events ---
+  const upcomingEvents = await prisma.event.findMany({
+    where: {
+      companyId: company.id,
+      authorId: user.userId,
+      isDeleted: false,
+      date: { gte: today.toISOString() }, // date string compare
+    },
+    orderBy: { date: 'asc' },
+    take: 10,
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      date: true,
+      startTime: true,
+      endTime: true,
+    },
+  });
+
+  const totalUpcomingEventCount = await prisma.event.count({
+    where: {
+      companyId: company.id,
+      authorId: user.userId,
+      isDeleted: false,
+      date: { gte: today.toISOString() },
+    },
+  });
+
+  // --- Recent course activity (completed this month) ---
+  const recentCourseActivity = await prisma.enrolledCourse.findMany({
+    where: {
+      isComplete: true,
+      isDeleted: false,
+      updatedAt: { gte: startOfMonth },
+      course: { companyId: company.id },
+      authorId: user.userId,
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 10,
+    select: {
+      updatedAt: true,
+      author: { select: { id: true, name: true, email: true } },
+      course: { select: { id: true, title: true } },
+    },
+  });
+
+  const thisMonthCompletedCount = await prisma.enrolledCourse.count({
+    where: {
+      isComplete: true,
+      isDeleted: false,
+      updatedAt: { gte: startOfMonth },
+      course: { companyId: company.id },
+      authorId: user.userId,
+    },
+  });
+
   return {
     totalCourseCount,
-    totalInstructorCount,
-    totalCompanyCount,
+    enrolledCoursesCount,
     totalRevenue: revenue,
+    totalUpcomingEventCount,
+    thisMonthCompletedCount,
+    recentCourseActivity: recentCourseActivity.map(a => ({
+      courseName: a.course.title,
+      studentName: a.author.name,
+      completedAt: a.updatedAt,
+    })),
+    upcomingEvents: upcomingEvents.map(e => ({
+      title: e.title,
+      type: e.type,
+      date: e.date,
+      time: `${e.startTime} - ${e.endTime}`,
+    })),
+  };
+};
+
+const employeeMetaData = async (user: any) => {
+  if (user?.role !== UserRole.employee) {
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
+  }
+
+  // fetch enrolled courses for this user
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: { userId: user?.userId, isDeleted: false },
+    select: {
+      completedRate: true,
+      learningTime: true,
+      isComplete: true,
+      course: {
+        select: { id: true, title: true, category: true },
+      },
+    },
+  });
+
+  // total learned hours (minutes → hours)
+  const totalLearnedHours = Math.round(
+    enrolledCourses.reduce((sum, ec) => sum + ec.learningTime, 0) / 60,
+  );
+
+  // completed courses
+  const completedCourses = enrolledCourses
+    .filter(ec => ec.isComplete)
+    .map(ec => ({
+      id: ec.course.id,
+      name: ec.course.title,
+      category: ec.course.category,
+      completionRate: ec.completedRate,
+    }));
+
+  const totalCompletedCourseCount = completedCourses.length;
+
+  // in-progress courses
+  const inProgressCourses = enrolledCourses
+    .filter(ec => !ec.isComplete)
+    .map(ec => ({
+      id: ec.course.id,
+      name: ec.course.title,
+      category: ec.course.category,
+      completionRate: ec.completedRate,
+    }));
+
+  const totalInProgressCourseCount = inProgressCourses.length;
+
+  return {
+    totalCompletedCourseCount,
+    totalInProgressCourseCount,
+    totalLearnedHours,
+    completedCourses,
+    inProgressCourses,
+  };
+};
+
+const studentMetaData = async (user: any) => {
+  if (user?.role !== UserRole.student) {
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
+  }
+
+  // fetch enrolled courses for this user
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: { userId: user?.userId, isDeleted: false },
+    select: {
+      completedRate: true,
+      learningTime: true,
+      isComplete: true,
+      course: {
+        select: { id: true, title: true, category: true },
+      },
+    },
+  });
+
+  // total learned hours (minutes → hours)
+  const totalLearnedHours = Math.round(
+    enrolledCourses.reduce((sum, ec) => sum + ec.learningTime, 0) / 60,
+  );
+
+  // completed courses
+  const completedCourses = enrolledCourses
+    .filter(ec => ec.isComplete)
+    .map(ec => ({
+      id: ec.course.id,
+      name: ec.course.title,
+      category: ec.course.category,
+      completionRate: ec.completedRate,
+    }));
+
+  const totalCompletedCourseCount = completedCourses.length;
+
+  // in-progress courses
+  const inProgressCourses = enrolledCourses
+    .filter(ec => !ec.isComplete)
+    .map(ec => ({
+      id: ec.course.id,
+      name: ec.course.title,
+      category: ec.course.category,
+      completionRate: ec.completedRate,
+    }));
+
+  const totalInProgressCourseCount = inProgressCourses.length;
+
+  return {
+    totalCompletedCourseCount,
+    totalInProgressCourseCount,
+    totalLearnedHours,
+    completedCourses,
+    inProgressCourses,
   };
 };
 
@@ -818,4 +1008,6 @@ export const MetaService = {
   superAdminSubscriptionAnalysis,
   companyAdminMetaData,
   businessInstructorMetaData,
+  employeeMetaData,
+  studentMetaData,
 };
