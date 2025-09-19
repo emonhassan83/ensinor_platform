@@ -103,7 +103,7 @@ const employeeMetaData = catchAsync(async (req, res) => {
 });
 
 const instructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.instructorMetaData(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -114,7 +114,7 @@ const instructorMetaData = catchAsync(async (req, res) => {
 });
 
 const coInstructorMetaData = catchAsync(async (req, res) => {
-  const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
+  const result = await MetaService.coInstructorMetaData(req.user, req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

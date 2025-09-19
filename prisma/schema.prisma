@@ -1065,27 +1065,28 @@ model Subscription {
 }
 
 model Payment {
-  id                String           @id @default(uuid())
-  userId            String
-  authorId          String
-  companyId         String?
-  orderId           String?
-  subscriptionId    String?
-  modelType         PaymentModelType
-  type              PaymentType
-  company           CompanyType
-  transactionId     String           @unique
-  amount            Float            @default(0.00)
-  adminCommission   Float            @default(0.00)
-  instructorEarning Float            @default(0.00)
-  status            PaymentStatus    @default(unpaid)
-  paymentMethod     PaymentMethod
-  paymentIntentId   String?
-  isPaid            Boolean          @default(false)
-  isSellerPaid      Boolean          @default(false)
-  isDeleted         Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                  String           @id @default(uuid())
+  userId              String
+  authorId            String
+  companyId           String?
+  orderId             String?
+  subscriptionId      String?
+  modelType           PaymentModelType
+  type                PaymentType
+  company             CompanyType
+  transactionId       String           @unique
+  amount              Float            @default(0.00)
+  adminCommission     Float            @default(0.00)
+  instructorEarning   Float            @default(0.00)
+  coInstructorEarning Float            @default(0.00)
+  status              PaymentStatus    @default(unpaid)
+  paymentMethod       PaymentMethod
+  paymentIntentId     String?
+  isPaid              Boolean          @default(false)
+  isSellerPaid        Boolean          @default(false)
+  isDeleted           Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   account      User          @relation("PaymentUserAccount", references: [id], fields: [userId])
   author       User          @relation("PaymentAuthorAccount", references: [id], fields: [authorId])

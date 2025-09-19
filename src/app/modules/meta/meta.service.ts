@@ -147,6 +147,54 @@ const getMostEnrolledCourses = async () => {
   });
 };
 
+const getMostInstructorEnrolledCourses = async (instructorId: string) => {
+  const courses = await prisma.course.findMany({
+    where: {
+      authorId: instructorId,
+      isDeleted: false,
+      status: CoursesStatus.approved,
+      type: CourseType.external,
+    },
+    orderBy: {
+      enrollments: 'desc', // sort by enrollments
+    },
+    take: 5, // only top 5
+    select: {
+      id: true,
+      title: true,
+      thumbnail: true,
+      category: true,
+      price: true,
+      enrollments: true,
+      totalCompleted: true,
+      avgRating: true,
+      ratingCount: true,
+      instructor: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (!courses || courses.length === 0) {
+    return []; // always return array
+  }
+
+  // Calculate completionRate for each course
+  return courses.map(course => {
+    const completionRate =
+      course.enrollments > 0
+        ? Math.round((course.totalCompleted / course.enrollments) * 100)
+        : 0;
+
+    return {
+      ...course,
+      completionRate, // add field
+    };
+  });
+};
+
 const getRevenueBreakdown = async () => {
   const [courseSaleAgg, eventSaleAgg, bookSaleAgg, subscriptionSaleAgg] =
     await Promise.all([
@@ -400,6 +448,44 @@ const getSubscriptionOverview = async ({
       amount: Math.round(monthAmount),
     };
   });
+};
+
+const getInstructorEarningOverview = async (authorId: string, year: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const isCurrentYear = year === currentYear;
+
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  // only include months until current month for the active year
+  const filteredMonths = isCurrentYear
+    ? months.slice(0, now.getMonth() + 1)
+    : months;
+
+  // Query instructor earnings grouped by month
+  const earnings = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      authorId,
+      createdAt: { gte: yearStart, lte: yearEnd },
+      status: 'paid',
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { instructorEarning: true },
+  });
+
+  // Map data into chart-friendly format
+  const earningOverview = filteredMonths.map((month, index) => {
+    const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
+    return {
+      month,
+      amount: row?._sum.instructorEarning ?? 0,
+    };
+  });
+
+  return earningOverview;
 };
 
 const superAdminMetaDashboard = async (
@@ -943,6 +1029,123 @@ const employeeMetaData = async (user: any) => {
   };
 };
 
+const instructorMetaData = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  if (user?.role !== UserRole.instructor) {
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
+  }
+  const { year } = query;
+
+  const totalCourseCount = await prisma.course.count({
+    where: {
+      authorId: user?.userId,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
+  });
+
+  const enrolledCoursesCount = await prisma.enrolledCourse.count({
+    where: {
+      course: {
+        authorId: user?.userId,
+        status: CoursesStatus.approved,
+      },
+      isDeleted: false,
+    },
+  });
+
+  // --- Revenue ---
+  const totalRevenue = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: {
+      status: PaymentStatus.paid,
+      isPaid: true,
+      isDeleted: false,
+      authorId: user.id,
+    },
+  });
+  const revenue = Math.round(totalRevenue._sum.amount ?? 0);
+
+  // --- Selected Year for Chart ---
+  const selectedEarningYear = year
+    ? parseInt(year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  // --- Monthly Content Growth Overview ---
+  const earningOverview = await getInstructorEarningOverview(
+    user.userId,
+    selectedEarningYear,
+  );
+  const mostEnrolledCourses = await getMostInstructorEnrolledCourses(
+    user.userId,
+  );
+
+  return {
+    totalCourseCount,
+    enrolledCoursesCount,
+    totalRevenue: revenue,
+    earningOverview,
+    mostEnrolledCourses,
+  };
+};
+
+const coInstructorMetaData = async (
+  user: any,
+  query: Record<string, unknown>,
+) => {
+  if (
+    user?.role !== UserRole.instructor ||
+    user.role !== UserRole.business_instructors
+  ) {
+    throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
+  }
+  const { year } = query;
+
+  const totalCourseCount = await prisma.course.count({
+    where: {
+      authorId: user?.userId,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
+  });
+
+  // --- Revenue ---
+  const totalRevenue = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: {
+      status: PaymentStatus.paid,
+      isPaid: true,
+      isDeleted: false,
+      authorId: user.id,
+    },
+  });
+  const revenue = Math.round(totalRevenue._sum.amount ?? 0);
+
+  // --- Selected Year for Chart ---
+  const selectedEarningYear = year
+    ? parseInt(year as string, 10) || new Date().getFullYear()
+    : new Date().getFullYear();
+
+  // --- Monthly Content Growth Overview ---
+  const earningOverview = await getInstructorEarningOverview(
+    user.userId,
+    selectedEarningYear,
+  );
+
+    const mostEnrolledCourses = await getMostInstructorEnrolledCourses(
+    user.userId,
+  );
+
+  return {
+    totalCourseCount,
+    totalRevenue: revenue,
+    earningOverview,
+    mostEnrolledCourses
+  };
+};
+
 const studentMetaData = async (user: any) => {
   if (user?.role !== UserRole.student) {
     throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
@@ -1009,5 +1212,7 @@ export const MetaService = {
   companyAdminMetaData,
   businessInstructorMetaData,
   employeeMetaData,
+  instructorMetaData,
+  coInstructorMetaData,
   studentMetaData,
 };
