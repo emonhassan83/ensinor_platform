@@ -17,6 +17,7 @@ export const hashedPassword = async (password: string): Promise<string> => {
   }
 };
 
+// User Status Change Notification → Admin
 export const sendUserStatusNotifYToAdmin = async (
   status: 'active' | 'blocked',
   user: Partial<User>,
@@ -45,6 +46,45 @@ export const sendUserStatusNotifYToAdmin = async (
   });
 };
 
+// Invitation Notification (companyAdmin → employee/instructor/student)
+export const sendInvitationNotification = async (
+  receiverId: string,
+  role: 'company_admin' | 'instructor' | 'student',
+) => {
+  const admin = await findAdmin();
+  if (!admin) throw new Error('Super admin not found!');
+
+  const message = messages.userManagement.invitationSent;
+  const description = `${admin?.name} has invited you to join as a ${role}.`;
+
+  await NotificationService.createNotificationIntoDB({
+    receiverId,
+    message,
+    description,
+    modeType: NotificationModeType.users,
+  });
+};
+
+// Notify Admin when new Instructor Request comes
+export const sendInstructorRequestNotification = async (
+  user: Partial<User>,
+  type: 'instructor',
+) => {
+  const admin = await findAdmin();
+  if (!admin) throw new Error('Super admin not found!');
+
+  const message = messages.userManagement.joinRequest;
+  const description = `User ${user?.name} (ID: ${user?.id}) has requested to become a ${type}.`;
+
+  await NotificationService.createNotificationIntoDB({
+    receiverId: admin?.id,
+    message,
+    description,
+    modeType: NotificationModeType.users,
+  });
+};
+
+// User Status Change Notification → User
 export const sendUserStatusNotifYToUser = async (
   status: 'active' | 'blocked',
   user: Partial<User>,

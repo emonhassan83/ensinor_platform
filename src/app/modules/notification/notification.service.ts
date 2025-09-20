@@ -12,8 +12,8 @@ import { INotification } from './notification.interface';
 const createNotificationIntoDB = async (payload: INotification) => {
   const notification = await prisma.notification.create({
      data: {
-      receiverId: payload.receiver,
-      referenceId: payload.reference,
+      receiverId: payload.receiverId,
+      referenceId: payload.referenceId,
       modeType: payload.modeType,
       message: payload.message,
       description: payload?.description ?? '',
@@ -26,7 +26,7 @@ const createNotificationIntoDB = async (payload: INotification) => {
   //@ts-ignore
   const io = global?.socketio;
   if (io) {
-    const ver = 'notification::' + payload?.receiver;
+    const ver = 'notification::' + payload?.receiverId;
     io.emit(ver, { ...payload, createdAt: moment().format('YYYY-MM-DD') });
   }
 

@@ -1,7 +1,7 @@
 import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
-import { hashedPassword } from './user.utils';
+import { hashedPassword, sendInvitationNotification } from './user.utils';
 import {
   IBusinessInstructor,
   ICompanyAdmin,
@@ -159,6 +159,7 @@ const invitationCompanyAdmin = async (
     await sendCompanyApprovalEmail(user.email, user.name, password);
 
     // 4️⃣ Send notify to invitee
+    await sendInvitationNotification(user.id, "company_admin")
 
     return user;
   });
