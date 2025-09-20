@@ -1,7 +1,13 @@
 import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
-import { hashedPassword, sendInvitationNotification } from './user.utils';
+import {
+  hashedPassword,
+  sendInstructorRequestNotification,
+  sendInvitationNotification,
+  sendUserStatusNotifYToAdmin,
+  sendUserStatusNotifYToUser,
+} from './user.utils';
 import {
   IBusinessInstructor,
   ICompanyAdmin,
@@ -15,7 +21,7 @@ import {
 import { userSearchableFields } from './user.constant';
 import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IGenericResponse } from '../../interfaces/common';
+import { IGenericResponse, ILogUser } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
 import {
@@ -112,9 +118,25 @@ const registerAUser = async (
 
 const invitationCompanyAdmin = async (
   payload: ICompanyAdmin,
+  userId: string,
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      role: UserRole.super_admin,
+      status: UserStatus.active,
+      isDeleted: false
+    }
+  })
+  if (!author) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Invitee author not found!',
+    );
+  }
 
   const result = await prisma.$transaction(async transactionClient => {
     // 1️⃣ Create User
@@ -159,7 +181,7 @@ const invitationCompanyAdmin = async (
     await sendCompanyApprovalEmail(user.email, user.name, password);
 
     // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(user.id, "company_admin")
+    await sendInvitationNotification(author, user.id, 'company_admin');
 
     return user;
   });
@@ -250,10 +272,15 @@ const createBusinessInstructor = async (
       password,
     );
 
+    // 4️⃣ Send notify to invitee
+    await sendInvitationNotification(
+      company,
+      userData.id,
+      'business-instructor',
+    );
+
     return userData;
   });
-
-  // sent notify to invitee user
 
   return result;
 };
@@ -361,6 +388,9 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
       company.companyAdmin!.user.name,
     );
 
+    // 4️⃣ Send notify to invitee
+    await sendInvitationNotification(company, user.id, 'employee');
+
     return user;
   });
 
@@ -414,7 +444,8 @@ const createInstructor = async (
     // 4️⃣ Send email with credentials
     await sendInstructorRequestEmail(user.email, user.name, password);
 
-    // sent user invitee notify
+    // sent admin tp invitee notify
+    await sendInstructorRequestNotification(user, 'instructor');
 
     return user;
   });
@@ -424,9 +455,25 @@ const createInstructor = async (
 
 const invitationInstructor = async (
   payload: IInstructor,
+  userId: string,
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      role: UserRole.super_admin,
+      status: UserStatus.active,
+      isDeleted: false
+    }
+  })
+  if (!author) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Invitee author not found!',
+    );
+  }
 
   const isExist = await prisma.user.findFirst({
     where: {
@@ -470,15 +517,36 @@ const invitationInstructor = async (
     // 4️⃣ Send email with credentials
     await sendInstructorInvitationEmail(user.email, user.name, password);
 
+    // 4️⃣ Send notify to invitee
+    await sendInvitationNotification(author, user.id, 'instructor');
+
     return user;
   });
 
   return result;
 };
 
-const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
+const createStudent = async (
+  payload: IStudent,
+  userId: string,
+): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
+
+  const author = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      role: UserRole.super_admin,
+      status: UserStatus.active,
+      isDeleted: false
+    }
+  })
+  if (!author) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Invitee author not found!',
+    );
+  }
 
   const isExist = await prisma.user.findFirst({
     where: {
@@ -522,7 +590,8 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
     // 4️⃣ Send email with credentials
     await sendStudentInvitationEmail(user.email, user.name, password);
 
-    // sent notify to invitee
+    // 4️⃣ Send notify to invitee
+    await sendInvitationNotification(author, user.id, 'student');
 
     return user;
   });
@@ -626,7 +695,7 @@ const geUserById = async (userId: string) => {
       lastActive: true,
       isDeleted: true,
       createdAt: true,
-      updatedAt: true
+      updatedAt: true,
     },
   });
 
@@ -643,8 +712,8 @@ const geUserById = async (userId: string) => {
         userId: userData.id,
       },
       include: {
-        company: true
-      }
+        company: true,
+      },
     });
   } else if (userData?.role === UserRole.business_instructors) {
     profileData = await prisma.businessInstructor.findUnique({
@@ -652,8 +721,8 @@ const geUserById = async (userId: string) => {
         userId: userData.id,
       },
       include: {
-        company: true
-      }
+        company: true,
+      },
     });
   } else if (userData?.role === UserRole.employee) {
     profileData = await prisma.employee.findUnique({
@@ -662,8 +731,8 @@ const geUserById = async (userId: string) => {
       },
       include: {
         company: true,
-        department: true
-      }
+        department: true,
+      },
     });
   } else if (userData?.role === UserRole.student) {
     profileData = await prisma.student.findUnique({
@@ -798,6 +867,9 @@ const changeProfileStatus = async (
   });
 
   // 🎯 Send email and notification based on status
+  await sendUserStatusNotifYToAdmin(status, user)
+  await sendUserStatusNotifYToUser(status, user)
+
   if (status === UserStatus.active) {
     await sendUserActiveEmail(user.email, user.name);
   } else if (status === UserStatus.denied) {

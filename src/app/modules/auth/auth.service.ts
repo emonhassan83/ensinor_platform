@@ -4,6 +4,7 @@ import config from '../../config';
 import { JwtPayload } from 'jsonwebtoken';
 import emailSender from '../../utils/emailSender';
 import {
+  authNotify,
   // authNotifyAdmin,
   createToken,
   TExpiresIn,
@@ -579,8 +580,8 @@ const changePassword = async (
     );
   }
 
-  // Send a notification to the admin informing them about the successful password change
-  // user?.role === UserRole.super_admin  && (await authNotifyAdmin('PASSWORD_CHANGE'))
+  // Send a notification to the user password change
+  await authNotify('PASSWORD_CHANGE', user);
 };
 
 const refreshToken = async (token: string) => {
@@ -739,8 +740,8 @@ const resetPassword = async (
     );
   }
 
-  // Send a notification to the admin informing them about the password reset
-  // user?.role === UserRole.super_admin && (await authNotifyAdmin('PASSWORD_RESET'))
+  // Send a notification to user about the password reset
+  await authNotify('PASSWORD_RESET', user);
 };
 
 export const AuthServices = {

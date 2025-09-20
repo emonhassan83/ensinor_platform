@@ -1605,8 +1605,8 @@ enum ReviewModelType {
 }
 
 enum NotificationModeType {
-  courses
   users
+  courses
   quiz
   orders
   payments

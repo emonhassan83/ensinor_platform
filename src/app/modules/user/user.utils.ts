@@ -19,7 +19,7 @@ export const hashedPassword = async (password: string): Promise<string> => {
 
 // User Status Change Notification → Admin
 export const sendUserStatusNotifYToAdmin = async (
-  status: 'active' | 'blocked',
+  status: "active" | "pending" | "denied" | "blocked" | "deleted",
   user: Partial<User>,
 ) => {
   const admin = await findAdmin();
@@ -48,14 +48,12 @@ export const sendUserStatusNotifYToAdmin = async (
 
 // Invitation Notification (companyAdmin → employee/instructor/student)
 export const sendInvitationNotification = async (
+  sender: any,
   receiverId: string,
-  role: 'company_admin' | 'instructor' | 'student',
+  role: 'company_admin' | 'business-instructor' | 'employee' | 'instructor' | 'student',
 ) => {
-  const admin = await findAdmin();
-  if (!admin) throw new Error('Super admin not found!');
-
   const message = messages.userManagement.invitationSent;
-  const description = `${admin?.name} has invited you to join as a ${role}.`;
+  const description = `${sender?.name} has invited you to join as a ${role}.`;
 
   await NotificationService.createNotificationIntoDB({
     receiverId,
@@ -86,7 +84,7 @@ export const sendInstructorRequestNotification = async (
 
 // User Status Change Notification → User
 export const sendUserStatusNotifYToUser = async (
-  status: 'active' | 'blocked',
+  status: "active" | "pending" | "denied" | "blocked" | "deleted",
   user: Partial<User>,
 ) => {
   // Determine the message and description based on the status

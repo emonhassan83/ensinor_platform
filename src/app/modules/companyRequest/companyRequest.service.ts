@@ -15,11 +15,13 @@ import { companyRequestSearchAbleFields } from './companyRequest.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
-import {
-  hashedPassword,
-} from '../user/user.utils';
+import { hashedPassword } from '../user/user.utils';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
-import { sendCompanyApprovalEmail, sendCompanyDenialEmail } from '../../utils/email/sentCompanyStatusEmail';
+import {
+  sendCompanyApprovalEmail,
+  sendCompanyDenialEmail,
+} from '../../utils/email/sentCompanyStatusEmail';
+import { sendNotifYToAdmin, sendNotifYToUser } from './companyRequest.utils';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   const user = await prisma.user.findUnique({
@@ -29,7 +31,7 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
       isDeleted: false,
     },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
@@ -81,6 +83,7 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
   }
 
   // here sent notify to admin
+  await sendNotifYToAdmin(user);
 
   return result;
 };
@@ -219,15 +222,15 @@ const updateIntoDB = async (
           verification: {
             create: { otp: '', expiresAt: null, status: true },
           },
-          status: UserStatus.active
+          status: UserStatus.active,
         },
         select: {
           id: true,
           name: true,
-          email:true,
+          email: true,
           photoUrl: true,
-          status: true
-        }
+          status: true,
+        },
       });
 
       const companyAdmin = await transactionClient.companyAdmin.create({
@@ -278,6 +281,9 @@ const updateIntoDB = async (
     },
   });
 
+  // sent notification to user
+  await sendNotifYToUser(status, result.userId);
+
   return result;
 };
 
@@ -296,7 +302,8 @@ const deleteFromDB = async (id: string): Promise<CompanyRequest> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
 
-  // sent to notify to invitee user
+  // sent notification to user
+  await sendNotifYToUser('deleted', result.userId);
 
   return result;
 };

@@ -1,9 +1,8 @@
 export const notificationSearchableFields: string[] = ['message'];
 export const notificationFilterableFields: string[] = ['searchTerm'];
 
-
 export const messages = {
-  adminProfile: {
+  authSettings: {
     passwordChanged: 'Password changed successfully.',
     passwordReset: 'Password Reset Processed',
     passwordForgot: 'Password Forgot Processed',
@@ -16,10 +15,11 @@ export const messages = {
     joinRequest: 'Invitation sent',
   },
 
-  galleryLock: {
-    keyAdded: 'Your journal is now protected.',
-    keyUpdated: 'Journal key updated successfully.',
-    keyDeleted: 'Journal key deleted successfully.',
+  companyRequest: {
+    add: 'New company request added.',
+    approved: 'Company request approved.',
+    rejected: 'Company request rejected.',
+    deleted: 'Company request deleted.',
   },
 
   purityMeter: {
@@ -38,11 +38,11 @@ export const messages = {
 
   subscription: {
     newPlan: 'New subscription plan added.',
-    warningForPlan: "Alert for add new plan"
+    warningForPlan: 'Alert for add new plan',
   },
 
   paymentManagement: {
     paymentSuccess: 'Payment was successful!',
     paymentRefunded: 'Payment refunded successfully.',
   },
-}
+};

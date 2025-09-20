@@ -22,3 +22,11 @@ export type IAuthUser = {
   role: UserRole,
   email: string
 } | null
+
+export type ILogUser = {
+  userId: string;
+  email: string;
+  role: UserRole;
+  iat: number; 
+  exp: number;
+} | null

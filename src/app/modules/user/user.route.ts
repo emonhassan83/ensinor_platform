@@ -36,8 +36,6 @@ router.post(
 router.post(
   '/employee-invitation',
   auth(UserRole.company_admin),
-  upload.single('image'),
-  parseData(),
   validateRequest(UserValidation.createEmployee),
   UserController.createEmployee,
 );
