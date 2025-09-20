@@ -29,12 +29,12 @@ import {
   sendInstructorRequestEmail,
 } from '../../utils/email/sentInstructorEmail';
 import { sendStudentInvitationEmail } from '../../utils/email/sentStudentInvitation';
+import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 
 const registerAUser = async (
   payload: IRegisterUser,
 ): Promise<IUserResponse> => {
   const { password, confirmPassword, user } = payload;
-
   if (password !== confirmPassword) {
     throw new ApiError(
       httpStatus.CONFLICT,
@@ -158,6 +158,8 @@ const invitationCompanyAdmin = async (
     // 4️⃣ Send email with credentials
     await sendCompanyApprovalEmail(user.email, user.name, password);
 
+    // 4️⃣ Send notify to invitee
+
     return user;
   });
 
@@ -173,14 +175,28 @@ const createBusinessInstructor = async (
 
   const company = await prisma.user.findFirst({
     where: {
-      id: businessInstructor.company,
+      id: businessInstructor.authorId,
       role: UserRole.company_admin,
       status: UserStatus.active,
       isDeleted: false,
     },
+    select: {
+      companyAdmin: {
+        select: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!company) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Company not found or deleted!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Company admin not found or deleted!',
+    );
   }
 
   const isExist = await prisma.user.findFirst({
@@ -221,7 +237,7 @@ const createBusinessInstructor = async (
       data: {
         userId: userData.id,
         authorId: businessInstructor.authorId,
-        companyId: company.id,
+        companyId: company.companyAdmin!.company!.id,
         designation: businessInstructor.designation,
       },
     });
@@ -236,26 +252,91 @@ const createBusinessInstructor = async (
     return userData;
   });
 
+  // sent notify to invitee user
+
   return result;
 };
 
 const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
-  const hashPassword = await hashedPassword(payload.password);
+  const { user: userPayload, employee } = payload;
+  const password = generateDefaultPassword(12);
+  const hashPassword = await hashedPassword(password);
+
+  const company = await prisma.user.findFirst({
+    where: {
+      id: employee.authorId,
+      role: UserRole.company_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+    select: {
+      companyAdmin: {
+        select: {
+          user: {
+            select: {
+              name: true,
+            },
+          },
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!company) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Company admin not found or deleted!',
+    );
+  }
+
+  const department = await prisma.department.findFirst({
+    where: {
+      id: employee.departmentId,
+      authorId: employee.authorId,
+      isDeleted: false,
+    },
+  });
+  if (!department) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Department not found or deleted!',
+    );
+  }
+
+  const isExist = await prisma.user.findFirst({
+    where: {
+      email: payload.user.email,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (isExist) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'This email already exist in this platform!',
+    );
+  }
 
   const result = await prisma.$transaction(async transactionClient => {
     const user = await transactionClient.user.create({
       data: {
-        name: payload.user.name,
-        email: payload.user.email,
+        name: userPayload.name,
+        email: userPayload.email,
         password: hashPassword,
         role: UserRole.employee,
         registerWith: RegisterWith.credentials,
+        status: UserStatus.active,
         // Create verification record at the same time
         verification: {
           create: {
             otp: '',
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // now + 30 min
-            status: false,
+            expiresAt: null,
+            status: true,
           },
         },
       },
@@ -264,11 +345,20 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
     await transactionClient.employee.create({
       data: {
         userId: user.id,
-        authorId: payload.employee.author,
-        companyId: payload.employee.company,
-        departmentId: payload.employee.department,
+        authorId: employee.authorId,
+        companyId: company.companyAdmin!.company!.id,
+        departmentId: employee.departmentId,
       },
     });
+
+    // 4️⃣ Send email with credentials
+    await sendEmployeeInvitationEmail(
+      user.email,
+      user.name,
+      password,
+      company.companyAdmin!.company!.name,
+      company.companyAdmin!.user.name,
+    );
 
     return user;
   });
@@ -284,7 +374,7 @@ const createInstructor = async (
 
   const isExist = await prisma.user.findFirst({
     where: {
-      email: payload.user.email
+      email: payload.user.email,
     },
   });
   if (isExist) {
@@ -302,7 +392,6 @@ const createInstructor = async (
         password: hashPassword,
         role: UserRole.instructor,
         registerWith: RegisterWith.credentials,
-        status: UserStatus.active,
         // Create verification record at the same time
         verification: {
           create: {
@@ -324,6 +413,8 @@ const createInstructor = async (
     // 4️⃣ Send email with credentials
     await sendInstructorRequestEmail(user.email, user.name, password);
 
+    // sent user invitee notify
+
     return user;
   });
 
@@ -338,7 +429,7 @@ const invitationInstructor = async (
 
   const isExist = await prisma.user.findFirst({
     where: {
-      email: payload.user.email
+      email: payload.user.email,
     },
   });
   if (isExist) {
@@ -390,7 +481,7 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
 
   const isExist = await prisma.user.findFirst({
     where: {
-      email: payload.user.email
+      email: payload.user.email,
     },
   });
   if (isExist) {
@@ -408,7 +499,7 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
         password: hashPassword,
         role: UserRole.student,
         registerWith: RegisterWith.credentials,
-         status: UserStatus.active,
+        status: UserStatus.active,
         // Create verification record at the same time
         verification: {
           create: {
@@ -430,51 +521,12 @@ const createStudent = async (payload: IStudent): Promise<IUserResponse> => {
     // 4️⃣ Send email with credentials
     await sendStudentInvitationEmail(user.email, user.name, password);
 
+    // sent notify to invitee
+
     return user;
   });
 
   return result;
-};
-
-const changeProfileStatus = async (
-  userId: string,
-  payload: { status: UserStatus },
-) => {
-  const { status } = payload;
-
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-  });
-  if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data: { status },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      photoUrl: true,
-      role: true,
-      status: true,
-      isDeleted: true,
-    },
-  });
-
-  // 🎯 Send email based on status
-  if (status === UserStatus.active) {
-    await sendUserActiveEmail(user.email, user.name);
-  } else if (status === UserStatus.denied) {
-    await sendUserDeniedEmail(user.email, user.name);
-  }
-
-  return updatedUser;
 };
 
 const getAllUser = async (
@@ -573,7 +625,7 @@ const geUserById = async (userId: string) => {
       lastActive: true,
       isDeleted: true,
       createdAt: true,
-      updatedAt: true,
+      updatedAt: true
     },
   });
 
@@ -589,18 +641,28 @@ const geUserById = async (userId: string) => {
       where: {
         userId: userData.id,
       },
+      include: {
+        company: true
+      }
     });
   } else if (userData?.role === UserRole.business_instructors) {
     profileData = await prisma.businessInstructor.findUnique({
       where: {
         userId: userData.id,
       },
+      include: {
+        company: true
+      }
     });
   } else if (userData?.role === UserRole.employee) {
     profileData = await prisma.employee.findUnique({
       where: {
         userId: userData.id,
       },
+      include: {
+        company: true,
+        department: true
+      }
     });
   } else if (userData?.role === UserRole.student) {
     profileData = await prisma.student.findUnique({
@@ -700,6 +762,48 @@ const updateAProfile = async (userId: string, payload: any) => {
     ...updateUser,
     ...profileData,
   };
+};
+
+const changeProfileStatus = async (
+  userId: string,
+  payload: { status: UserStatus },
+) => {
+  const { status } = payload;
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+      isDeleted: false,
+    },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: { status },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      photoUrl: true,
+      role: true,
+      status: true,
+      isDeleted: true,
+    },
+  });
+
+  // 🎯 Send email and notification based on status
+  if (status === UserStatus.active) {
+    await sendUserActiveEmail(user.email, user.name);
+  } else if (status === UserStatus.denied) {
+    await sendUserDeniedEmail(user.email, user.name);
+  }
+
+  return updatedUser;
 };
 
 const deleteAProfile = async (userId: string) => {

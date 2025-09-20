@@ -9,16 +9,17 @@ export const messages = {
     passwordForgot: 'Password Forgot Processed',
   },
 
+  userManagement: {
+    accountActivated: 'User account activated.',
+    accountDeactivated: 'User account deactivated.',
+    invitationSent: 'Invitation sent',
+    joinRequest: 'Invitation sent',
+  },
+
   galleryLock: {
     keyAdded: 'Your journal is now protected.',
     keyUpdated: 'Journal key updated successfully.',
     keyDeleted: 'Journal key deleted successfully.',
-  },
-
-  userManagement: {
-    createAccount: 'User account created.',
-    accountActivated: 'User account activated.',
-    accountDeactivated: 'User account deactivated.',
   },
 
   purityMeter: {

@@ -60,13 +60,12 @@ export type IBusinessInstructor = {
   };
   businessInstructor: {
     authorId: string;
-    company: string;
+    companyId: string;
     designation: string;
   };
 };
 
 export type IEmployee = {
-  password: string;
   user: {
     name: string;
     email: string;
@@ -78,9 +77,9 @@ export type IEmployee = {
     photoUrl?: string;
   };
   employee: {
-    author: string;
-    company: string;
-    department: string;
+    authorId: string;
+    companyId: string;
+    departmentId: string;
   };
 };
 

@@ -31,12 +31,6 @@ const registerAUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 const invitationCompanyAdmin = catchAsync(async (req: Request, res: Response) => {
-  if (req?.file) {
-    req.body.photoUrl = await uploadToS3({
-      file: req.file,
-      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    });
-  }
   const result = await UserServices.invitationCompanyAdmin(req.body);
   const { id, name, email, photoUrl, contactNo, status } = result;
 
@@ -57,13 +51,6 @@ const invitationCompanyAdmin = catchAsync(async (req: Request, res: Response) =>
 
 const createBusinessInstructor = catchAsync(
   async (req: Request, res: Response) => {
-    if (req?.file) {
-      req.body.photoUrl = await uploadToS3({
-        file: req.file,
-        fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-      });
-    }
-
     const result = await UserServices.createBusinessInstructor(req.body);
     const { id, name, email, photoUrl, contactNo, status } = result;
     sendResponse(res, {
@@ -94,13 +81,6 @@ const createEmployee = catchAsync(async (req: Request, res: Response) => {
 });
 
 const createInstructor = catchAsync(async (req: Request, res: Response) => {
-  if (req?.file) {
-    req.body.photoUrl = await uploadToS3({
-      file: req.file,
-      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    });
-  }
-
   const result = await UserServices.createInstructor(req.body);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
@@ -112,13 +92,6 @@ const createInstructor = catchAsync(async (req: Request, res: Response) => {
 });
 
 const invitationInstructor = catchAsync(async (req: Request, res: Response) => {
-  if (req?.file) {
-    req.body.photoUrl = await uploadToS3({
-      file: req.file,
-      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    });
-  }
-
   const result = await UserServices.invitationInstructor(req.body);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
@@ -130,13 +103,6 @@ const invitationInstructor = catchAsync(async (req: Request, res: Response) => {
 });
 
 const createStudent = catchAsync(async (req: Request, res: Response) => {
-  if (req?.file) {
-    req.body.photoUrl = await uploadToS3({
-      file: req.file,
-      fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
-    });
-  }
-
   const result = await UserServices.createStudent(req.body);
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {

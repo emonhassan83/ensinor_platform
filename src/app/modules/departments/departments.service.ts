@@ -18,7 +18,7 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
       isDeleted: false,
     },
   });
-  if (!author || author?.isDeleted) {
+  if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 

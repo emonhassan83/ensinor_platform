@@ -488,6 +488,51 @@ const getInstructorEarningOverview = async (authorId: string, year: number) => {
   return earningOverview;
 };
 
+const getCoInstructorEarningOverview = async (coInstructorId: string, year: number) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const isCurrentYear = year === currentYear;
+
+  const yearStart = startOfYear(new Date(year, 0, 1));
+  const yearEnd = endOfYear(new Date(year, 11, 31));
+
+  const filteredMonths = isCurrentYear
+    ? months.slice(0, now.getMonth() + 1)
+    : months;
+
+  // Find co instructor invitee course
+  const coInstructorCourses = await prisma.coInstructor.findMany({
+    where: { coInstructorId, isDeleted: false, isActive: true },
+    select: { courseId: true },
+  });
+  const courseIds = coInstructorCourses.map(c => c.courseId);
+
+  // earning data group by month
+  const earnings = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    where: {
+      isPaid: true,
+      isDeleted: false,
+      coInstructorEarning: { gt: 0 },
+      createdAt: { gte: yearStart, lte: yearEnd },
+      order: {
+        courseId: { in: courseIds },
+      },
+    },
+    _sum: { coInstructorEarning: true },
+  });
+
+  const earningOverview = filteredMonths.map((month, index) => {
+    const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
+    return {
+      month,
+      amount: row?._sum.coInstructorEarning ?? 0,
+    };
+  });
+
+  return earningOverview;
+};
+
 const superAdminMetaDashboard = async (
   user: any,
   query: Record<string, unknown>,
@@ -1103,25 +1148,38 @@ const coInstructorMetaData = async (
   }
   const { year } = query;
 
-  const totalCourseCount = await prisma.course.count({
+  const totalCourseCount = await prisma.coInstructor.count({
     where: {
-      authorId: user?.userId,
-      status: CoursesStatus.approved,
+      coInstructorId: user.id,
       isDeleted: false,
+      isActive: true,
+      course: {
+        status: CoursesStatus.approved,
+        isDeleted: false,
+      },
     },
   });
 
   // --- Revenue ---
   const totalRevenue = await prisma.payment.aggregate({
-    _sum: { amount: true },
+    _sum: { coInstructorEarning: true },
     where: {
-      status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
-      authorId: user.id,
+      coInstructorEarning: { gt: 0 },
+      order: {
+        courseId: {
+          in: (
+            await prisma.coInstructor.findMany({
+              where: { coInstructorId: user.id, isDeleted: false },
+              select: { courseId: true },
+            })
+          ).map(c => c.courseId),
+        },
+      },
     },
   });
-  const revenue = Math.round(totalRevenue._sum.amount ?? 0);
+  const revenue = Math.round(totalRevenue._sum.coInstructorEarning ?? 0);
 
   // --- Selected Year for Chart ---
   const selectedEarningYear = year
@@ -1129,20 +1187,51 @@ const coInstructorMetaData = async (
     : new Date().getFullYear();
 
   // --- Monthly Content Growth Overview ---
-  const earningOverview = await getInstructorEarningOverview(
+  const earningOverview = await getCoInstructorEarningOverview(
     user.userId,
     selectedEarningYear,
   );
 
-    const mostEnrolledCourses = await getMostInstructorEnrolledCourses(
-    user.userId,
-  );
+  const mostEnrolledCourses = await prisma.course.findMany({
+    where: {
+      id: {
+        in: (
+          await prisma.coInstructor.findMany({
+            where: { coInstructorId: user.id, isDeleted: false },
+            select: { courseId: true },
+          })
+        ).map(c => c.courseId),
+      },
+      isDeleted: false,
+      status: CoursesStatus.approved,
+    },
+    orderBy: {
+      enrollments: 'desc',
+    },
+    take: 5,
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      enrollments: true,
+      instructor: {
+        select: {
+          name: true,
+        },
+      },
+      coInstructor: {
+        select: {
+          permissions: true,
+        },
+      },
+    },
+  });
 
   return {
     totalCourseCount,
     totalRevenue: revenue,
     earningOverview,
-    mostEnrolledCourses
+    mostEnrolledCourses,
   };
 };
 

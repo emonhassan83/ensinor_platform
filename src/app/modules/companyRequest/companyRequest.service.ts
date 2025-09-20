@@ -79,6 +79,9 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
       'Company request creation failed!',
     );
   }
+
+  // here sent notify to admin
+
   return result;
 };
 
@@ -190,7 +193,6 @@ const updateIntoDB = async (
     where: { id },
     include: { user: true },
   });
-
   if (!request) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
@@ -245,6 +247,7 @@ const updateIntoDB = async (
 
       return updatedRequest;
     });
+    // sent to notification to invitee user
 
     return result;
   }
@@ -292,6 +295,8 @@ const deleteFromDB = async (id: string): Promise<CompanyRequest> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
+
+  // sent to notify to invitee user
 
   return result;
 };

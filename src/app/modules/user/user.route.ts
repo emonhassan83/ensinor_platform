@@ -22,8 +22,6 @@ router.post(
 router.post(
   '/company-admin-invitation',
   auth(UserRole.super_admin),
-  upload.single('image'),
-  parseData(),
   validateRequest(UserValidation.createCompanyAdmin),
   UserController.invitationCompanyAdmin,
 );
@@ -31,15 +29,13 @@ router.post(
 router.post(
   '/business-instructor-invitation',
   auth(UserRole.company_admin),
-  upload.single('image'),
-  parseData(),
   validateRequest(UserValidation.createBusinessInstructor),
   UserController.createBusinessInstructor,
 );
 
 router.post(
-  '/employee',
-  auth(UserRole.super_admin),
+  '/employee-invitation',
+  auth(UserRole.company_admin),
   upload.single('image'),
   parseData(),
   validateRequest(UserValidation.createEmployee),
@@ -61,8 +57,6 @@ router.post(
 
 router.post(
   '/student-invitation',
-  upload.single('image'),
-  parseData(),
   validateRequest(UserValidation.createStudent),
   UserController.createStudent,
 );

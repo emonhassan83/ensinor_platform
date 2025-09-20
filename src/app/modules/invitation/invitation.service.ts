@@ -21,7 +21,7 @@ import { hashedPassword } from '../user/user.utils';
 import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 
 const insertIntoDB = async (payload: IInvitation) => {
-  const { userId, departmentId, companyId, name, email } = payload;
+  const { userId, departmentId, name, email } = payload;
 
   // 1. Check if inviter (company admin) exists
   const inviter = await prisma.user.findFirst({
@@ -33,6 +33,7 @@ const insertIntoDB = async (payload: IInvitation) => {
         select: {
           company: {
             select: {
+              id: true,
               name: true,
             },
           },
@@ -99,7 +100,7 @@ const insertIntoDB = async (payload: IInvitation) => {
       data: {
         userId: newUser.id,
         authorId: inviter.id,
-        companyId: companyId,
+        companyId: inviter.companyAdmin!.company!.id,
         departmentId: departmentId,
       },
     });
@@ -124,11 +125,13 @@ const insertIntoDB = async (payload: IInvitation) => {
     },
   });
 
+  // sent the notify to invitee user
+
   return result;
 };
 
 const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
-  const { userId,companyId, departmentId, emails, groupName } = payload;
+  const { userId, departmentId, emails, groupName } = payload;
 
   // 1. Validate inviter
   const inviter = await prisma.user.findFirst({
@@ -195,7 +198,7 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
         data: {
           userId: user.id,
           authorId: inviter.id,
-          companyId: companyId,
+          companyId: inviter.companyAdmin!.company!.id,
           departmentId,
         },
       });
@@ -210,7 +213,15 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       ).catch(console.error);
 
       invitedEmployees.push({ user, employee });
+
+      // sent all user to sent notify
     }
+
+    // Increment department joined count
+    await tx.department.update({
+      where: { id: departmentId },
+      data: { joined: { increment: emails.length } },
+    });
 
     return invitedEmployees;
   });
