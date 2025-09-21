@@ -125,7 +125,14 @@ const insertIntoDB = async (payload: IInvitation) => {
     },
   });
 
-  // sent the notify to invitee user
+  // here updated company info
+  await prisma.company.update({
+    where: { id: inviter.companyAdmin!.company!.id },
+    data: {
+      employee: { increment: 1 },
+      size: { increment: 1 },
+    },
+  });
 
   return result;
 };
@@ -213,14 +220,21 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       ).catch(console.error);
 
       invitedEmployees.push({ user, employee });
-
-      // sent all user to sent notify
     }
 
     // Increment department joined count
     await tx.department.update({
       where: { id: departmentId },
       data: { joined: { increment: emails.length } },
+    });
+
+    // here updated company info
+    await prisma.company.update({
+      where: { id: inviter.companyAdmin!.company!.id },
+      data: {
+        employee: { increment: emails.length },
+        size: { increment: emails.length },
+      },
     });
 
     return invitedEmployees;

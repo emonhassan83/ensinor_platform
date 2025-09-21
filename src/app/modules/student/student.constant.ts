@@ -1,3 +1,3 @@
 export const studentSearchAbleFields = [''];
 
-export const studentFilterableFields = ['searchTerm'];
+export const studentFilterableFields = ['searchTerm', 'status'];

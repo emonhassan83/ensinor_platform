@@ -167,10 +167,7 @@ const invitationCompanyAdmin = async (
       data: {
         userId: companyAdmin.id, // relation: Company → CompanyAdmin.id
         name: payload.name,
-        industryType: payload.companyType,
-        size: payload.companySize,
-        employee: payload.numberOfPeopleToTrain,
-        instructor: payload.trainingNeeds,
+        industryType: payload.companyType
       },
     });
 
@@ -259,6 +256,15 @@ const createBusinessInstructor = async (
         authorId: businessInstructor.authorId,
         companyId: company.companyAdmin!.company!.id,
         designation: businessInstructor.designation,
+      },
+    });
+
+    // here updated company info
+    await prisma.company.update({
+      where: { id: company.companyAdmin!.company!.id },
+      data: {
+        instructor: { increment: 1 },
+        size: { increment: 1 },
       },
     });
 
@@ -373,6 +379,15 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
         authorId: employee.authorId,
         companyId: company.companyAdmin!.company!.id,
         departmentId: employee.departmentId,
+      },
+    });
+
+    // here updated company info
+    await prisma.company.update({
+      where: { id: company.companyAdmin!.company!.id },
+      data: {
+        employee: { increment: 1 },
+        size: { increment: 1 },
       },
     });
 
