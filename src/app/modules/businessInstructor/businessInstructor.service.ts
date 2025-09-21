@@ -11,27 +11,47 @@ import { IBusinessInstructorFilterRequest } from './businessInstructor.interface
 import { businessInstructorSearchAbleFields } from './businessInstructor.constant';
 import prisma from '../../utils/prisma';
 import { uploadToS3 } from '../../utils/s3';
+import ApiError from '../../errors/ApiError';
 
 const getAllFromDB = async (
   params: IBusinessInstructorFilterRequest,
   options: IPaginationOptions,
+  userId: string
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { searchTerm, status, ...filterData } = params;
 
-  const andConditions: Prisma.BusinessInstructorWhereInput[] = [];
+  const andConditions: Prisma.BusinessInstructorWhereInput[] = [{
+    authorId: userId
+  }];
 
   // Search across BusinessInstructor and nested User fields
   if (searchTerm) {
-    andConditions.push({
-      OR: [
-        ...businessInstructorSearchAbleFields.map(field => ({
-          [field]: { contains: searchTerm, mode: 'insensitive' },
-        })),
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-      ],
+    const businessInstructorFieldsConditions = (
+      businessInstructorSearchAbleFields || []
+    )
+      .filter(Boolean)
+      .map(field => ({
+        [field]: { contains: searchTerm, mode: 'insensitive' },
+      }));
+
+    const orConditions: Prisma.BusinessInstructorWhereInput[] = [];
+
+    if (businessInstructorFieldsConditions.length) {
+      orConditions.push(...businessInstructorFieldsConditions);
+    }
+
+    // Nested user search
+    orConditions.push({
+      user: {
+        OR: [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
     });
+
+    andConditions.push({ OR: orConditions });
   }
 
   // Filters
@@ -45,22 +65,28 @@ const getAllFromDB = async (
     });
   }
 
+  // === FILTER BY USER STATUS ===
+  if (status) {
+    andConditions.push({
+      user: {
+        status: status as UserStatus,
+      },
+    });
+  }
+
   const whereConditions: Prisma.BusinessInstructorWhereInput = {
     AND: andConditions,
   };
 
-  const result = await prisma.businessInstructor.findMany({
+ // === FETCH BUSINESS INSTRUCTORS WITH USER DATA ===
+  const instructors = await prisma.businessInstructor.findMany({
     where: whereConditions,
     skip,
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
     include: {
       user: {
         select: {
@@ -68,23 +94,57 @@ const getAllFromDB = async (
           name: true,
           email: true,
           photoUrl: true,
-        },
-      },
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-          companyAdmin: {
-            select: {
-              company: true,
-            },
-          },
+          status: true,
         },
       },
     },
   });
+
+  const instructorIds = instructors.map(i => i.id);
+
+  // === TOTAL COURSES PER INSTRUCTOR ===
+  const courses = await prisma.course.groupBy({
+    by: ['instructorId'],
+    where: {
+      instructorId: { in: instructorIds },
+      isDeleted: false,
+    },
+    _count: { id: true },
+    _sum: { enrollments: true },
+  });
+
+  const courseMap: Record<string, { totalCourses: number; totalEnrolled: number }> = {};
+  courses.forEach(c => {
+    courseMap[c.instructorId] = {
+      totalCourses: c._count.id || 0,
+      totalEnrolled: c._sum.enrollments || 0,
+    };
+  });
+
+  // === TOTAL INSTRUCTOR EARNING PER INSTRUCTOR ===
+  const earnings = await prisma.payment.groupBy({
+    by: ['authorId'],
+    where: {
+      authorId: { in: instructorIds },
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: { instructorEarning: true },
+  });
+
+  const earningMap: Record<string, number> = {};
+  earnings.forEach(e => {
+    earningMap[e.authorId] = e._sum.instructorEarning || 0;
+  });
+
+  // === MAP RESULTS WITH CALCULATIONS ===
+  const dataWithExtras = instructors.map(i => ({
+    ...i,
+    totalCourses: courseMap[i.id]?.totalCourses || 0,
+    totalEnrolled: courseMap[i.id]?.totalEnrolled || 0,
+    instructorEarning: earningMap[i.id] || 0,
+  }));
+
 
   const total = await prisma.businessInstructor.count({
     where: whereConditions,
@@ -96,7 +156,7 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: result,
+    data: dataWithExtras,
   };
 };
 
@@ -138,6 +198,9 @@ const getByIdFromDB = async (
     },
   });
 
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company instructor not exists!');
+  }
   return result;
 };
 
@@ -152,6 +215,9 @@ const updateIntoDB = async (
   const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
     where: { id },
   });
+  if (!businessInstructor) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company instructor not exists!');
+  }
 
   // file upload
   if (file) {
@@ -207,6 +273,9 @@ const deleteFromDB = async (id: string): Promise<User> => {
   const businessInstructor = await prisma.businessInstructor.findUniqueOrThrow({
     where: { id },
   });
+  if (!businessInstructor) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company instructor not exists!');
+  }
 
   const result = await prisma.$transaction(async tx => {
     const deletedUser = await tx.user.update({

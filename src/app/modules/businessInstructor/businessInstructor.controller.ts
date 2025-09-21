@@ -10,7 +10,7 @@ const getAllFromDB = catchAsync(
     const filters = pick(req.query, businessInstructorFilterableFields);
     const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-    const result = await BusinessInstructorService.getAllFromDB(filters, options);
+    const result = await BusinessInstructorService.getAllFromDB(filters, options, req.user!.userId);
 
     sendResponse(res, {
       statusCode: httpStatus.OK,

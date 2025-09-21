@@ -13,20 +13,19 @@ const upload = multer({ storage });
 
 router.get(
   '/',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.company_admin),
   BusinessInstructorController.getAllFromDB,
 );
 
 router.get(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.company_admin),
   BusinessInstructorController.getByIdFromDB,
 );
 
 router.put(
   '/:id',
   auth(
-    UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
   ),
@@ -39,7 +38,6 @@ router.put(
 router.delete(
   '/:id',
   auth(
-    UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
   ),

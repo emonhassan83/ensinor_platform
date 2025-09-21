@@ -10,7 +10,7 @@ const getAllFromDB = catchAsync(
     const filters = pick(req.query, employeeFilterableFields);
     const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-    const result = await EmployeeService.getAllFromDB(filters, options);
+    const result = await EmployeeService.getAllFromDB(filters, options, req.user!.userId);
 
     sendResponse(res, {
       statusCode: httpStatus.OK,

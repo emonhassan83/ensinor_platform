@@ -11,17 +11,17 @@ const router = express.Router();
 const storage = memoryStorage();
 const upload = multer({ storage });
 
-router.get('/', EmployeeController.getAllFromDB);
+router.get('/', auth(UserRole.company_admin), EmployeeController.getAllFromDB);
 
 router.get(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.company_admin),
   EmployeeController.getByIdFromDB,
 );
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin, UserRole.employee),
+  auth(UserRole.company_admin, UserRole.employee),
   upload.single('image'),
   parseData(),
   validateRequest(EmployeeValidation.updateValidationSchema),
@@ -30,7 +30,7 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin, UserRole.employee),
+  auth(UserRole.company_admin, UserRole.employee),
   EmployeeController.deleteFromDB,
 );
 

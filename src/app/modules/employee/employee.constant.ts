@@ -1,3 +1,3 @@
 export const employeeSearchAbleFields = [''];
 
-export const employeeFilterableFields = ['searchTerm'];
+export const employeeFilterableFields = ['searchTerm', 'status'];

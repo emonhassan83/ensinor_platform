@@ -1,4 +1,4 @@
-import { CompanyAdmin, Prisma, User, UserStatus } from '@prisma/client';
+import { CompanyAdmin, CoursesStatus, Prisma, User, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { ICompanyAdminFilterRequest } from './companyAdmin.interface';
@@ -129,10 +129,27 @@ const getAllFromDB = async (
     if (e.companyId) earningsMap[e.companyId] = e._sum.amount || 0;
   });
 
-  // Add companyEarning to each result
-  const dataWithEarnings = companyAdmins.map(ca => ({
+  // === CALCULATE TOTAL ACTIVE COURSES PER COMPANY ===
+  const activeCourses = await prisma.course.groupBy({
+    by: ['companyId'],
+    where: {
+      companyId: { in: companyIds },
+      status: CoursesStatus.approved, // assuming Course model has isActive field
+      isDeleted: false,
+    },
+    _count: { id: true },
+  });
+
+  const courseMap: Record<string, number> = {};
+  activeCourses.forEach(c => {
+    if (c.companyId) courseMap[c.companyId] = c._count.id || 0;
+  });
+
+  // === MAP RESULTS WITH EARNINGS & ACTIVE COURSES ===
+  const dataWithExtras = companyAdmins.map(ca => ({
     ...ca,
     companyEarning: ca.company?.id ? earningsMap[ca.company.id] || 0 : 0,
+    activeCourses: ca.company?.id ? courseMap[ca.company.id] || 0 : 0,
   }));
 
   const total = await prisma.companyAdmin.count({
@@ -145,7 +162,7 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: dataWithEarnings,
+    data: dataWithExtras,
   };
 };
 
@@ -180,20 +197,13 @@ const getByIdFromDB = async (id: string): Promise<CompanyAdmin | null> => {
           },
         },
       },
-      company: {
-        select: {
-          name: true,
-          industryType: true,
-          logo: true,
-          color: true,
-          employee: true,
-          instructor: true,
-          size: true,
-        },
-      },
+      company: true
     },
   });
 
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not exists!');
+  }
   return result;
 };
 
@@ -206,7 +216,7 @@ const updateIntoDB = async (
     where: { id },
   });
   if (!companyAdmin) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Company admin not exists!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not exists!');
   }
 
   // file upload
@@ -265,7 +275,7 @@ const deleteFromDB = async (id: string): Promise<User> => {
     where: { id },
   });
   if (!companyAdmin) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Company admin not exists!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not exists!');
   }
 
   const result = await prisma.$transaction(async tx => {

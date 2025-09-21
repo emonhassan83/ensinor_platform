@@ -352,6 +352,8 @@ model Employee {
   session      String?
   subjects     String?
   departmentId String
+  courseEnrolled  Int      @default(0)
+  courseCompleted Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -397,7 +399,6 @@ model Student {
   subjects        String
   courseEnrolled  Int      @default(0)
   courseCompleted Int      @default(0)
-  progress        Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

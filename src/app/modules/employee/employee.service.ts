@@ -5,27 +5,47 @@ import { IEmployeeFilterRequest } from './employee.interface';
 import { employeeSearchAbleFields } from './employee.constant';
 import prisma from '../../utils/prisma';
 import { uploadToS3 } from '../../utils/s3';
+import ApiError from '../../errors/ApiError';
 
 const getAllFromDB = async (
   params: IEmployeeFilterRequest,
   options: IPaginationOptions,
+  userId: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { searchTerm, status, ...filterData } = params;
 
-  const andConditions: Prisma.EmployeeWhereInput[] = [];
+  const andConditions: Prisma.EmployeeWhereInput[] = [
+    {
+      authorId: userId,
+    },
+  ];
 
   // Search across Employee and nested User fields
   if (searchTerm) {
-    andConditions.push({
-      OR: [
-        ...employeeSearchAbleFields.map(field => ({
-          [field]: { contains: searchTerm, mode: 'insensitive' },
-        })),
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-      ],
+    const employeeFieldsConditions = (employeeSearchAbleFields || [])
+      .filter(Boolean)
+      .map(field => ({
+        [field]: { contains: searchTerm, mode: 'insensitive' },
+      }));
+
+    const orConditions: Prisma.EmployeeWhereInput[] = [];
+
+    if (employeeFieldsConditions.length) {
+      orConditions.push(...employeeFieldsConditions);
+    }
+
+    // Nested user search
+    orConditions.push({
+      user: {
+        OR: [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
     });
+
+    andConditions.push({ OR: orConditions });
   }
 
   // Filters
@@ -39,9 +59,18 @@ const getAllFromDB = async (
     });
   }
 
+  // === FILTER BY USER STATUS ===
+  if (status) {
+    andConditions.push({
+      user: {
+        status: status as UserStatus,
+      },
+    });
+  }
+
   const whereConditions: Prisma.EmployeeWhereInput = { AND: andConditions };
 
-  const result = await prisma.employee.findMany({
+  const employees = await prisma.employee.findMany({
     where: whereConditions,
     include: {
       user: {
@@ -50,17 +79,10 @@ const getAllFromDB = async (
           name: true,
           email: true,
           photoUrl: true,
+          status: true,
         },
       },
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
-      },
-      company: {
+      department: {
         select: {
           name: true,
         },
@@ -76,6 +98,20 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+  });
+
+  // === Add progress calculation ===
+  const result = employees.map(emp => {
+    const { courseEnrolled, courseCompleted } = emp;
+    const progress =
+      courseEnrolled > 0
+        ? Number(((courseCompleted / courseEnrolled) * 100).toFixed(2))
+        : 0;
+
+    return {
+      ...emp,
+      progress,
+    };
   });
 
   const total = await prisma.employee.count({
@@ -119,9 +155,13 @@ const getByIdFromDB = async (id: string): Promise<Employee | null> => {
         },
       },
       company: true,
+      department: true,
     },
   });
 
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Employee not exists!');
+  }
   return result;
 };
 
@@ -130,9 +170,12 @@ const updateIntoDB = async (
   payload: { employee?: Partial<Employee>; user?: Partial<any> },
   file: any,
 ): Promise<Employee> => {
-  const employee = await prisma.employee.findUniqueOrThrow({
+  const employee = await prisma.employee.findUnique({
     where: { id },
   });
+  if (!employee) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Employee not exists!');
+  }
 
   // file upload
   if (file) {
@@ -187,9 +230,12 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<User> => {
-  const employee = await prisma.employee.findUniqueOrThrow({
+  const employee = await prisma.employee.findUnique({
     where: { id },
   });
+  if (!employee) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Employee not exists!');
+  }
 
   const result = await prisma.$transaction(async tx => {
     const deletedUser = await tx.user.update({
