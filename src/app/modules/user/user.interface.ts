@@ -12,6 +12,7 @@ export type IUser = {
   name: string;
   email: string;
   password: string;
+  fcmToken?: string | null;
   photoUrl?: string | null;
   bio?: string | null;
   dateOfBirth?: string | null;

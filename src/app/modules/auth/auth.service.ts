@@ -21,10 +21,10 @@ import prisma from '../../utils/prisma';
 // ---------------------- LOGIN ----------------------
 const loginUser = async (payload: TLoginUser) => {
   const user = await prisma.user.findUnique({
-    where: { email: payload.email },
+    where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -179,6 +179,15 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
       config.jwt_refresh_expires_in as TExpiresIn,
     );
 
+    // Update lastActive + save FCM token if provided
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastActive: new Date(),
+        ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+      },
+    });
+
     return {
       accessToken,
       refreshToken,
@@ -228,6 +237,15 @@ const registerWithGoogle = async (payload: Partial<IUser>) => {
     config.jwt_refresh_secret as string,
     config.jwt_refresh_expires_in as TExpiresIn,
   );
+
+  // Update lastActive + save FCM token if provided
+  await prisma.user.update({
+    where: { id: newUser.id },
+    data: {
+      lastActive: new Date(),
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  });
 
   return {
     user: newUser,
@@ -306,6 +324,15 @@ const registerWithLinkedIn = async (payload: Partial<IUser>) => {
         config.jwt_refresh_expires_in as TExpiresIn,
       );
 
+      // Update lastActive + save FCM token if provided
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastActive: new Date(),
+          ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+        },
+      });
+
       return {
         user: updatedUser,
         accessToken,
@@ -379,6 +406,15 @@ const registerWithLinkedIn = async (payload: Partial<IUser>) => {
     config.jwt_refresh_secret as string,
     config.jwt_refresh_expires_in as TExpiresIn,
   );
+
+  // Update lastActive + save FCM token if provided
+  await prisma.user.update({
+    where: { id: newUser.id },
+    data: {
+      lastActive: new Date(),
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  });
 
   return {
     user: newUser,
@@ -481,6 +517,15 @@ const registerWithFacebook = async (payload: Partial<IUser>) => {
       config.jwt_refresh_expires_in as TExpiresIn,
     );
 
+    // Update lastActive + save FCM token if provided
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastActive: new Date(),
+        ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+      },
+    });
+
     return {
       accessToken,
       refreshToken,
@@ -530,6 +575,15 @@ const registerWithFacebook = async (payload: Partial<IUser>) => {
     config.jwt_refresh_expires_in as TExpiresIn,
   );
 
+  // Update lastActive + save FCM token if provided
+  await prisma.user.update({
+    where: { id: newUser.id },
+    data: {
+      lastActive: new Date(),
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  });
+
   return {
     user: newUser,
     accessToken,
@@ -543,9 +597,9 @@ const changePassword = async (
 ) => {
   //* checking if the user is exist
   const user = await prisma.user.findUnique({
-    where: { email: userData.email },
+    where: { email: userData.email, isDeleted: true },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -590,9 +644,9 @@ const refreshToken = async (token: string) => {
 
   //* checking if the user is exist
   const user = await prisma.user.findUnique({
-    where: { email: decoded.email },
+    where: { email: decoded.email, isDeleted: false },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -616,10 +670,10 @@ const refreshToken = async (token: string) => {
 const forgetPassword = async (payload: { email: string }) => {
   //* checking if the user is exist
   const user = await prisma.user.findUnique({
-    where: { email: payload.email },
+    where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -645,8 +699,7 @@ const forgetPassword = async (payload: { email: string }) => {
     data: { otp, expiresAt, status: false },
   });
 
-  // const resetUILink = `${config.reset_pass_link}?id=${user._id}&token=${resetToken} `
-
+  // sent forgot email
   await emailSender(
     user?.email,
     'Your One-Time OTP',
@@ -672,9 +725,6 @@ const forgetPassword = async (payload: { email: string }) => {
     `,
   );
 
-  // Send a notification to the admin informing them about the forgot password request
-  // user?.role === UserRole.super_admin && (await authNotifyAdmin('PASSWORD_FORGET'))
-
   return { token: resetToken };
 };
 
@@ -684,10 +734,10 @@ const resetPassword = async (
 ) => {
   //* checking if the user is exist
   const user = await prisma.user.findUnique({
-    where: { email: payload.email },
+    where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 

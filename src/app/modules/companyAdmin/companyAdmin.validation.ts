@@ -14,7 +14,6 @@ const updateValidationSchema = z.object({
       .object({
         name: z.string().optional(),
         industryType: z.string().optional(),
-        logo: z.string().url().optional(),
         color: z.string().optional(),
       })
       .optional(),

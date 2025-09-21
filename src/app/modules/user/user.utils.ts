@@ -19,7 +19,7 @@ export const hashedPassword = async (password: string): Promise<string> => {
 
 // User Status Change Notification → Admin
 export const sendUserStatusNotifYToAdmin = async (
-  status: "active" | "pending" | "denied" | "blocked" | "deleted",
+  status: 'active' | 'pending' | 'denied' | 'blocked' | 'deleted',
   user: Partial<User>,
 ) => {
   const admin = await findAdmin();
@@ -32,6 +32,9 @@ export const sendUserStatusNotifYToAdmin = async (
   if (status === 'active') {
     message = messages.userManagement.accountActivated;
     description = `User ${user?.name} (ID: ${user?.id}) has been successfully activated.`;
+  } else if (status === 'deleted') {
+    message = messages.userManagement.accountDeleted;
+    description = `User ${user?.name} (ID: ${user?.id}) has been successfully deleted.`;
   } else {
     message = messages.userManagement.accountDeactivated;
     description = `User ${user?.name} (ID: ${user?.id}) has been blocked from accessing the system.`;
@@ -50,7 +53,12 @@ export const sendUserStatusNotifYToAdmin = async (
 export const sendInvitationNotification = async (
   sender: any,
   receiverId: string,
-  role: 'company_admin' | 'business-instructor' | 'employee' | 'instructor' | 'student',
+  role:
+    | 'company_admin'
+    | 'business-instructor'
+    | 'employee'
+    | 'instructor'
+    | 'student',
 ) => {
   const message = messages.userManagement.invitationSent;
   const description = `${sender?.name} has invited you to join as a ${role}.`;
@@ -84,7 +92,7 @@ export const sendInstructorRequestNotification = async (
 
 // User Status Change Notification → User
 export const sendUserStatusNotifYToUser = async (
-  status: "active" | "pending" | "denied" | "blocked" | "deleted",
+  status: 'active' | 'pending' | 'denied' | 'blocked' | 'deleted',
   user: Partial<User>,
 ) => {
   // Determine the message and description based on the status
@@ -94,9 +102,12 @@ export const sendUserStatusNotifYToUser = async (
   if (status === 'active') {
     message = messages.userManagement.accountActivated;
     description = `Your account has been successfully activated. You can now access all available features.`;
+  } else if (status === 'deleted') {
+    message = messages.userManagement.accountDeleted;
+    description = `User ${user?.name} (ID: ${user?.id}) has been successfully deleted.`;
   } else {
     message = messages.userManagement.accountDeactivated;
-    description = `Your account has been blocked. Please contact support for further assistance.`;
+    description = `User ${user?.name} (ID: ${user?.id}) has been blocked from accessing the system.`;
   }
 
   // Create a notification entry

@@ -45,6 +45,7 @@ model User {
   packageExpiry       DateTime?
   fcmToken            String?
   points              Int          @default(0)
+  freePoints          Int          @default(0)
   badges              String[]     @default([])
   balance             Float        @default(0.0)
   registerWith        RegisterWith
@@ -333,9 +334,10 @@ model CoInstructor {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  course           Course @relation(fields: [courseId], references: [id])
-  invitedBy        User   @relation("InvitedByRelation", fields: [invitedById], references: [id])
-  coInstructorUser User   @relation("CoInstructorRelation", fields: [coInstructorId], references: [id])
+  course              Course                @relation(fields: [courseId], references: [id])
+  invitedBy           User                  @relation("InvitedByRelation", fields: [invitedById], references: [id])
+  coInstructorUser    User                  @relation("CoInstructorRelation", fields: [coInstructorId], references: [id])
+  coInstructorEarning CoInstructorEarning[]
 
   @@map("co_instructors")
 }
@@ -1065,36 +1067,54 @@ model Subscription {
 }
 
 model Payment {
-  id                  String           @id @default(uuid())
-  userId              String
-  authorId            String
-  companyId           String?
-  orderId             String?
-  subscriptionId      String?
-  modelType           PaymentModelType
-  type                PaymentType
-  company             CompanyType
-  transactionId       String           @unique
-  amount              Float            @default(0.00)
-  adminCommission     Float            @default(0.00)
-  instructorEarning   Float            @default(0.00)
-  coInstructorEarning Float            @default(0.00)
-  status              PaymentStatus    @default(unpaid)
-  paymentMethod       PaymentMethod
-  paymentIntentId     String?
-  isPaid              Boolean          @default(false)
-  isSellerPaid        Boolean          @default(false)
-  isDeleted           Boolean          @default(false)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  id                String           @id @default(uuid())
+  userId            String
+  authorId          String
+  companyId         String?
+  orderId           String?
+  subscriptionId    String?
+  modelType         PaymentModelType
+  type              PaymentType
+  company           CompanyType
+  transactionId     String           @unique
+  amount            Float            @default(0.00)
+  adminEarning      Float            @default(0.00)
+  instructorEarning Float            @default(0.00)
+  coInstructorPool  Float            @default(0.00)
+  status            PaymentStatus    @default(unpaid)
+  paymentMethod     PaymentMethod
+  paymentIntentId   String?
+  isPaid            Boolean          @default(false)
+  isSellerPaid      Boolean          @default(false)
+  isDeleted         Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  account      User          @relation("PaymentUserAccount", references: [id], fields: [userId])
-  author       User          @relation("PaymentAuthorAccount", references: [id], fields: [authorId])
-  order        Order?        @relation(fields: [orderId], references: [id])
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
-  companies    Company?      @relation(fields: [companyId], references: [id])
+  account             User                  @relation("PaymentUserAccount", references: [id], fields: [userId])
+  author              User                  @relation("PaymentAuthorAccount", references: [id], fields: [authorId])
+  order               Order?                @relation(fields: [orderId], references: [id])
+  subscription        Subscription?         @relation(fields: [subscriptionId], references: [id])
+  companies           Company?              @relation(fields: [companyId], references: [id])
+  coInstructorEarning CoInstructorEarning[]
 
   @@map("payments")
+}
+
+model CoInstructorEarning {
+  id             String    @id @default(uuid())
+  coInstructorId String
+  paymentId      String
+  amount         Float     @default(0.00)
+  isWithdrawn    Boolean   @default(false)
+  withdrawnAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  coInstructor CoInstructor @relation(fields: [coInstructorId], references: [id])
+  payment      Payment      @relation(fields: [paymentId], references: [id])
+
+  @@map("co_instructor_earnings")
 }
 
 model Batch {
@@ -1262,6 +1282,8 @@ model Chat {
   type       ChatType
   groupName  String? // Optional, for group chats
   groupImage String? // Optional, for group chats
+  courseId   String? // if this is group chat
+  isReadOnly Boolean    @default(false) // For Announcement chat
   status     ChatStatus @default(accepted)
   isDeleted  Boolean    @default(false)
   createdAt  DateTime   @default(now())
@@ -1622,10 +1644,10 @@ enum UserStatus {
 }
 
 enum Permission {
-  add
   edit
-  review
-  grade_assignment
+  quiz
+  resources
+  grade
 }
 
 enum CoursesStatus {
@@ -1715,6 +1737,7 @@ enum PaymentMethod {
 enum ChatType {
   private
   group
+  announcement
 }
 
 enum WishListModelType {

@@ -4,13 +4,13 @@ export const notificationFilterableFields: string[] = ['searchTerm'];
 export const messages = {
   authSettings: {
     passwordChanged: 'Password changed successfully.',
-    passwordReset: 'Password Reset Processed',
-    passwordForgot: 'Password Forgot Processed',
+    passwordReset: 'Password Reset Processed'
   },
 
   userManagement: {
     accountActivated: 'User account activated.',
     accountDeactivated: 'User account deactivated.',
+    accountDeleted: 'Your account Deleted.',
     invitationSent: 'Invitation sent',
     joinRequest: 'Invitation sent',
   },

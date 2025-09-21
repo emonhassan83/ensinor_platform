@@ -12,21 +12,35 @@ const getAllFromDB = async (
   options: IPaginationOptions,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { searchTerm, status, ...filterData } = params;
 
   const andConditions: Prisma.CompanyAdminWhereInput[] = [];
 
-  // Search across CompanyAdmin and nested User fields
+  // Search across CompanyAdmin and nested User, company fields
   if (searchTerm) {
-    andConditions.push({
-      OR: [
-        ...companyAdminSearchAbleFields.map(field => ({
-          [field]: { contains: searchTerm, mode: 'insensitive' },
-        })),
-        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
-      ],
+    const companyAdminFieldsConditions = (companyAdminSearchAbleFields || [])
+      .filter(Boolean)
+      .map(field => ({
+        [field]: { contains: searchTerm, mode: 'insensitive' },
+      }));
+
+    const orConditions: Prisma.CompanyAdminWhereInput[] = [];
+
+    if (companyAdminFieldsConditions.length) {
+      orConditions.push(...companyAdminFieldsConditions);
+    }
+
+    // Nested user search
+    orConditions.push({
+      user: {
+        OR: [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
     });
+
+    andConditions.push({ OR: orConditions });
   }
 
   // Filters
@@ -40,9 +54,18 @@ const getAllFromDB = async (
     });
   }
 
+  // === FILTER BY USER STATUS ===
+  if (status) {
+    andConditions.push({
+      user: {
+        status: status as UserStatus,
+      },
+    });
+  }
+
   const whereConditions: Prisma.CompanyAdminWhereInput = { AND: andConditions };
 
-  const result = await prisma.companyAdmin.findMany({
+  const companyAdmins = await prisma.companyAdmin.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -61,21 +84,56 @@ const getAllFromDB = async (
           name: true,
           email: true,
           photoUrl: true,
+          status: true,
+          subscription: {
+            select: {
+              type: true,
+            },
+          },
         },
       },
       company: {
         select: {
+          id: true,
           name: true,
           industryType: true,
           logo: true,
-          color: true,
           employee: true,
           instructor: true,
-          size: true,
+          courses: true,
         },
       },
     },
   });
+
+    // === FETCH COMPANY EARNINGS IN BULK ===
+  const companyIds = companyAdmins
+    .map(ca => ca.company?.id)
+    .filter(Boolean) as string[];
+
+  const companyEarnings = await prisma.payment.groupBy({
+    by: ['companyId'],
+    where: {
+      companyId: { in: companyIds },
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  // Map companyId => totalEarning
+  const earningsMap: Record<string, number> = {};
+  companyEarnings.forEach(e => {
+    if (e.companyId) earningsMap[e.companyId] = e._sum.amount || 0;
+  });
+
+  // Add companyEarning to each result
+  const dataWithEarnings = companyAdmins.map(ca => ({
+    ...ca,
+    companyEarning: ca.company?.id ? earningsMap[ca.company.id] || 0 : 0,
+  }));
 
   const total = await prisma.companyAdmin.count({
     where: whereConditions,
@@ -87,7 +145,7 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: result,
+    data: dataWithEarnings,
   };
 };
 
@@ -109,6 +167,17 @@ const getByIdFromDB = async (id: string): Promise<CompanyAdmin | null> => {
           status: true,
           lastActive: true,
           isDeleted: true,
+          subscription: {
+            select: {
+              type: true,
+              package: {
+                select: {
+                  title: true,
+                  billingCycle: true,
+                },
+              },
+            },
+          },
         },
       },
       company: {

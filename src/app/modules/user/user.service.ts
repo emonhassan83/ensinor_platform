@@ -128,14 +128,11 @@ const invitationCompanyAdmin = async (
       id: userId,
       role: UserRole.super_admin,
       status: UserStatus.active,
-      isDeleted: false
-    }
-  })
+      isDeleted: false,
+    },
+  });
   if (!author) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Invitee author not found!',
-    );
+    throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
   const result = await prisma.$transaction(async transactionClient => {
@@ -465,14 +462,11 @@ const invitationInstructor = async (
       id: userId,
       role: UserRole.super_admin,
       status: UserStatus.active,
-      isDeleted: false
-    }
-  })
+      isDeleted: false,
+    },
+  });
   if (!author) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Invitee author not found!',
-    );
+    throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
   const isExist = await prisma.user.findFirst({
@@ -538,14 +532,11 @@ const createStudent = async (
       id: userId,
       role: UserRole.super_admin,
       status: UserStatus.active,
-      isDeleted: false
-    }
-  })
+      isDeleted: false,
+    },
+  });
   if (!author) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Invitee author not found!',
-    );
+    throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
   const isExist = await prisma.user.findFirst({
@@ -867,8 +858,8 @@ const changeProfileStatus = async (
   });
 
   // 🎯 Send email and notification based on status
-  await sendUserStatusNotifYToAdmin(status, user)
-  await sendUserStatusNotifYToUser(status, user)
+  await sendUserStatusNotifYToAdmin(status, user);
+  await sendUserStatusNotifYToUser(status, user);
 
   if (status === UserStatus.active) {
     await sendUserActiveEmail(user.email, user.name);
@@ -883,9 +874,10 @@ const deleteAProfile = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
+      isDeleted: false,
     },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User does not exists!');
   }
 
@@ -898,6 +890,9 @@ const deleteAProfile = async (userId: string) => {
       status: UserStatus.deleted,
     },
   });
+
+  // 🎯 Send notification based on status
+  await sendUserStatusNotifYToUser('deleted', user);
 
   return updateUser;
 };

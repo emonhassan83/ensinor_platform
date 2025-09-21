@@ -250,13 +250,12 @@ const updateIntoDB = async (
 
       return updatedRequest;
     });
-    // sent to notification to invitee user
 
     return result;
   }
 
   // Deny and delete request
-  if (status === UserStatus.deleted) {
+  if (status === UserStatus.denied) {
     await prisma.companyRequest.delete({ where: { id } });
 
     // Send denial email
