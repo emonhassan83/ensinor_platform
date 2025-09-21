@@ -4,7 +4,7 @@ export const notificationFilterableFields: string[] = ['searchTerm'];
 export const messages = {
   authSettings: {
     passwordChanged: 'Password changed successfully.',
-    passwordReset: 'Password Reset Processed'
+    passwordReset: 'Password Reset Processed',
   },
 
   userManagement: {
@@ -22,9 +22,10 @@ export const messages = {
     deleted: 'Company request deleted.',
   },
 
-  purityMeter: {
-    empty: 'Purity Meter Empty',
-    warning: 'Purity Meter Running Low',
+  coInstructor: {
+    invitation: 'You have been invited as a Co-Instructor.',
+    revoke: 'Your Co-Instructor access has been revoked.',
+    deleted: 'Your Co-Instructor role has been removed permanently.',
   },
 
   trackWater: {

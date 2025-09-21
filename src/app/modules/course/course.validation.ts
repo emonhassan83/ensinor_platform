@@ -1,4 +1,4 @@
-import { CourseType } from '@prisma/client';
+import { CompanyType, CourseType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -9,16 +9,21 @@ const createValidationSchema = z.object({
       .uuid('author must be a valid UUID'),
     instructorId: z
       .string({ required_error: 'instructor is required' })
-      .uuid('instructor must be a valid UUID'),
+      .uuid('instructor must be a valid UUID')
+      .optional(),
+    companyId: z
+      .string({ required_error: 'instructor is required' })
+      .uuid('instructor must be a valid UUID')
+      .optional(),
     title: z.string({ required_error: 'Title is required!' }),
     type: z.nativeEnum(CourseType).optional(),
+    company: z.nativeEnum(CompanyType),
     shortDescription: z.string({
       required_error: 'Short description is required!',
     }),
     category: z.string({ required_error: 'Category is required!' }),
     level: z.string({ required_error: 'Course level is required!' }),
     language: z.string({ required_error: 'Course language is required!' }),
-    points: z.number({ required_error: 'Course points is required!' }),
     deadline: z.string({ required_error: 'Course deadline is required!' }),
     price: z
       .number({ required_error: 'Price is required!' })
@@ -41,13 +46,11 @@ const updateValidationSchema = z.object({
       .string({ required_error: 'Short description is required!' })
       .optional(),
     type: z.nativeEnum(CourseType).optional(),
+    company: z.nativeEnum(CompanyType).optional(),
     category: z.string({ required_error: 'Category is required!' }).optional(),
     level: z.string({ required_error: 'Course level is required!' }).optional(),
     language: z
       .string({ required_error: 'Course language is required!' })
-      .optional(),
-    points: z
-      .number({ required_error: 'Course points is required!' })
       .optional(),
     deadline: z
       .string({ required_error: 'Course deadline is required!' })

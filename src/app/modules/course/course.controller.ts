@@ -34,6 +34,23 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getByCompanyFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseService.getAllFromDB(filters, options, {
+    companyId: req.params.companyId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My Courses data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 const getMyCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -118,6 +135,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CourseController = {
   insertIntoDB,
   getAllFromDB,
+  getByCompanyFromDB,
   getMyCourseFromDB,
   getMyInstructorCourse,
   getByIdFromDB,

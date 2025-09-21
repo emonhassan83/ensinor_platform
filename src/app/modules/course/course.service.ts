@@ -1,7 +1,9 @@
 import {
+  Company,
   Course,
   CoursesStatus,
   Prisma,
+  User,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -15,8 +17,9 @@ import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { authorId, instructorId } = payload;
+  const { authorId, instructorId, companyId } = payload;
 
+  // === Validate Author
   const author = await prisma.user.findFirst({
     where: {
       id: authorId,
@@ -28,15 +31,34 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
-  const instructor = await prisma.user.findFirst({
-    where: {
-      id: instructorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!instructor) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
+  // === Validate Instructor (optional) ===
+  let instructor: User | null = null;
+  if (instructorId) {
+    instructor = await prisma.user.findFirst({
+      where: {
+        id: instructorId,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+    });
+    if (!instructor) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
+    }
+  }
+
+  // === Validate Company (if provided) ===
+  let company: Company | null = null;
+  if (companyId) {
+    company = await prisma.company.findFirst({
+      where: {
+        id: companyId,
+        userId: authorId,
+        isDeleted: false,
+      },
+    });
+    if (!company) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    }
   }
 
   // upload to image
@@ -52,13 +74,52 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   author.role === UserRole.super_admin &&
     (payload.status = CoursesStatus.approved as any);
 
-  const result = await prisma.course.create({
-    data: payload,
+  // Create Course + Update Counts ===
+  const result = await prisma.$transaction(async tx => {
+    const newCourse = await tx.course.create({
+      data: payload,
+    });
+    if (!newCourse) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Course creation failed!');
+    }
+
+    // Increase company course count
+    if (companyId) {
+      await tx.company.update({
+        where: { id: companyId },
+        data: {
+          courses: { increment: 1 },
+        },
+      });
+    }
+
+    // If instructor exists
+    if (instructorId) {
+      const businessInstructor = await tx.businessInstructor.findUnique({
+        where: { userId: instructorId },
+      });
+
+      if (businessInstructor) {
+        await tx.businessInstructor.update({
+          where: { id: businessInstructor.id },
+          data: { courses: { increment: 1 } },
+        });
+      } else {
+        const instructorRecord = await tx.instructor.findUnique({
+          where: { userId: instructorId },
+        });
+        if (instructorRecord) {
+          await tx.instructor.update({
+            where: { id: instructorRecord.id },
+            data: { courses: { increment: 1 } },
+          });
+        }
+      }
+    }
+
+    return newCourse;
   });
 
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Course creation failed!');
-  }
   return result;
 };
 
@@ -68,14 +129,13 @@ const getAllFromDB = async (
   filterBy: {
     authorId?: string;
     instructorId?: string;
+    companyId?: string;
   },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseWhereInput[] = [
-    { isDeleted: false },
-  ];
+  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
   // Filter either by authorId, instructorId
   if (filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
@@ -83,7 +143,9 @@ const getAllFromDB = async (
   if (filterBy.instructorId) {
     andConditions.push({ instructorId: filterBy.instructorId });
   }
-
+  if (filterBy.companyId) {
+    andConditions.push({ companyId: filterBy.companyId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {

@@ -1,4 +1,9 @@
-import { CoInstructor, Prisma, UserStatus } from '@prisma/client';
+import {
+  CoInstructor,
+  CoursesStatus,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -10,13 +15,19 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { sendCoInstructorInvitationEmail } from '../../utils/email/sentCoInstructorInvitation';
 import httpStatus from 'http-status';
+import { sendCoInstructorNotification } from './coInstructors.utils';
 
 const inviteCoInstructor = async (payload: ICoInstructors) => {
   const { invitedById, coInstructorId, courseId } = payload;
 
   // Check course belongs to inviter
   const course = await prisma.course.findFirst({
-    where: { id: courseId, instructorId: invitedById },
+    where: {
+      id: courseId,
+      instructorId: invitedById,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
   });
   if (!course)
     throw new ApiError(
@@ -52,6 +63,9 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     inviter.name,
     course.title,
   );
+
+  // sent notification to invitee
+  await sendCoInstructorNotification(inviter, coInstructor.id, 'invitation');
 
   return coInstructor;
 };
@@ -219,6 +233,12 @@ const revokeAccess = async (id: string): Promise<CoInstructor> => {
   if (!coInstructor) {
     throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
   }
+  const inviter = await prisma.coInstructor.findUnique({
+    where: { id: coInstructor.invitedById, isDeleted: false },
+  });
+  if (!inviter) {
+    throw new ApiError(httpStatus.CONFLICT, 'You have no access to revoke!');
+  }
 
   const result = await prisma.coInstructor.update({
     where: { id },
@@ -227,6 +247,9 @@ const revokeAccess = async (id: string): Promise<CoInstructor> => {
   if (!result) {
     throw new ApiError(httpStatus.CONFLICT, 'Co instructors not revoked !');
   }
+
+  // sent notification to invitee
+  await sendCoInstructorNotification(inviter, coInstructor.id, 'revoke');
 
   return result;
 };
@@ -239,6 +262,13 @@ const deleteIntoDB = async (id: string): Promise<CoInstructor> => {
     throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
   }
 
+  const inviter = await prisma.coInstructor.findUnique({
+    where: { id: coInstructor.invitedById, isDeleted: false },
+  });
+  if (!inviter) {
+    throw new ApiError(httpStatus.CONFLICT, 'You have no access to revoke!');
+  }
+
   const result = await prisma.coInstructor.update({
     where: { id },
     data: { isDeleted: true },
@@ -246,6 +276,9 @@ const deleteIntoDB = async (id: string): Promise<CoInstructor> => {
   if (!result) {
     throw new ApiError(httpStatus.CONFLICT, 'Co instructors not deleted !');
   }
+
+  // sent notification to invitee
+  await sendCoInstructorNotification(inviter, coInstructor.id, 'deleted');
 
   return result;
 };

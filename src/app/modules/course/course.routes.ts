@@ -28,6 +28,12 @@ router.post(
 router.get('/', CourseController.getAllFromDB);
 
 router.get(
+  '/company/:companyId',
+  auth(UserRole.company_admin),
+  CourseController.getByCompanyFromDB,
+);
+
+router.get(
   '/author/my-course',
   auth(
     UserRole.super_admin,

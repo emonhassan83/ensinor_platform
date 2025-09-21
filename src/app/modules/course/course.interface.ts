@@ -13,6 +13,7 @@ export type ICourseFilterRequest = {
 export type ICourse = {
   authorId: string;
   instructorId: string;
+  companyId: string;
   title: string;
   shortDescription: string;
   company: CompanyType;

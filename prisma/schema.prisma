@@ -311,6 +311,8 @@ model BusinessInstructor {
   website     String?
   avgRating   Float    @default(0.0)
   ratingCount Int      @default(0)
+  courses     Int      @default(0)
+  enrolled    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -456,9 +458,9 @@ model Book {
 // Course Related Models
 model Course {
   id               String        @id @default(uuid())
-  authorId         String?
+  authorId         String
   companyId        String?
-  instructorId     String
+  instructorId     String?
   title            String
   shortDescription String
   company          CompanyType
@@ -466,7 +468,6 @@ model Course {
   category         String
   level            CourseLevel
   language         String
-  points           Int           @default(0)
   deadline         String?
   price            Float
   description      String
@@ -484,7 +485,7 @@ model Course {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  author     User?    @relation("CourseAuthor", fields: [authorId], references: [id])
+  author     User    @relation("CourseAuthor", fields: [authorId], references: [id])
   instructor User?    @relation("CourseInstructor", fields: [instructorId], references: [id])
   companies  Company? @relation(fields: [companyId], references: [id])
 
