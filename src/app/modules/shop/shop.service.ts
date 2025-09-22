@@ -1,4 +1,11 @@
-import { Book, BookStatus, Package, Prisma, UserStatus } from '@prisma/client';
+import {
+  Book,
+  BookStatus,
+  PlatformType,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IShop, IShopFilterRequest } from './shop.interface';
@@ -8,9 +15,11 @@ import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 import { UploadedFiles } from '../../interfaces/common.interface';
 import httpStatus from 'http-status';
+import { sendNotifYToAdmin, sendNotifYToUser } from './shop.utils';
+import { findAdmin } from '../../utils/findAdmin';
 
 const insertIntoDB = async (payload: IShop, files: any) => {
-  const { authorId } = payload;
+  const { authorId, platform } = payload;
 
   const author = await prisma.user.findFirst({
     where: {
@@ -18,9 +27,90 @@ const insertIntoDB = async (payload: IShop, files: any) => {
       status: UserStatus.active,
       isDeleted: false,
     },
+    include: {
+      companyAdmin: {
+        select: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+      businessInstructor: {
+        select: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  }
+
+  let company: any = null;
+  let companyAuthor: any = null;
+
+  // 🔹 2. If platform = company → validate company & company admin
+  if (platform === PlatformType.company) {
+    if (
+      author.role !== UserRole.company_admin &&
+      author.role !== UserRole.business_instructors
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Only company admin or business instructor can add shop data in company platform!',
+      );
+    }
+
+    if (author.role === UserRole.company_admin) {
+      payload.companyId = author.companyAdmin?.company!.id;
+    }
+    if (author.role === UserRole.business_instructors) {
+      payload.companyId = author.businessInstructor?.company!.id;
+    }
+
+    // Validate company
+    company = await prisma.company.findFirst({
+      where: { id: payload.companyId, isDeleted: false },
+      include: {
+        author: {
+          select: {
+            user: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!company) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    }
+
+    if (company.isActive === false) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Your company is not active now!',
+      );
+    }
+
+    companyAuthor = await prisma.user.findFirst({
+      where: {
+        id: company.author.user.id,
+        role: UserRole.company_admin,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+    });
+    if (!companyAuthor) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
+    }
   }
 
   // upload thumbnail and file
@@ -48,6 +138,15 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     data: payload,
   });
 
+  // if platform wise sent notification
+  if (platform === PlatformType.admin) {
+    const admin = await findAdmin();
+    if (!admin) throw new Error('Super admin not found!');
+    await sendNotifYToAdmin(author, admin);
+  } else if (platform === PlatformType.company) {
+    await sendNotifYToAdmin(author, companyAuthor);
+  }
+
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
   }
@@ -63,7 +162,7 @@ const getAllFromDB = async (
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.BookWhereInput[] = [{ isDeleted: false }];
-  
+
   // Filter either by authorId or companyId
   if (filterBy && filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
@@ -111,7 +210,20 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      author: {
+        select: {
+          name: true,
+        },
+      },
+    },
   });
+
+  // 🔹 Add computed `salesAmount`
+  const booksWithSalesAmount = result.map(book => ({
+    ...book,
+    salesAmount: book.sales * book.price,
+  }));
 
   const total = await prisma.book.count({
     where: whereConditions,
@@ -123,13 +235,42 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: result,
+    data: booksWithSalesAmount,
+  };
+};
+
+const getAllCategoryFromDB = async () => {
+  const andConditions: Prisma.BookWhereInput[] = [
+    { status: BookStatus.published, isDeleted: false },
+  ];
+
+  const whereConditions: Prisma.BookWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.book.groupBy({
+    by: ['category'],
+    where: whereConditions,
+    _count: { category: true },
+    orderBy: {
+      category: 'asc', // alphabetically
+    },
+  });
+
+  // Format result: unique categories + their counts
+  const categories = result.map(item => ({
+    name: item.category,
+    count: item._count.category,
+  }));
+
+  return {
+    data: categories,
   };
 };
 
 const getByIdFromDB = async (id: string): Promise<Book | null> => {
   const result = await prisma.book.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {
@@ -142,10 +283,9 @@ const getByIdFromDB = async (id: string): Promise<Book | null> => {
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Book not found!');
   }
-
   return result;
 };
 
@@ -155,9 +295,9 @@ const updateIntoDB = async (
   files: any,
 ): Promise<Book> => {
   const book = await prisma.book.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!book || book?.isDeleted) {
+  if (!book) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
   }
 
@@ -186,10 +326,10 @@ const updateIntoDB = async (
     where: { id },
     data: payload,
   });
+
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not updated!');
   }
-
   return result;
 };
 
@@ -200,9 +340,9 @@ const changeStatusIntoDB = async (
   const { status } = payload;
 
   const book = await prisma.book.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!book || book?.isDeleted) {
+  if (!book) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
   }
 
@@ -214,14 +354,17 @@ const changeStatusIntoDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not updated!');
   }
 
+  // here sent notification to author
+  await sendNotifYToUser(status, book.authorId);
+
   return result;
 };
 
 const deleteFromDB = async (id: string): Promise<Book> => {
   const book = await prisma.book.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!book || book?.isDeleted) {
+  if (!book) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not found!');
   }
 
@@ -235,12 +378,16 @@ const deleteFromDB = async (id: string): Promise<Book> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Shop book not deleted!');
   }
 
+  // sent notify to author
+  await sendNotifYToUser('deleted', book.authorId);
+
   return result;
 };
 
 export const ShopService = {
   insertIntoDB,
   getAllFromDB,
+  getAllCategoryFromDB,
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,

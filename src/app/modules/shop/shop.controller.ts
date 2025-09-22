@@ -30,6 +30,17 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getAllCategoriesFromDB = catchAsync(async (req, res) => {
+  const result = await ShopService.getAllCategoryFromDB();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Shop books categories data fetched!',
+    data: result,
+  });
+});
+
 const getMyShopFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, shopFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -114,6 +125,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const ShopController = {
   insertIntoDB,
   getAllFromDB,
+  getAllCategoriesFromDB,
   getMyShopFromDB,
   getByCompanyFromDB,
   getByIdFromDB,

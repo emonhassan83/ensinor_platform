@@ -13,7 +13,12 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin, UserRole.instructor),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'file', maxCount: 1 },
@@ -25,9 +30,16 @@ router.post(
 
 router.get('/', ShopController.getAllFromDB);
 
+router.get('/categories', ShopController.getAllCategoriesFromDB);
+
 router.get(
   '/author/my-shop',
-  auth(UserRole.business_instructors, UserRole.instructor),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   ShopController.getMyShopFromDB,
 );
 
@@ -41,13 +53,18 @@ router.get('/:id', ShopController.getByIdFromDB);
 
 router.patch(
   '/status/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   ShopController.changeStatusIntoDB,
 );
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin, UserRole.instructor),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'file', maxCount: 1 },
@@ -59,7 +76,12 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.instructor),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   ShopController.deleteFromDB,
 );
 

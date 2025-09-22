@@ -28,9 +28,10 @@ export const messages = {
     deleted: 'Your Co-Instructor role has been removed permanently.',
   },
 
-  trackWater: {
-    completed: 'You finally reached you goal !',
-    inCompleted: 'You were not able to reach you goal !',
+  shop: {
+    added: 'Shop data added.',
+    changedStatus: 'Your book shop status changed !',
+    deleted: 'Shop data deleted.',
   },
 
   settings: {

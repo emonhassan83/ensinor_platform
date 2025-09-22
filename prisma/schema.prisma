@@ -1630,11 +1630,15 @@ enum ReviewModelType {
 
 enum NotificationModeType {
   users
-  courses
-  quiz
-  orders
-  payments
-  events
+  shop
+  course
+  event
+  assignment
+  order
+  payment
+  certificate
+  batch
+  withdraw_request
 }
 
 enum UserStatus {
@@ -1660,7 +1664,6 @@ enum CoursesStatus {
 
 enum BookStatus {
   inReview
-  inPublishing
   published
 }
 
