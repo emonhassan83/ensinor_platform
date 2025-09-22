@@ -27,6 +27,8 @@ router.post(
 
 router.get('/', CourseController.getAllFromDB);
 
+router.get('/filter-data', CourseController.getAllFilterDataFromDB);
+
 router.get(
   '/company/:companyId',
   auth(UserRole.company_admin),

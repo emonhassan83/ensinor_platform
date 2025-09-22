@@ -34,6 +34,17 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getAllFilterDataFromDB = catchAsync(async (req, res) => {
+  const result = await CourseService.getAllFilterDataFromDB();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Courses filter data fetched!',
+    data: result,
+  });
+});
+
 const getByCompanyFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -135,6 +146,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CourseController = {
   insertIntoDB,
   getAllFromDB,
+  getAllFilterDataFromDB,
   getByCompanyFromDB,
   getMyCourseFromDB,
   getMyInstructorCourse,

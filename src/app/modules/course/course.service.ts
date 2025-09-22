@@ -1,10 +1,8 @@
 import {
-  Company,
   Course,
   CoursesStatus,
   PlatformType,
   Prisma,
-  User,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -17,117 +15,135 @@ import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 import { findAdmin } from '../../utils/findAdmin';
-import { sendNotifYToAdmin } from './course.utils';
+import { sendNotifYToAdmin, sendNotifYToUser } from './course.utils';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { authorId, instructorId, platform } = payload;
+  const { platform, instructorId, authorId } = payload;
 
-  // === Validate Author
-  const author = await prisma.user.findFirst({
-    where: {
-      id: authorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-    include: {
-      companyAdmin: {
-        select: {
-          company: {
-            select: {
-              id: true,
-            },
-          },
-        },
-      },
-      businessInstructor: {
-        select: {
-          company: {
-            select: {
-              id: true,
-            },
-          },
-        },
-      },
-    },
-  });
-  if (!author) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
-  }
-
-  // === Validate Instructor
-  const instructor = await prisma.user.findFirst({
-    where: {
-      id: instructorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!instructor) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
-  }
-
-  let company: any = null;
+  let resolvedAuthorId: string | undefined = authorId;
+  let resolvedInstructorId: string | undefined = instructorId;
+  let resolvedCompanyId: string | undefined = payload.companyId;
   let companyAuthor: any = null;
+  let company: any = null;
 
-  // 🔹 2. If platform = company → validate company & company admin
-  if (platform === PlatformType.company) {
-    if (
-      author.role !== UserRole.company_admin &&
-      author.role !== UserRole.business_instructors
-    ) {
+  // 🔹 1. Platform = Admin
+  if (platform === PlatformType.admin) {
+    const superAdmin = await findAdmin();
+    if (!superAdmin)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Super admin not found!');
+
+    if (!resolvedInstructorId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'Only company admin or business instructor can add shop data in company platform!',
+        'InstructorId is required for admin platform.',
       );
     }
 
-    if (author.role === UserRole.company_admin) {
-      payload.companyId = author.companyAdmin?.company!.id as string;
-    }
-    if (author.role === UserRole.business_instructors) {
-      payload.companyId = author.businessInstructor?.company!.id as string;
+    resolvedAuthorId = superAdmin.id;
+  }
+
+  // 🔹 2. Platform = Company
+  if (platform === PlatformType.company) {
+    const actor = await prisma.user.findFirst({
+      where: {
+        id: resolvedAuthorId ?? resolvedInstructorId,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+      include: {
+        companyAdmin: { select: { company: { select: { id: true } } } },
+        businessInstructor: {
+          select: {
+            company: {
+              select: { id: true, author: { select: { userId: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!actor)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Actor user not found!');
+
+    if (actor.role === UserRole.company_admin) {
+      // Case A: company admin creates course
+      if (!resolvedInstructorId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'InstructorId is required when company admin creates a course.',
+        );
+      }
+      resolvedAuthorId = actor.id;
+      resolvedCompanyId = actor.companyAdmin?.company?.id;
+    } else if (actor.role === UserRole.business_instructors) {
+      // Case B: business instructor creates course
+      resolvedInstructorId = actor.id;
+      resolvedCompanyId = actor.businessInstructor?.company?.id;
+
+      if (!actor.businessInstructor?.company?.author?.userId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Company admin not linked with this business instructor.',
+        );
+      }
+
+      // assign company admin (author)
+      const companyAdminUser = await prisma.user.findFirst({
+        where: {
+          id: actor.businessInstructor.company.author.userId,
+          role: UserRole.company_admin,
+          status: UserStatus.active,
+          isDeleted: false,
+        },
+      });
+      if (!companyAdminUser)
+        throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
+      resolvedAuthorId = companyAdminUser.id;
+      companyAuthor = companyAdminUser;
+    } else {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Only company admin or business instructor can create company courses.',
+      );
     }
 
     // Validate company
     company = await prisma.company.findFirst({
-      where: { id: payload.companyId, isDeleted: false },
-      include: {
-        author: {
-          select: {
-            user: {
-              select: {
-                id: true,
-              },
-            },
-          },
-        },
-      },
+      where: { id: resolvedCompanyId, isDeleted: false },
+      include: { author: { select: { user: { select: { id: true } } } } },
     });
-    if (!company) {
+    if (!company)
       throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-    }
-
-    if (company.isActive === false) {
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        'Your company is not active now!',
-      );
-    }
-
-    companyAuthor = await prisma.user.findFirst({
-      where: {
-        id: company.author.user.id,
-        role: UserRole.company_admin,
-        status: UserStatus.active,
-        isDeleted: false,
-      },
-    });
-    if (!companyAuthor) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
-    }
+    if (!company.isActive)
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Company is not active!');
   }
 
-  // upload to image
+  // 🔹 Validate instructor user
+  const instructorUser = await prisma.user.findFirst({
+    where: {
+      id: resolvedInstructorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!instructorUser)
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Instructor not found or inactive!',
+    );
+
+  if (
+    ![UserRole.instructor, UserRole.business_instructors].includes(
+      // @ts-ignore
+      instructorUser.role,
+    )
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'InstructorId must belong to an instructor.',
+    );
+  }
+
+  // 🔹 Upload thumbnail
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -135,36 +151,40 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     })) as string;
   }
 
-  // sent isFreeCourse field
-  payload.price === 0 && (payload.isFreeCourse = true);
-  author.role === UserRole.super_admin &&
-    (payload.status = CoursesStatus.approved as any);
+  // 🔹 Set flags
+  if (typeof payload.price === 'number' && payload.price === 0) {
+    payload.isFreeCourse = true;
+  }
 
-  // Create Course + Update Counts ===
+  // Auto approve if superAdmin author
+  const authorUser = await prisma.user.findUnique({
+    where: { id: resolvedAuthorId },
+  });
+
+  // 🔹 Create transaction
   const result = await prisma.$transaction(async tx => {
     const newCourse = await tx.course.create({
-      data: payload,
+      data: {
+        ...payload,
+        authorId: resolvedAuthorId as string,
+        instructorId: resolvedInstructorId as string,
+        companyId: resolvedCompanyId ?? null,
+      },
     });
-    if (!newCourse) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Course creation failed!');
-    }
 
-    // Increase company course count
+    // Update company counters
     if (company) {
       await tx.company.update({
         where: { id: company.id },
-        data: {
-          courses: { increment: 1 },
-        },
+        data: { courses: { increment: 1 } },
       });
     }
 
-    // If instructor exists
-    if (instructorId) {
+    // Update instructor counters
+    if (resolvedInstructorId) {
       const businessInstructor = await tx.businessInstructor.findUnique({
-        where: { userId: instructorId },
+        where: { userId: resolvedInstructorId },
       });
-
       if (businessInstructor) {
         await tx.businessInstructor.update({
           where: { id: businessInstructor.id },
@@ -172,7 +192,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
         });
       } else {
         const instructorRecord = await tx.instructor.findUnique({
-          where: { userId: instructorId },
+          where: { userId: resolvedInstructorId },
         });
         if (instructorRecord) {
           await tx.instructor.update({
@@ -186,14 +206,14 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     return newCourse;
   });
 
-    // if platform wise sent notification
-    if (platform === PlatformType.admin) {
-      const admin = await findAdmin();
-      if (!admin) throw new Error('Super admin not found!');
-      await sendNotifYToAdmin(author, admin);
-    } else if (platform === PlatformType.company) {
-      await sendNotifYToAdmin(author, companyAuthor);
-    }
+  // 🔹 Send notification
+  if (platform === PlatformType.admin) {
+    const admin = await findAdmin();
+    if (!admin) throw new Error('Super admin not found!');
+    await sendNotifYToAdmin(authorUser!, admin);
+  } else if (platform === PlatformType.company && companyAuthor) {
+    await sendNotifYToAdmin(authorUser!, companyAuthor);
+  }
 
   return result;
 };
@@ -274,6 +294,77 @@ const getAllFromDB = async (
       total,
     },
     data: result,
+  };
+};
+
+const getAllFilterDataFromDB = async () => {
+  const andConditions: Prisma.CourseWhereInput[] = [
+    { status: CoursesStatus.approved, isDeleted: false },
+  ];
+
+  const whereConditions: Prisma.CourseWhereInput = {
+    AND: andConditions,
+  };
+
+  // === Categories ===
+  const categories = await prisma.course.groupBy({
+    by: ['category'],
+    where: whereConditions,
+    _count: { category: true },
+    orderBy: { category: 'asc' }, // alphabetically
+  });
+
+  const formattedCategories = categories.map(item => ({
+    name: item.category,
+    count: item._count.category,
+  }));
+
+  // === Price (free vs paid) ===
+  const freePaid = await prisma.course.groupBy({
+    by: ['isFreeCourse'],
+    where: whereConditions,
+    _count: { isFreeCourse: true },
+  });
+
+  const priceFilter = {
+    free: freePaid.find(f => f.isFreeCourse === true)?._count.isFreeCourse || 0,
+    paid:
+      freePaid.find(f => f.isFreeCourse === false)?._count.isFreeCourse || 0,
+  };
+
+  // === Skill Levels ===
+  const levels = await prisma.course.groupBy({
+    by: ['level'],
+    where: whereConditions,
+    _count: { level: true },
+    orderBy: { level: 'asc' },
+  });
+
+  const formattedLevels = levels.map(item => ({
+    name: item.level,
+    count: item._count.level,
+  }));
+
+  // === Languages ===
+  const languages = await prisma.course.groupBy({
+    by: ['language'],
+    where: whereConditions,
+    _count: { language: true },
+    orderBy: { language: 'asc' },
+  });
+
+  const formattedLanguages = languages.map(item => ({
+    name: item.language,
+    count: item._count.language,
+  }));
+
+  return {
+    data: {
+      categories: formattedCategories,
+      price: priceFilter,
+      levels: formattedLevels,
+      languages: formattedLanguages,
+    },
   };
 };
 
@@ -361,6 +452,7 @@ const changeStatusIntoDB = async (
   }
 
   // sent notify to author when changed status
+  await sendNotifYToUser(status, course.instructorId!);
 
   return result;
 };
@@ -383,12 +475,16 @@ const deleteFromDB = async (id: string): Promise<Course> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not deleted!');
   }
 
+  // sent notify to author when changed status
+  await sendNotifYToUser('deleted', course.instructorId!);
+
   return result;
 };
 
 export const CourseService = {
   insertIntoDB,
   getAllFromDB,
+  getAllFilterDataFromDB,
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,

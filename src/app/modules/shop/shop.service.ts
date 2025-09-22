@@ -21,6 +21,16 @@ import { findAdmin } from '../../utils/findAdmin';
 const insertIntoDB = async (payload: IShop, files: any) => {
   const { authorId, platform } = payload;
 
+  // 🔹 1. If platform = admin → auto assign super admin
+  if (platform === PlatformType.admin) {
+    const admin = await findAdmin();
+    if (!admin) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+    }
+    payload.authorId = admin.id;
+  }
+
+  // 🔹 2. Validate author user
   const author = await prisma.user.findFirst({
     where: {
       id: authorId,
@@ -28,24 +38,8 @@ const insertIntoDB = async (payload: IShop, files: any) => {
       isDeleted: false,
     },
     include: {
-      companyAdmin: {
-        select: {
-          company: {
-            select: {
-              id: true,
-            },
-          },
-        },
-      },
-      businessInstructor: {
-        select: {
-          company: {
-            select: {
-              id: true,
-            },
-          },
-        },
-      },
+      companyAdmin: { select: { company: { select: { id: true } } } },
+      businessInstructor: { select: { company: { select: { id: true } } } },
     },
   });
   if (!author) {
@@ -55,7 +49,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
   let company: any = null;
   let companyAuthor: any = null;
 
-  // 🔹 2. If platform = company → validate company & company admin
+  // 🔹 3. If platform = company → validate company & company admin
   if (platform === PlatformType.company) {
     if (
       author.role !== UserRole.company_admin &&
@@ -89,10 +83,10 @@ const insertIntoDB = async (payload: IShop, files: any) => {
         },
       },
     });
+
     if (!company) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
     }
-
     if (company.isActive === false) {
       throw new ApiError(
         httpStatus.NOT_FOUND,
@@ -113,7 +107,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     }
   }
 
-  // upload thumbnail and file
+  // 4. upload thumbnail and file
   if (files) {
     const { thumbnail, file } = files as UploadedFiles;
 
@@ -134,11 +128,15 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     }
   }
 
+  //🔹 5. Create record
   const result = await prisma.book.create({
     data: payload,
   });
+  if (!result) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
+  }
 
-  // if platform wise sent notification
+  // 🔹 6. Send notification
   if (platform === PlatformType.admin) {
     const admin = await findAdmin();
     if (!admin) throw new Error('Super admin not found!');
@@ -147,9 +145,6 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     await sendNotifYToAdmin(author, companyAuthor);
   }
 
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
-  }
   return result;
 };
 
