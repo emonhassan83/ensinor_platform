@@ -1,10 +1,4 @@
-import {
-  Prisma,
-  Quiz,
-  QuizAnswer,
-  QuizAttempt,
-  UserStatus,
-} from '@prisma/client';
+import { CourseGrade, Prisma, QuizAnswer } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IQuizAnswer, IQuizAnswerFilterRequest } from './quizAnswer.interface';
@@ -53,6 +47,11 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
       isCorrect: option.isCorrect,
     },
   });
+  if (!result)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Quiz question answer saved failed!',
+    );
 
   return result;
 };
@@ -112,7 +111,7 @@ const completeAttemptIntoDB = async (attemptId: string) => {
       lastActivity: new Date(),
       marksObtained,
       correctRate,
-      grade,
+      grade: grade || "N/A",
     },
   });
 
@@ -191,6 +190,7 @@ const getByIdFromDB = async (id: string) => {
       attempt: true,
     },
   });
+  
   if (!result)
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
   return result;

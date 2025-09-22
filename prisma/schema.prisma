@@ -664,20 +664,20 @@ model Options {
 }
 
 model QuizAttempt {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   quizId        String
   userId        String
   authorId      String
-  timeTaken     String? // e.g. "15m", "00:12:45"
-  marksObtained Int      @default(0)
-  totalMarks    Int      @default(0)
-  grade         String?
-  correctRate   Float    @default(0.0)
-  lastActivity  DateTime @default(now())
-  isCompleted   Boolean  @default(false)
-  isDeleted     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  timeTaken     Int?
+  marksObtained Int         @default(0)
+  totalMarks    Int         @default(0)
+  grade         CourseGrade
+  correctRate   Float       @default(0.0)
+  lastAttempt   DateTime    @default(now())
+  isCompleted   Boolean     @default(false)
+  isDeleted     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   // Relations
   quiz       Quiz         @relation(fields: [quizId], references: [id])
@@ -1553,6 +1553,9 @@ enum CourseGrade {
   D
   D_MINUS
   F
+  PASS
+  FAIL
+  NOT_APPLY
 }
 
 enum NewsletterCategory {

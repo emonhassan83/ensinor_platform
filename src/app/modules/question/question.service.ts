@@ -66,6 +66,7 @@ const insertIntoDB = async (payload: IQuestion) => {
     data: {
       questions: { increment: 1 },
       marks: { increment: 1 },
+      time: { increment: 1 },
     },
   });
 
@@ -182,10 +183,9 @@ const getAllFromDB = async (
 
 const getOptionsByQuestionId = async (questionId: string) => {
   const question = await prisma.question.findUnique({
-    where: { id: questionId },
+    where: { id: questionId, isDeleted: false },
   });
-
-  if (!question || question.isDeleted) {
+  if (!question) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Question not found!');
   }
 
@@ -201,16 +201,16 @@ const getOptionsByQuestionId = async (questionId: string) => {
 
 const getByIdFromDB = async (id: string): Promise<Question | null> => {
   const result = await prisma.question.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       quiz: true,
+      options: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Quiz question not found!');
   }
-
   return result;
 };
 
@@ -219,9 +219,9 @@ const updateIntoDB = async (
   payload: Partial<IQuestion>,
 ): Promise<Question> => {
   const question = await prisma.question.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!question || question?.isDeleted) {
+  if (!question) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz question not found!');
   }
 
@@ -232,10 +232,10 @@ const updateIntoDB = async (
       name: payload.name,
     },
   });
+
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz question not updated!');
   }
-
   return result;
 };
 
@@ -270,9 +270,9 @@ const updateOption = async (
 
 const deleteFromDB = async (id: string): Promise<Question> => {
   const question = await prisma.question.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!question || question?.isDeleted) {
+  if (!question) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz question not found!');
   }
 
@@ -292,6 +292,7 @@ const deleteFromDB = async (id: string): Promise<Question> => {
     data: {
       questions: { decrement: 1 },
       marks: { decrement: 1 },
+      time: { decrement: 1 },
     },
   });
 

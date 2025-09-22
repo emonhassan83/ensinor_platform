@@ -32,12 +32,12 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
     where: { quizId, userId, isDeleted: false },
   });
   if (existingAttempt) {
-    if (existingAttempt.isCompleted) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Quiz attempt already completed!',
-      );
-    }
+    // if (existingAttempt.isCompleted) {
+    //   throw new ApiError(
+    //     httpStatus.BAD_REQUEST,
+    //     'Quiz attempt already completed!',
+    //   );
+    // }
     return existingAttempt;
   }
 
@@ -55,6 +55,7 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
   return result;
 };
 
+// Ignore this fixed this in quiz answer
 const completeAttemptIntoDB = async (attemptId: string) => {
   // 1. Find attempt
   const attempt = await prisma.quizAttempt.findFirst({
@@ -151,8 +152,22 @@ const getAllFromDB = async (
           },
 
     include: {
-      user: true,
-      quiz: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      quiz: {
+        include: {
+          course: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -174,15 +189,29 @@ const getByIdFromDB = async (id: string): Promise<QuizAttempt | null> => {
   const result = await prisma.quizAttempt.findUnique({
     where: { id, isDeleted: false },
     include: {
-      user: true,
-      quiz: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      quiz: {
+        include: {
+          course: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      },
+      quizAnswer: true
     },
   });
 
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Quiz Attempt not found!');
   }
-
   return result;
 };
 

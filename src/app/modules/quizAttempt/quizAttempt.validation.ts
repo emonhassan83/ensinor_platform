@@ -1,3 +1,4 @@
+import { CourseGrade } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -16,14 +17,12 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     timeTaken: z
-      .string({ required_error: 'Quiz attempt timeTaken is required!' })
+      .number({ required_error: 'Quiz attempt timeTaken is required!' })
       .optional(),
     marksObtained: z
       .number({ required_error: 'Quiz attempt marksObtained is required!' })
       .optional(),
-    grade: z
-      .string({ required_error: 'Quiz attempt grade is required!' })
-      .optional(),
+    grade: z.nativeEnum(CourseGrade).optional(),
     correctRate: z
       .number({ required_error: 'Quiz attempt correctRate is required!' })
       .optional(),
