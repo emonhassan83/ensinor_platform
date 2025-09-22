@@ -33,6 +33,11 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       authorId,
       isDeleted: false,
     },
+    select: {
+      id: true,
+      companyId: true,
+      platform: true,
+    },
   });
   if (courses.length !== courseIds.length) {
     throw new ApiError(
@@ -40,6 +45,34 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       'One or more courses do not belong to this author!',
     );
   }
+
+  // Assign companyId if any course has it
+  const companyIds = courses
+    .map(c => c.companyId)
+    .filter((id): id is string => !!id);
+
+  if (companyIds.length > 0) {
+    // Ensure all courses are from the same company
+    const uniqueCompanyIds = [...new Set(companyIds)];
+    if (uniqueCompanyIds.length > 1) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'All courses in a bundle must belong to the same company!',
+      );
+    }
+
+    bundleData.companyId = uniqueCompanyIds[0];
+  }
+
+  // Assign platform
+  const platforms = [...new Set(courses.map(c => c.platform))];
+  if (platforms.length > 1) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'All courses in a bundle must have the same platform!',
+    );
+  }
+  bundleData.platform = platforms[0]; // take the only platform
 
   // upload to image
   if (file) {
@@ -74,14 +107,19 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
 const getAllFromDB = async (
   params: ICourseBundleFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy: { authorId?: string; companyId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseBundleWhereInput[] = [
-    { authorId: userId, isDeleted: false },
-  ];
+  const andConditions: Prisma.CourseBundleWhereInput[] = [{ isDeleted: false }];
+  // Filter either by authorId, instructorId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.companyId) {
+    andConditions.push({ companyId: filterBy.companyId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -140,17 +178,16 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<CourseBundle | null> => {
   const result = await prisma.courseBundle.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: { select: { id: true, name: true, email: true, photoUrl: true } },
       courseBundleCourses: { include: { course: true } },
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course bundle not found!');
   }
-
   return result;
 };
 
@@ -159,8 +196,10 @@ const updateIntoDB = async (
   payload: Partial<ICourseBundle>,
   file: any,
 ): Promise<CourseBundle> => {
-  const bundle = await prisma.courseBundle.findUnique({ where: { id } });
-  if (!bundle || bundle?.isDeleted) {
+  const bundle = await prisma.courseBundle.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!bundle) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course bundle not found!');
   }
 
@@ -175,7 +214,7 @@ const updateIntoDB = async (
     where: { id },
     data: {
       ...payload,
-       thumbnail: payload.thumbnail,
+      thumbnail: payload.thumbnail,
     },
     include: {
       author: true,
@@ -190,8 +229,10 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<CourseBundle> => {
-  const bundle = await prisma.courseBundle.findUnique({ where: { id } });
-  if (!bundle || bundle?.isDeleted) {
+  const bundle = await prisma.courseBundle.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!bundle) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course bundle not found!');
   }
 

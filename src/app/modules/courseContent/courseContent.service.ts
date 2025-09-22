@@ -128,7 +128,6 @@ const getByIdFromDB = async (id: string): Promise<CourseContent | null> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
   }
-
   return result;
 };
 

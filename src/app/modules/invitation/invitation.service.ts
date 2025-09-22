@@ -35,14 +35,19 @@ const insertIntoDB = async (payload: IInvitation) => {
             select: {
               id: true,
               name: true,
+              isActive: true,
             },
           },
         },
       },
     },
   });
+
   if (!inviter) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+  }
+  if (inviter.companyAdmin?.company?.isActive === false) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company active!');
   }
 
   // 2. Check department validity
@@ -147,12 +152,18 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       id: true,
       name: true,
       companyAdmin: {
-        select: { company: { select: { id: true, name: true } } },
+        select: {
+          company: { select: { id: true, name: true, isActive: true } },
+        },
       },
     },
   });
+  
   if (!inviter) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+  }
+  if (inviter.companyAdmin?.company?.isActive === false) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company active!');
   }
 
   // 2. Validate department

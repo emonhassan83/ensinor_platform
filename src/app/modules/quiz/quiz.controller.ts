@@ -19,7 +19,9 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, quizFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await QuizService.getByAuthorIdFromDB(filters, options, req.params.authorId);
+  const result = await QuizService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +36,9 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, quizFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await QuizService.getAllFromDB(filters, options, req.params.courseId);
+  const result = await QuizService.getAllFromDB(filters, options, {
+    courseId: req.params.courseId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -56,10 +60,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await QuizService.updateIntoDB(
-    req.params.id,
-    req.body
-  );
+  const result = await QuizService.updateIntoDB(req.params.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

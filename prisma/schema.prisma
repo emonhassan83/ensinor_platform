@@ -491,7 +491,7 @@ model Course {
   updatedAt        DateTime      @updatedAt
 
   author     User     @relation("CourseAuthor", fields: [authorId], references: [id])
-  instructor User    @relation("CourseInstructor", fields: [instructorId], references: [id])
+  instructor User     @relation("CourseInstructor", fields: [instructorId], references: [id])
   companies  Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many with CourseBundle via join table
@@ -536,22 +536,23 @@ model CourseContent {
 }
 
 model CourseBundle {
-  id             String     @id @default(uuid())
+  id             String       @id @default(uuid())
   authorId       String?
   companyId      String?
+  platform       PlatformType
   title          String
   category       String
   price          Int
   thumbnail      String?
-  discount       Int        @default(0)
-  popularity     Int        @default(0)
-  totalCompleted Int        @default(0)
-  status         UserStatus @default(active)
-  avgRating      Float      @default(0.0)
-  ratingCount    Int        @default(0)
-  isDeleted      Boolean    @default(false)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  discount       Int          @default(0)
+  enrollments    Int          @default(0)
+  totalCompleted Int          @default(0)
+  status         UserStatus   @default(active)
+  avgRating      Float        @default(0.0)
+  ratingCount    Int          @default(0)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   // Relations
   author  User?    @relation("BundleAuthor", fields: [authorId], references: [id])
@@ -613,8 +614,8 @@ model Quiz {
   authorId     String
   courseId     String
   deadline     String?
-  time         String? // e.g. "30m" or "01:00:00"
-  marks        Int?
+  time         Int      @default(0)
+  marks        Int      @default(0)
   questions    Int      @default(0)
   totalAttempt Int      @default(0)
   isDeleted    Boolean  @default(false)

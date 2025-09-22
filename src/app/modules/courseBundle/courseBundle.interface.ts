@@ -1,3 +1,5 @@
+import { PlatformType } from "@prisma/client";
+
 export type ICourseBundleFilterRequest = {
   searchTerm?: string | undefined;
   title?: string | undefined;
@@ -6,6 +8,8 @@ export type ICourseBundleFilterRequest = {
 
 export type ICourseBundle = {
   authorId: string;
+  companyId?: string;
+  platform: PlatformType
   title: string;
   course: string[];
   category: string;

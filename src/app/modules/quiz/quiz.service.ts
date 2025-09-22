@@ -45,14 +45,19 @@ const insertIntoDB = async (payload: IQuiz) => {
 const getAllFromDB = async (
   params: IQuizFilterRequest,
   options: IPaginationOptions,
-  courseId?: string,
+  filterBy: { authorId?: string; courseId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.QuizWhereInput[] = [
-    { courseId, isDeleted: false },
-  ];
+  const andConditions: Prisma.QuizWhereInput[] = [{ isDeleted: false }];
+  // Filter either by authorId, instructorId
+  if (filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy.courseId) {
+    andConditions.push({ courseId: filterBy.courseId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -93,73 +98,11 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-  });
-
-  const total = await prisma.quiz.count({
-    where: whereConditions,
-  });
-
-  return {
-    meta: {
-      page,
-      limit,
-      total,
+    include: {
+      course: {
+        select: { id: true, title: true },
+      },
     },
-    data: result,
-  };
-};
-
-const getByAuthorIdFromDB = async (
-  params: IQuizFilterRequest,
-  options: IPaginationOptions,
-  authorId?: string,
-) => {
-  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
-
-  const andConditions: Prisma.QuizWhereInput[] = [
-    { authorId, isDeleted: false },
-  ];
-
-  // Search across Package and nested User fields
-  if (searchTerm) {
-    andConditions.push({
-      OR: quizSearchAbleFields.map(field => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
-      })),
-    });
-  }
-
-  // Filters
-  if (Object.keys(filterData).length > 0) {
-    andConditions.push({
-      AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
-      })),
-    });
-  }
-
-  const whereConditions: Prisma.QuizWhereInput = {
-    AND: andConditions,
-  };
-
-  const result = await prisma.quiz.findMany({
-    where: whereConditions,
-    skip,
-    take: limit,
-    orderBy:
-      options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
   });
 
   const total = await prisma.quiz.count({
@@ -178,16 +121,18 @@ const getByAuthorIdFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<Quiz | null> => {
   const result = await prisma.quiz.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
-      course: true,
+      course: {
+        select: { id: true, title: true },
+      },
+      questionsList: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Quiz not found!');
   }
-
   return result;
 };
 
@@ -196,9 +141,9 @@ const updateIntoDB = async (
   payload: Partial<IQuiz>,
 ): Promise<Quiz> => {
   const quiz = await prisma.quiz.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!quiz || quiz?.isDeleted) {
+  if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz not found!');
   }
 
@@ -215,9 +160,9 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string): Promise<Quiz> => {
   const quiz = await prisma.quiz.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!quiz || quiz?.isDeleted) {
+  if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz not found!');
   }
 
@@ -237,7 +182,6 @@ const deleteFromDB = async (id: string): Promise<Quiz> => {
 export const QuizService = {
   insertIntoDB,
   getAllFromDB,
-  getByAuthorIdFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

@@ -28,7 +28,7 @@ router.post(
 router.get('/', CourseBundleController.getAllFromDB);
 
 router.get(
-  '/my-bundle-course',
+  '/author/my-bundle-course',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,
@@ -36,6 +36,12 @@ router.get(
     UserRole.instructor,
   ),
   CourseBundleController.getMyCourseFromDB,
+);
+
+router.get(
+  '/company/:companyId',
+  auth(UserRole.company_admin),
+  CourseBundleController.getByCompanyFromDB,
 );
 
 router.get('/:id', CourseBundleController.getByIdFromDB);

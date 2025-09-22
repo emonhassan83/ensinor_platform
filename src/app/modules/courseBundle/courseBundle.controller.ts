@@ -18,8 +18,16 @@ const insertIntoDB = catchAsync(async (req, res) => {
 const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseBundleFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const filterBy = {
+    authorId: req.query.authorId as string | undefined,
+    companyId: req.query.companyId as string | undefined,
+  };
 
-  const result = await CourseBundleService.getAllFromDB(filters, options);
+  const result = await CourseBundleService.getAllFromDB(
+    filters,
+    options,
+    filterBy,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +42,26 @@ const getMyCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseBundleFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CourseBundleService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CourseBundleService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My Courses bundle data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByCompanyFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseBundleFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseBundleService.getAllFromDB(filters, options, {
+    companyId: req.params.companyId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -83,6 +110,7 @@ export const CourseBundleController = {
   insertIntoDB,
   getAllFromDB,
   getMyCourseFromDB,
+  getByCompanyFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,
