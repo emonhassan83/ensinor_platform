@@ -245,7 +245,7 @@ model CompanyRequest {
   userId                String
   name                  String
   organizationEmail     String     @unique
-  PlatformType          String
+  platformType          String
   phoneNumber           String
   role                  String
   companySize           Int
@@ -464,8 +464,8 @@ model Book {
 model Course {
   id               String        @id @default(uuid())
   authorId         String
+  instructorId     String
   companyId        String?
-  instructorId     String?
   title            String
   shortDescription String
   platform         PlatformType
@@ -491,7 +491,7 @@ model Course {
   updatedAt        DateTime      @updatedAt
 
   author     User     @relation("CourseAuthor", fields: [authorId], references: [id])
-  instructor User?    @relation("CourseInstructor", fields: [instructorId], references: [id])
+  instructor User    @relation("CourseInstructor", fields: [instructorId], references: [id])
   companies  Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many with CourseBundle via join table
@@ -515,7 +515,6 @@ model Course {
   resource           Resource[]
   coInstructor       CoInstructor[]
   assignment         Assignment[]
-  userId             String?
 
   @@map("courses")
 }

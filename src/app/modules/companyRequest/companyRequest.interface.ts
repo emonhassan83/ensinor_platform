@@ -10,6 +10,7 @@ export type ICompanyRequestFilterRequest = {
 export type ICompanyRequest = {
   userId: string;
   name: string;
+  platformType: string;
   organizationEmail: string;
   companyType: string;
   phoneNumber: string;

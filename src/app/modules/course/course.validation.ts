@@ -1,4 +1,4 @@
-import { CompanyType, CourseType } from '@prisma/client';
+import { CoursesStatus, CourseType, PlatformType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -17,7 +17,7 @@ const createValidationSchema = z.object({
       .optional(),
     title: z.string({ required_error: 'Title is required!' }),
     type: z.nativeEnum(CourseType).optional(),
-    company: z.nativeEnum(CompanyType),
+    platform: z.nativeEnum(PlatformType),
     shortDescription: z.string({
       required_error: 'Short description is required!',
     }),
@@ -45,8 +45,6 @@ const updateValidationSchema = z.object({
     shortDescription: z
       .string({ required_error: 'Short description is required!' })
       .optional(),
-    type: z.nativeEnum(CourseType).optional(),
-    company: z.nativeEnum(CompanyType).optional(),
     category: z.string({ required_error: 'Category is required!' }).optional(),
     level: z.string({ required_error: 'Course level is required!' }).optional(),
     language: z
@@ -72,7 +70,14 @@ const updateValidationSchema = z.object({
   }),
 });
 
+const changedStatusValidationSchema = z.object({
+  body: z.object({
+    status: z.nativeEnum(CoursesStatus),
+  }),
+});
+
 export const CourseValidation = {
   createValidationSchema,
   updateValidationSchema,
+  changedStatusValidationSchema,
 };

@@ -2,6 +2,7 @@ import {
   Company,
   Course,
   CoursesStatus,
+  PlatformType,
   Prisma,
   User,
   UserRole,
@@ -15,9 +16,11 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
+import { findAdmin } from '../../utils/findAdmin';
+import { sendNotifYToAdmin } from './course.utils';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { authorId, instructorId, companyId } = payload;
+  const { authorId, instructorId, platform } = payload;
 
   // === Validate Author
   const author = await prisma.user.findFirst({
@@ -26,38 +29,101 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       status: UserStatus.active,
       isDeleted: false,
     },
+    include: {
+      companyAdmin: {
+        select: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+      businessInstructor: {
+        select: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
-  // === Validate Instructor (optional) ===
-  let instructor: User | null = null;
-  if (instructorId) {
-    instructor = await prisma.user.findFirst({
-      where: {
-        id: instructorId,
-        status: UserStatus.active,
-        isDeleted: false,
-      },
-    });
-    if (!instructor) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
-    }
+  // === Validate Instructor
+  const instructor = await prisma.user.findFirst({
+    where: {
+      id: instructorId,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!instructor) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Instructor not found!');
   }
 
-  // === Validate Company (if provided) ===
-  let company: Company | null = null;
-  if (companyId) {
+  let company: any = null;
+  let companyAuthor: any = null;
+
+  // 🔹 2. If platform = company → validate company & company admin
+  if (platform === PlatformType.company) {
+    if (
+      author.role !== UserRole.company_admin &&
+      author.role !== UserRole.business_instructors
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Only company admin or business instructor can add shop data in company platform!',
+      );
+    }
+
+    if (author.role === UserRole.company_admin) {
+      payload.companyId = author.companyAdmin?.company!.id as string;
+    }
+    if (author.role === UserRole.business_instructors) {
+      payload.companyId = author.businessInstructor?.company!.id as string;
+    }
+
+    // Validate company
     company = await prisma.company.findFirst({
-      where: {
-        id: companyId,
-        userId: authorId,
-        isDeleted: false,
+      where: { id: payload.companyId, isDeleted: false },
+      include: {
+        author: {
+          select: {
+            user: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!company) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    }
+
+    if (company.isActive === false) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Your company is not active now!',
+      );
+    }
+
+    companyAuthor = await prisma.user.findFirst({
+      where: {
+        id: company.author.user.id,
+        role: UserRole.company_admin,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+    });
+    if (!companyAuthor) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
     }
   }
 
@@ -84,9 +150,9 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     }
 
     // Increase company course count
-    if (companyId) {
+    if (company) {
       await tx.company.update({
-        where: { id: companyId },
+        where: { id: company.id },
         data: {
           courses: { increment: 1 },
         },
@@ -119,6 +185,15 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 
     return newCourse;
   });
+
+    // if platform wise sent notification
+    if (platform === PlatformType.admin) {
+      const admin = await findAdmin();
+      if (!admin) throw new Error('Super admin not found!');
+      await sendNotifYToAdmin(author, admin);
+    } else if (platform === PlatformType.company) {
+      await sendNotifYToAdmin(author, companyAuthor);
+    }
 
   return result;
 };

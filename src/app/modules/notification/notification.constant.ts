@@ -34,6 +34,12 @@ export const messages = {
     deleted: 'Shop data deleted.',
   },
 
+  course: {
+    added: 'Course video upload.',
+    changedStatus: 'Your course status changed !',
+    deleted: 'Your course deleted.',
+  },
+
   settings: {
     systemUpdated: 'System settings updated.',
   },

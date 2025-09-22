@@ -241,7 +241,7 @@ const updateIntoDB = async (
         data: {
           userId: companyAdmin.id,
           name: updatedRequest.name,
-          industryType: updatedRequest.companyType,
+          industryType: updatedRequest.platformType,
         },
       });
 

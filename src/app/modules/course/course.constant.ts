@@ -1,16 +1,9 @@
-export const courseSearchAbleFields = [
-  'title',
-  'category',
-  'shortDescription',
-  'description',
-];
+export const courseSearchAbleFields = ['title', 'category'];
 
 export const courseFilterableFields = [
   'searchTerm',
   'category',
-  'type',
   'level',
   'language',
   'status',
-  'avgRating',
 ];

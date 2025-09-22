@@ -115,7 +115,7 @@ const getAllFromDB = async (
 
   const courseMap: Record<string, { totalCourses: number; totalEnrolled: number }> = {};
   courses.forEach(c => {
-    courseMap[c.instructorId] = {
+    courseMap[c.instructorId!] = {
       totalCourses: c._count.id || 0,
       totalEnrolled: c._sum.enrollments || 0,
     };

@@ -73,7 +73,7 @@ router.put(
 
 router.patch(
   '/status/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(CourseValidation.updateValidationSchema),
   CourseController.changeStatusIntoDB,
 );
