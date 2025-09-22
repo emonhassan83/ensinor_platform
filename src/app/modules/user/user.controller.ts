@@ -106,6 +106,7 @@ const invitationInstructor = catchAsync(async (req: Request, res: Response) => {
 
 const createStudent = catchAsync(async (req: Request, res: Response) => {
   const result = await UserServices.createStudent(req.body, req.user!.userId);
+  
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
     statusCode: httpStatus.OK,

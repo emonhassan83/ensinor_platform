@@ -34,7 +34,26 @@ const getMyShopFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, shopFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ShopService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await ShopService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My shop books data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByCompanyFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, shopFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await ShopService.getAllFromDB(filters, options, {
+    companyId: req.params.companyId
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -96,6 +115,7 @@ export const ShopController = {
   insertIntoDB,
   getAllFromDB,
   getMyShopFromDB,
+  getByCompanyFromDB,
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,

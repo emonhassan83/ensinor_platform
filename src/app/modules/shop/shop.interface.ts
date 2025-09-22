@@ -1,3 +1,5 @@
+import { PlatformType } from "@prisma/client";
+
 export type IShopFilterRequest = {
   searchTerm?: string | undefined;
   title?: string | undefined;
@@ -7,6 +9,8 @@ export type IShopFilterRequest = {
 
 export type IShop = {
   authorId: string;
+  companyId?: string;
+  platform: PlatformType
   title: string;
   description: string;
   writer: string;

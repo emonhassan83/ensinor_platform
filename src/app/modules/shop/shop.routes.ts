@@ -26,9 +26,15 @@ router.post(
 router.get('/', ShopController.getAllFromDB);
 
 router.get(
-  '/my-shop',
-  auth(UserRole.super_admin, UserRole.instructor),
+  '/author/my-shop',
+  auth(UserRole.business_instructors, UserRole.instructor),
   ShopController.getMyShopFromDB,
+);
+
+router.get(
+  '/company/:companyId',
+  auth(UserRole.company_admin),
+  ShopController.getByCompanyFromDB,
 );
 
 router.get('/:id', ShopController.getByIdFromDB);

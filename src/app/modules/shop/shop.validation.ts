@@ -1,3 +1,4 @@
+import { PlatformType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -6,6 +7,10 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
+    companyId: z
+      .string({ required_error: 'Company is required' })
+      .uuid('company must be a valid UUID').optional(),
+    platform: z.nativeEnum(PlatformType),
     title: z.string({ required_error: 'Title is required!' }),
     description: z.string({ required_error: 'Description is required!' }),
     writer: z.string({ required_error: 'Writer is required!' }),

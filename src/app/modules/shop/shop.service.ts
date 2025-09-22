@@ -57,14 +57,20 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 const getAllFromDB = async (
   params: IShopFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy?: { authorId?: string; companyId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.BookWhereInput[] = [
-    { authorId: userId, isDeleted: false },
-  ];
+  const andConditions: Prisma.BookWhereInput[] = [{ isDeleted: false }];
+  
+  // Filter either by authorId or companyId
+  if (filterBy && filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy && filterBy.companyId) {
+    andConditions.push({ companyId: filterBy.companyId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {

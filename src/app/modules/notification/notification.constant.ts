@@ -12,7 +12,7 @@ export const messages = {
     accountDeactivated: 'User account deactivated.',
     accountDeleted: 'Your account Deleted.',
     invitationSent: 'Invitation sent',
-    joinRequest: 'Invitation sent',
+    joinRequest: 'Sent join request',
   },
 
   companyRequest: {

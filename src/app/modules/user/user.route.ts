@@ -55,6 +55,7 @@ router.post(
 
 router.post(
   '/student-invitation',
+  auth(UserRole.super_admin),
   validateRequest(UserValidation.createStudent),
   UserController.createStudent,
 );

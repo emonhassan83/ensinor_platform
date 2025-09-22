@@ -235,6 +235,7 @@ model Company {
   businessInstructor BusinessInstructor[]
   employees          Employee[]
   payment            Payment[]
+  Book               Book[]
 
   @@map("companies")
 }
@@ -244,7 +245,7 @@ model CompanyRequest {
   userId                String
   name                  String
   organizationEmail     String     @unique
-  companyType           String
+  PlatformType          String
   phoneNumber           String
   role                  String
   companySize           Int
@@ -345,19 +346,19 @@ model CoInstructor {
 }
 
 model Employee {
-  id           String   @id @unique @default(uuid())
-  userId       String   @unique
-  authorId     String
-  companyId    String
-  interests    String[] @default([])
-  university   String?
-  session      String?
-  subjects     String?
-  departmentId String
+  id              String   @id @unique @default(uuid())
+  userId          String   @unique
+  authorId        String
+  companyId       String
+  interests       String[] @default([])
+  university      String?
+  session         String?
+  subjects        String?
+  departmentId    String
   courseEnrolled  Int      @default(0)
   courseCompleted Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user       User       @relation(references: [id], fields: [userId])
   author     User       @relation("companyUser", references: [id], fields: [authorId])
@@ -428,8 +429,10 @@ model BankDetail {
 }
 
 model Book {
-  id            String     @id @default(uuid())
+  id            String       @id @default(uuid())
   authorId      String
+  companyId     String?
+  platform      PlatformType @default(admin)
   title         String
   description   String?
   writer        String
@@ -437,14 +440,16 @@ model Book {
   price         Float
   thumbnail     String?
   file          String
-  sales         Int        @default(0)
+  sales         Int          @default(0)
   publishedDate String?
-  status        BookStatus @default(inReview)
-  isDeleted     Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status        BookStatus   @default(inReview)
+  isDeleted     Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  author        User            @relation(fields: [authorId], references: [id]) // FK relation to User table
+  author  User     @relation(fields: [authorId], references: [id]) // FK relation to User table
+  company Company? @relation(fields: [companyId], references: [id]) // FK relation to Company table
+
   order         Order[]
   coupon        Coupon[]
   promoCode     PromoCode[]
@@ -463,7 +468,7 @@ model Course {
   instructorId     String?
   title            String
   shortDescription String
-  company          CompanyType
+  platform         PlatformType
   type             CourseType    @default(external)
   category         String
   level            CourseLevel
@@ -485,7 +490,7 @@ model Course {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  author     User    @relation("CourseAuthor", fields: [authorId], references: [id])
+  author     User     @relation("CourseAuthor", fields: [authorId], references: [id])
   instructor User?    @relation("CourseInstructor", fields: [instructorId], references: [id])
   companies  Company? @relation(fields: [companyId], references: [id])
 
@@ -700,22 +705,22 @@ model QuizAnswer {
 }
 
 model EnrolledCourse {
-  id             String         @id @default(uuid())
+  id             String       @id @default(uuid())
   userId         String
   authorId       String
   courseId       String
-  type           EnrollmentType
+  platform       PlatformType @default(admin)
   courseCategory String
-  completedRate  Int            @default(0)
-  courseMark     Int?           @default(0)
+  completedRate  Int          @default(0)
+  courseMark     Int?         @default(0)
   grade          CourseGrade?
-  learningTime   Int            @default(0) // in minutes
-  lectureWatched Int            @default(0)
-  lastActivity   DateTime       @default(now())
-  isComplete     Boolean        @default(false)
-  isDeleted      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  learningTime   Int          @default(0) // in minutes
+  lectureWatched Int          @default(0)
+  lastActivity   DateTime     @default(now())
+  isComplete     Boolean      @default(false)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   user   User   @relation("EnrolledUser", fields: [userId], references: [id])
   author User   @relation("CourseAuthor", fields: [authorId], references: [id])
@@ -819,13 +824,13 @@ model Certificate {
 
 //* Event Related Models
 model Event {
-  id             String      @id @default(uuid())
+  id             String       @id @default(uuid())
   authorId       String?
   companyId      String?
   title          String
   slogan         String
   type           String
-  company        CompanyType @default(platform)
+  platform       PlatformType @default(company)
   thumbnail      String
   organizedBy    String
   price          Int
@@ -836,10 +841,10 @@ model Event {
   description    String
   speakerSlogan  String
   scheduleSlogan String
-  registered     Int         @default(0)
-  isDeleted      Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  registered     Int          @default(0)
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   author    User?    @relation(fields: [authorId], references: [id])
   companies Company? @relation(fields: [companyId], references: [id])
@@ -1077,7 +1082,7 @@ model Payment {
   subscriptionId    String?
   modelType         PaymentModelType
   type              PaymentType
-  company           CompanyType
+  platform          PlatformType
   transactionId     String           @unique
   amount            Float            @default(0.00)
   adminEarning      Float            @default(0.00)
@@ -1607,14 +1612,9 @@ enum PaymentType {
   company_subscription
 }
 
-enum EnrollmentType {
-  business
-  platform
-}
-
-enum CompanyType {
-  business
-  platform
+enum PlatformType {
+  company
+  admin
 }
 
 enum CertificateRequestStatus {

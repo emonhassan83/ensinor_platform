@@ -167,18 +167,20 @@ const invitationCompanyAdmin = async (
       data: {
         userId: companyAdmin.id, // relation: Company → CompanyAdmin.id
         name: payload.name,
-        industryType: payload.companyType
+        industryType: payload.companyType,
       },
     });
 
     // 4️⃣ Send email with credentials
     await sendCompanyApprovalEmail(user.email, user.name, password);
 
-    // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(author, user.id, 'company_admin');
-
     return user;
   });
+
+  // 4️⃣ Send notify to invitee
+  if (author && result) {
+    await sendInvitationNotification(author, result.id, 'company_admin');
+  }
 
   return result;
 };
@@ -275,15 +277,13 @@ const createBusinessInstructor = async (
       password,
     );
 
-    // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(
-      company,
-      userData.id,
-      'business-instructor',
-    );
-
     return userData;
   });
+
+  // 4️⃣ Send notify to invitee
+  if (company && result) {
+    await sendInvitationNotification(company, result.id, 'business-instructor');
+  }
 
   return result;
 };
@@ -400,11 +400,13 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
       company.companyAdmin!.user.name,
     );
 
-    // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(company, user.id, 'employee');
-
     return user;
   });
+
+  // 4️⃣ Send notify to invitee
+  if (company && result) {
+    await sendInvitationNotification(company, result.id, 'employee');
+  }
 
   return result;
 };
@@ -526,11 +528,13 @@ const invitationInstructor = async (
     // 4️⃣ Send email with credentials
     await sendInstructorInvitationEmail(user.email, user.name, password);
 
-    // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(author, user.id, 'instructor');
-
     return user;
   });
+
+  // 4️⃣ Send notify to invitee
+  if (author && result) {
+    await sendInvitationNotification(author, result.id, 'instructor');
+  }
 
   return result;
 };
@@ -596,11 +600,13 @@ const createStudent = async (
     // 4️⃣ Send email with credentials
     await sendStudentInvitationEmail(user.email, user.name, password);
 
-    // 4️⃣ Send notify to invitee
-    await sendInvitationNotification(author, user.id, 'student');
-
     return user;
   });
+
+  // 4️⃣ Send notify to invitee
+  if (author && result) {
+    await sendInvitationNotification(author, result.id, 'student');
+  }
 
   return result;
 };
