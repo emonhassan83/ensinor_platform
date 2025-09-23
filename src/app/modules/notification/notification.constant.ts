@@ -40,8 +40,8 @@ export const messages = {
     deleted: 'Your course deleted.',
   },
 
-  quizSubmission: {
-    submit: 'Quiz attempt submission!',
+  enrolledCourse: {
+    completed: 'Course completed submission!',
   },
 
   subscription: {

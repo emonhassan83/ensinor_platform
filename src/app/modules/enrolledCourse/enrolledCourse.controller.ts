@@ -10,17 +10,17 @@ const insertIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Enroll course insert successfully!',
+    message: 'Enroll course enroll successfully!',
     data: result,
   });
 });
 
 const bulkInsertIntoDB = catchAsync(async (req, res) => {
-  const result = await EnrolledCourseService.enrollCoursesBulk(req.body);
+  const result = await EnrolledCourseService.enrollBundleCourses(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Bulk enroll course insert successfully!',
+    message: 'Bundle course enrolled successfully!',
     data: result,
   });
 });
@@ -32,7 +32,7 @@ const getMyFromDB = catchAsync(async (req, res) => {
   const result = await EnrolledCourseService.getAllFromDB(
     filters,
     options,
-    req.params.quizId,
+    req.user!.userId,
   );
 
   sendResponse(res, {

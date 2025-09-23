@@ -15,14 +15,14 @@ router.post(
 );
 
 router.post(
-  '/bulk',
+  '/bundle-courses',
   auth(UserRole.student, UserRole.employee),
   validateRequest(EnrolledCourseValidation.bulkEnrollValidationSchema),
   EnrolledCourseController.bulkInsertIntoDB,
 );
 
 router.get(
-  '/my-enrolled-courses',
+  '/author/my-enrolled-courses',
   auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.getMyFromDB,
 );
@@ -34,7 +34,7 @@ router.get(
 );
 
 router.patch(
-  '/mark-complete/:id',
+  '/complete/:id',
   auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.completeCourseIntoDB,
 );
@@ -48,7 +48,11 @@ router.put(
 
 router.put(
   '/:id',
-  auth(UserRole.student, UserRole.employee),
+  auth(
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(EnrolledCourseValidation.updateValidationSchema),
   EnrolledCourseController.updateIntoDB,
 );

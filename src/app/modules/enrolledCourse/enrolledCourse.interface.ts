@@ -1,4 +1,4 @@
-import { CourseGrade, EnrollmentType } from "@prisma/client";
+import { CourseGrade, PlatformType } from "@prisma/client";
 
 export type IEnrolledCourseFilterRequest = {
   searchTerm?: string | undefined;
@@ -7,9 +7,10 @@ export type IEnrolledCourseFilterRequest = {
 };
 
 export type IEnrolledCourse = {
+  userId: string;
   authorId: string;
   courseId: string;
-  type: EnrollmentType;
+  platform: PlatformType;
   courseCategory: string;
   completedRate?: number;
   courseMark?: number;

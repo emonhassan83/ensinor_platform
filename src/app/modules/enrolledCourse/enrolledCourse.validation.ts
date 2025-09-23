@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Create validation
 const createValidationSchema = z.object({
   body: z.object({
-    authorId: z
+    userId: z
       .string({ required_error: 'Author id is required' })
       .uuid('author id must be a valid UUID'),
     courseId: z
@@ -13,18 +13,14 @@ const createValidationSchema = z.object({
 });
 
 const bulkEnrollValidationSchema = z.object({
-  body: z
-    .array(
-      z.object({
-        authorId: z
-          .string({ required_error: 'Author id is required' })
-          .uuid('author id must be a valid UUID'),
-        courseId: z
-          .string({ required_error: 'Course id is required' })
-          .uuid('course id must be a valid UUID'),
-      }),
-    )
-    .min(1, { message: 'At least one enrollment is required' }),
+  body: z.object({
+    userId: z
+      .string({ required_error: 'Author id is required' })
+      .uuid('author id must be a valid UUID'),
+    bundleId: z
+      .string({ required_error: 'Course id is required' })
+      .uuid('course id must be a valid UUID'),
+  }),
 });
 
 // Create validation

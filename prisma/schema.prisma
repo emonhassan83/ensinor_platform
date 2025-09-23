@@ -222,6 +222,7 @@ model Company {
   instructor   Int      @default(0)
   size         Int      @default(0)
   courses      Int      @default(0)
+  enrolled     Int      @default(0)
   completed    Int      @default(0)
   isActive     Boolean  @default(false)
   isDeleted    Boolean  @default(false)
@@ -547,7 +548,6 @@ model CourseBundle {
   discount       Int          @default(0)
   enrollments    Int          @default(0)
   totalCompleted Int          @default(0)
-  status         UserStatus   @default(active)
   avgRating      Float        @default(0.0)
   ratingCount    Int          @default(0)
   isDeleted      Boolean      @default(false)
@@ -1635,6 +1635,7 @@ enum NotificationModeType {
   users
   shop
   course
+  enrolled_courses
   event
   quiz_attempts
   assignment
