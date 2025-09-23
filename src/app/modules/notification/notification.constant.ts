@@ -35,13 +35,13 @@ export const messages = {
   },
 
   course: {
-    added: 'Course video upload.',
+    added: 'New course upload.',
     changedStatus: 'Your course status changed !',
     deleted: 'Your course deleted.',
   },
 
-  settings: {
-    systemUpdated: 'System settings updated.',
+  quizSubmission: {
+    submit: 'Quiz attempt submission!',
   },
 
   subscription: {

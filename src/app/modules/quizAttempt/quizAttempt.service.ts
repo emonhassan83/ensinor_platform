@@ -1,4 +1,4 @@
-import { Prisma, Quiz, QuizAttempt, UserStatus } from '@prisma/client';
+import { Prisma, QuizAttempt, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -11,6 +11,7 @@ import ApiError from '../../errors/ApiError';
 
 const insertIntoDB = async (payload: IQuizAttempt) => {
   const { quizId, userId } = payload;
+  
   // 1. Validate quiz
   const quiz = await prisma.quiz.findFirst({
     where: { id: quizId, isDeleted: false },
@@ -76,7 +77,7 @@ const completeAttemptIntoDB = async (attemptId: string) => {
     where: { id: attempt.id },
     data: {
       isCompleted: true,
-      lastActivity: new Date(),
+      lastAttempt: new Date(),
     },
   });
 

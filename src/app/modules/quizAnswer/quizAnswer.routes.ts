@@ -15,7 +15,7 @@ router.post(
 );
 
 router.patch(
-  '/completed/:id',
+  '/completed/:attemptId',
   auth(UserRole.student, UserRole.employee),
   QuizAnswerController.completeAttemptIntoDB,
 );

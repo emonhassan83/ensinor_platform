@@ -16,7 +16,7 @@ const insertIntoDB = catchAsync(async (req, res) => {
 });
 
 const completeAttemptIntoDB = catchAsync(async (req, res) => {
-  const result = await QuizAnswerService.completeAttemptIntoDB(req.params.id);
+  const result = await QuizAnswerService.completeAttemptIntoDB(req.params.attemptId, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

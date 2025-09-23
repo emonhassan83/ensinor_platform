@@ -13,7 +13,7 @@ import httpStatus from 'http-status';
 
 // ---------------- Insert ----------------
 const insertIntoDB = async (payload: ICourseBundle, file: any) => {
-  const { authorId, course: courseIds, ...bundleData } = payload;
+  const { authorId, course: courseIds, discount = 0, ...bundleData } = payload;
 
   const author = await prisma.user.findFirst({
     where: {
@@ -30,13 +30,14 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
   const courses = await prisma.course.findMany({
     where: {
       id: { in: courseIds },
-      authorId,
+      // instructorId: authorId,
       isDeleted: false,
     },
     select: {
       id: true,
       companyId: true,
       platform: true,
+      price: true,
     },
   });
   if (courses.length !== courseIds.length) {
@@ -74,6 +75,11 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
   }
   bundleData.platform = platforms[0]; // take the only platform
 
+  // --- Calculate total price ---
+  const totalCoursePrice = courses.reduce((sum, c) => sum + (c.price || 0), 0);
+  const discountAmount = (totalCoursePrice * discount) / 100;
+  const finalPrice = Math.max(totalCoursePrice - discountAmount, 0);
+
   // upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
@@ -85,6 +91,8 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
   const result = await prisma.courseBundle.create({
     data: {
       ...bundleData,
+      price: Math.round(finalPrice),
+      discount,
       thumbnail: payload.thumbnail,
       authorId,
       courseBundleCourses: {

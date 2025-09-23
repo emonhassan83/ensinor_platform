@@ -245,7 +245,7 @@ model CompanyRequest {
   userId                String
   name                  String
   organizationEmail     String     @unique
-  platformType          String
+  platformType          String     @default("")
   phoneNumber           String
   role                  String
   companySize           Int
@@ -468,7 +468,7 @@ model Course {
   companyId        String?
   title            String
   shortDescription String
-  platform         PlatformType
+  platform         PlatformType  @default(admin)
   type             CourseType    @default(external)
   category         String
   level            CourseLevel
@@ -671,7 +671,7 @@ model QuizAttempt {
   timeTaken     Int?
   marksObtained Int         @default(0)
   totalMarks    Int         @default(0)
-  grade         CourseGrade
+  grade         CourseGrade @default(NA)
   correctRate   Float       @default(0.0)
   lastAttempt   DateTime    @default(now())
   isCompleted   Boolean     @default(false)
@@ -1555,7 +1555,7 @@ enum CourseGrade {
   F
   PASS
   FAIL
-  NOT_APPLY
+  NA
 }
 
 enum NewsletterCategory {
@@ -1636,7 +1636,9 @@ enum NotificationModeType {
   shop
   course
   event
+  quiz_attempts
   assignment
+  assignment_submissions
   order
   payment
   certificate

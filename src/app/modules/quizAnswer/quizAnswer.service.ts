@@ -5,6 +5,7 @@ import { IQuizAnswer, IQuizAnswerFilterRequest } from './quizAnswer.interface';
 import { quizAnswerSearchAbleFields } from './quizAnswer.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuizAnswer) => {
   const { attemptId, questionId, optionId } = payload;
@@ -38,7 +39,15 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
       'Invalid option for this question!',
     );
 
-  // 4. Save answer
+  // 4. Check if already answered
+  const existing = await prisma.quizAnswer.findFirst({
+    where: { attemptId, questionId, optionId },
+  });
+  if (existing) {
+    return existing; // ✅ return existing one
+  }
+
+  // 5. Save answer
   const result = await prisma.quizAnswer.create({
     data: {
       attemptId,
@@ -47,6 +56,7 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
       isCorrect: option.isCorrect,
     },
   });
+
   if (!result)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
@@ -56,7 +66,10 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
   return result;
 };
 
-const completeAttemptIntoDB = async (attemptId: string) => {
+const completeAttemptIntoDB = async (
+  attemptId: string,
+  payload: { timeTaken: number },
+) => {
   const attempt = await prisma.quizAttempt.findFirst({
     where: { id: attemptId, isDeleted: false },
     include: { quiz: true, quizAnswer: true },
@@ -93,14 +106,20 @@ const completeAttemptIntoDB = async (attemptId: string) => {
   }
 
   // 3. Determine grade
-  let grade: string | null = null;
+  const roundedCorrectRate = Number(correctRate.toFixed(2));
+  const percent = roundedCorrectRate * 100;
+  let grade: CourseGrade;
+
   if (gradingSystem && gradingSystem.grades.length > 0) {
-    // Example: each Grade has minPercentage, maxPercentage, letterGrade
-    const percent = correctRate * 100;
     const matchedGrade = gradingSystem.grades.find(
       g => percent >= g.minScore && percent <= g.maxScore,
     );
-    grade = matchedGrade ? matchedGrade.gradeLabel : null;
+    grade = matchedGrade
+      ? (matchedGrade.gradeLabel as CourseGrade)
+      : CourseGrade.NA;
+  } else {
+    // fallback logic if no grading system found
+    grade = percent >= 70 ? CourseGrade.PASS : CourseGrade.FAIL;
   }
 
   // 4. Update attempt
@@ -108,10 +127,11 @@ const completeAttemptIntoDB = async (attemptId: string) => {
     where: { id: attempt.id },
     data: {
       isCompleted: true,
-      lastActivity: new Date(),
+      lastAttempt: new Date(),
       marksObtained,
       correctRate,
-      grade: grade || "N/A",
+      grade,
+      timeTaken: payload.timeTaken,
     },
   });
 
@@ -133,7 +153,6 @@ const getAllFromDB = async (
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.QuizAnswerWhereInput[] = [{}];
-
   if (filterBy.attemptId) {
     andConditions.push({ attemptId: filterBy.attemptId });
   }
@@ -190,31 +209,54 @@ const getByIdFromDB = async (id: string) => {
       attempt: true,
     },
   });
-  
+
   if (!result)
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
   return result;
 };
 
 const updateIntoDB = async (
-  id: string,
-  payload: Partial<IQuizAnswer>,
+  id: string, // quizAnswerId
+  payload: { optionId: string },
 ): Promise<QuizAnswer> => {
   const quizAnswer = await prisma.quizAnswer.findUnique({
     where: { id },
+    include: {
+      question: true,
+    },
   });
+
   if (!quizAnswer) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
   }
 
-  const result = await prisma.quizAnswer.update({
-    where: { id },
-    data: payload,
+  // Validate new option belongs to the same question
+  const option = await prisma.options.findFirst({
+    where: {
+      id: payload.optionId,
+      questionId: quizAnswer.questionId,
+    },
   });
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not updated!');
+
+  if (!option) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Invalid option for this question!',
+    );
   }
 
+  // Update quizAnswer with new optionId + correctness
+  const result = await prisma.quizAnswer.update({
+    where: { id },
+    data: {
+      optionId: option.id,
+      isCorrect: option.isCorrect,
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz answer not updated!');
+  }
   return result;
 };
 

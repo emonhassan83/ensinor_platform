@@ -24,7 +24,6 @@ const insertIntoDB = async (payload: IQuiz) => {
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
-      authorId,
       isDeleted: false,
     },
   });

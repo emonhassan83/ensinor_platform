@@ -20,7 +20,7 @@ router.post(
 );
 
 router.get(
-  '/author/:authorId',
+  '/author/my-quizzes',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,

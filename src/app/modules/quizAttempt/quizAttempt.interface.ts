@@ -1,3 +1,5 @@
+import { CourseGrade } from "@prisma/client";
+
 export type IQuizAttemptFilterRequest = {
   searchTerm?: string | undefined;
   grade?: string | undefined;
@@ -8,10 +10,11 @@ export type IQuizAttempt = {
   quizId: string;
   userId: string;
   authorId: string;
-  timeTaken?: string;
+  timeTaken?: number;
   marksObtained?: number;
   totalMarks?: number;
-  grade?: string;
+  grade?: CourseGrade;
   correctRate?: number;
+  lastAttempt: Date;
   isCompleted?: boolean;
 };

@@ -13,10 +13,6 @@ const createValidationSchema = z.object({
     ),
     title: z.string({ required_error: 'Title course bundle is required!' }),
     category: z.string({ required_error: 'Category is required!' }),
-    price: z
-      .number({ required_error: 'Price is required!' })
-      .int('Price must be an integer')
-      .nonnegative('Price must be a positive number'),
     thumbnail: z
       .string({ required_error: 'Course bundle thumbnail is required!' })
       .optional(),
