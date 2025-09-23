@@ -101,6 +101,7 @@ const registerAUser = async (
         registerWith: RegisterWith.credentials,
         expireAt: new Date(Date.now() + 30 * 60 * 1000), // auto-delete marker
         needsPasswordChange: false,
+        status: UserStatus.active,
         verification: {
           create: {
             otp: '',

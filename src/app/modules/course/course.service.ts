@@ -1,4 +1,6 @@
 import {
+  ChatRole,
+  ChatType,
   Course,
   CoursesStatus,
   PlatformType,
@@ -437,11 +439,13 @@ const changeStatusIntoDB = async (
   const { status } = payload;
 
   const course = await prisma.course.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!course || course?.isDeleted) {
+  if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
+
+  const prevStatus = course.status;
 
   const result = await prisma.course.update({
     where: { id },
@@ -449,6 +453,80 @@ const changeStatusIntoDB = async (
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course status not updated!');
+  }
+
+  // Only on pending → approved
+  if (
+    prevStatus === CoursesStatus.pending &&
+    status === CoursesStatus.approved
+  ) {
+    // Check if either discussion OR announcement already exists
+    const existingChats = await prisma.chat.findMany({
+      where: {
+        courseId: course.id,
+        type: { in: [ChatType.group, ChatType.announcement] },
+        isDeleted: false,
+      },
+      select: { type: true },
+    });
+
+    const hasGroup = existingChats.some(c => c.type === ChatType.group);
+    const hasAnnouncement = existingChats.some(c => c.type === ChatType.announcement);
+
+    // 1. Discussion Chat (create only if not exists)
+    if (!hasGroup) {
+      const groupChat = await prisma.chat.create({
+        data: {
+          type: ChatType.group,
+          groupName: `${course.title} Discussion`,
+          groupImage: course.thumbnail || null,
+          courseId: course.id,
+          isReadOnly: false,
+        },
+      });
+
+      await prisma.chatParticipant.createMany({
+        data: [
+          {
+            userId: course.instructorId!,
+            chatId: groupChat.id,
+            role: ChatRole.admin,
+          },
+          {
+            userId: course.authorId!,
+            chatId: groupChat.id,
+            role: ChatRole.admin,
+          },
+        ],
+      });
+    }
+
+    // 2. Announcement Chat (create only if not exists)
+    if (!hasAnnouncement) {
+      const announcementChat = await prisma.chat.create({
+        data: {
+          type: ChatType.announcement,
+          groupName: `${course.title} Announcement`,
+          groupImage: course.thumbnail || null,
+          courseId: course.id,
+          isReadOnly: true,
+        },
+      });
+
+      await prisma.chatParticipant.createMany({
+        data: [
+          {
+            userId: course.authorId!,
+            chatId: announcementChat.id,
+            role: ChatRole.admin,
+          },
+          {
+            userId: course.instructorId!,
+            chatId: announcementChat.id,
+          },
+        ],
+      });
+    }
   }
 
   // sent notify to author when changed status

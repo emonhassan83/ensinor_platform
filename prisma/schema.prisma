@@ -516,6 +516,7 @@ model Course {
   resource           Resource[]
   coInstructor       CoInstructor[]
   assignment         Assignment[]
+  chat               Chat[]
 
   @@map("courses")
 }
@@ -1296,6 +1297,7 @@ model Chat {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
+  course       Course?           @relation(fields: [courseId], references: [id])
   participants ChatParticipant[]
   messages     Message[]
 
@@ -1307,8 +1309,9 @@ model ChatParticipant {
   userId String
   chatId String
 
-  user User @relation(fields: [userId], references: [id])
-  chat Chat @relation(fields: [chatId], references: [id])
+  user User     @relation(fields: [userId], references: [id])
+  chat Chat     @relation(fields: [chatId], references: [id])
+  role ChatRole @default(member)
 
   @@unique([userId, chatId])
   @@map("chat_participants")
@@ -1760,4 +1763,9 @@ enum ResourceModelType {
   course
   event
   book
+}
+
+enum ChatRole {
+  admin
+  member
 }

@@ -1,4 +1,6 @@
 import {
+  ChatRole,
+  ChatType,
   CoursesStatus,
   EnrolledCourse,
   Prisma,
@@ -15,6 +17,7 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import { sendCourseCompleteNotifYToAuthor } from './enrolledCourse.utils';
+import { sendCourseEnrollmentEmail } from '../../utils/email/courseEnrolledmentEmail';
 
 const insertIntoDB = async (payload: IEnrolledCourse) => {
   const { userId, courseId } = payload;
@@ -84,6 +87,39 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
       });
     }
   }
+
+  // 6. Auto-join student into course chats (discussion + announcement)
+  const chats = await prisma.chat.findMany({
+    where: {
+      courseId: course.id,
+      type: { in: [ChatType.group, ChatType.announcement] },
+      isDeleted: false,
+    },
+  });
+
+  for (const chat of chats) {
+    const alreadyParticipant = await prisma.chatParticipant.findFirst({
+      where: { chatId: chat.id, userId },
+    });
+
+    if (!alreadyParticipant) {
+      await prisma.chatParticipant.create({
+        data: {
+          userId,
+          chatId: chat.id,
+          role: ChatRole.member,
+        },
+      });
+    }
+  }
+
+  // 7. Send congratulatory email
+  await sendCourseEnrollmentEmail(
+    user.email,
+    user.name,
+    course.title,
+    'https://dashboard.ensinor.com', // replace with actual dashboard URL
+  );
 
   return enrolledCourse;
 };
@@ -195,6 +231,41 @@ const enrollBundleCourses = async (payload: {
     where: { id: bundleId },
     data: { enrollments: { increment: 1 } },
   });
+
+  // 10. Auto-join user into all chats (discussion + announcement) of each course
+  for (const course of filteredCourses) {
+    const chats = await prisma.chat.findMany({
+      where: {
+        courseId: course.id,
+        type: { in: [ChatType.group, ChatType.announcement] },
+        isDeleted: false,
+      },
+    });
+
+    for (const chat of chats) {
+      const alreadyParticipant = await prisma.chatParticipant.findFirst({
+        where: { chatId: chat.id, userId },
+      });
+
+      if (!alreadyParticipant) {
+        await prisma.chatParticipant.create({
+          data: {
+            userId,
+            chatId: chat.id,
+            role: ChatRole.member,
+          },
+        });
+      }
+    }
+
+    // send congratulation email for each course
+    await sendCourseEnrollmentEmail(
+      user.email,
+      user.name,
+      course.title,
+      `https://dashboard.ensinor.com/courses/${course.id}`
+    );
+  }
 
   return filteredCourses;
 };
