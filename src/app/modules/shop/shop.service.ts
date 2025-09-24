@@ -21,14 +21,14 @@ import { findAdmin } from '../../utils/findAdmin';
 const insertIntoDB = async (payload: IShop, files: any) => {
   const { authorId, platform } = payload;
 
-  // 🔹 1. If platform = admin → auto assign super admin
-  if (platform === PlatformType.admin) {
-    const admin = await findAdmin();
-    if (!admin) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
-    }
-    payload.authorId = admin.id;
-  }
+  // // 🔹 1. If platform = admin → auto assign super admin
+  // if (platform === PlatformType.admin) {
+  //   const admin = await findAdmin();
+  //   if (!admin) {
+  //     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  //   }
+  //   payload.authorId = admin.id;
+  // }
 
   // 🔹 2. Validate author user
   const author = await prisma.user.findFirst({

@@ -1,4 +1,4 @@
-import { CourseLevel } from "@prisma/client";
+import { EventType, PlatformType } from '@prisma/client';
 
 export type IEventFilterRequest = {
   searchTerm?: string | undefined;
@@ -8,13 +8,17 @@ export type IEventFilterRequest = {
 
 export type IEvent = {
   authorId: string;
+  companyId?: string;
+  platform: PlatformType;
   title: string;
   slogan: string;
-  type: string;
+  type: EventType;
+  category: string;
   thumbnail: string;
   organizedBy: string;
   price: number;
   location: string;
+  language: string;
   date: string;
   startTime: string;
   endTime: string;

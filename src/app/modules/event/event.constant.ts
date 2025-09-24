@@ -1,3 +1,3 @@
-export const eventSearchAbleFields = ['title', 'slogan', 'location'];
+export const eventSearchAbleFields = ['title'];
 
-export const eventFilterableFields = ['searchTerm', 'type', 'location'];
+export const eventFilterableFields = ['searchTerm', 'category', 'language'];

@@ -1,3 +1,4 @@
+import { EventType, PlatformType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -6,11 +7,18 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
+    companyId: z
+      .string({ required_error: 'Company is required' })
+      .uuid('company must be a valid UUID')
+      .optional(),
     title: z.string({ required_error: 'Title is required!' }),
+    type: z.nativeEnum(EventType),
+    platform: z.nativeEnum(PlatformType),
     slogan: z.string({
       required_error: 'Short slogan is required!',
     }),
-    type: z.string({ required_error: 'Type is required!' }),
+    category: z.string({ required_error: 'Category is required!' }),
+    language: z.string({ required_error: 'Language is required!' }),
     thumbnail: z
       .string({ required_error: 'Event thumbnail is required!' })
       .optional(),
@@ -39,12 +47,14 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     title: z.string({ required_error: 'Title is required!' }).optional(),
+    type: z.nativeEnum(EventType).optional(),
     slogan: z
       .string({
         required_error: 'Short slogan is required!',
       })
       .optional(),
-    type: z.string({ required_error: 'Type is required!' }).optional(),
+    category: z.string({ required_error: 'Type is required!' }).optional(),
+    language: z.string({ required_error: 'Language is required!' }).optional(),
     thumbnail: z
       .string({ required_error: 'Event thumbnail is required!' })
       .optional(),

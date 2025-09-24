@@ -486,8 +486,7 @@ const watchLectureIntoDB = async (payload: {
   const finalUpdate = await prisma.enrolledCourse.update({
     where: { id: enrolledCourseId },
     data: {
-      completedRate: completedRate,
-      isComplete: completedRate === 100,
+      completedRate: completedRate
     },
   });
 
@@ -529,6 +528,7 @@ const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
   }
 
   //  update the completed all table
+
 
   return result;
 };

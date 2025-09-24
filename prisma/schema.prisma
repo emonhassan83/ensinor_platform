@@ -831,16 +831,18 @@ model Certificate {
 //* Event Related Models
 model Event {
   id             String       @id @default(uuid())
-  authorId       String?
+  authorId       String
   companyId      String?
+  platform       PlatformType @default(admin)
   title          String
+  type           EventType    @default(in_person)
   slogan         String
-  type           String
-  platform       PlatformType @default(company)
+  category       String
   thumbnail      String
   organizedBy    String
   price          Int
   location       String
+  language       String
   date           String
   startTime      String
   endTime        String
@@ -852,8 +854,8 @@ model Event {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  author    User?    @relation(fields: [authorId], references: [id])
-  companies Company? @relation(fields: [companyId], references: [id])
+  author  User     @relation(fields: [authorId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
 
   eventBooking      EventBooking[]
   eventSchedule     EventSchedule[]
@@ -1539,6 +1541,11 @@ enum OrderModelType {
   course
   courseBundle
   event
+}
+
+enum EventType {
+  virtual
+  in_person
 }
 
 enum AssignmentModelType {

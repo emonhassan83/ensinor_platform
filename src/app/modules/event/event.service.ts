@@ -1,4 +1,10 @@
-import { Event, Prisma, UserStatus } from '@prisma/client';
+import {
+  Event,
+  PlatformType,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IEvent, IEventFilterRequest } from './event.interface';
@@ -9,20 +15,86 @@ import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IEvent, file: any) => {
-  const { authorId } = payload;
+  const { authorId, platform } = payload;
 
+  //🔹 1. Validate author user
   const author = await prisma.user.findFirst({
     where: {
       id: authorId,
       status: UserStatus.active,
       isDeleted: false,
     },
+    include: {
+      companyAdmin: { select: { company: { select: { id: true } } } },
+      businessInstructor: { select: { company: { select: { id: true } } } },
+    },
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
-  // upload to image
+  let company: any = null;
+  let companyAuthor: any = null;
+
+  // 🔹 2. If platform = company → validate company & company admin
+  if (platform === PlatformType.company) {
+    if (
+      author.role !== UserRole.company_admin &&
+      author.role !== UserRole.business_instructors
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Only company admin or business instructor can add shop data in company platform!',
+      );
+    }
+
+    if (author.role === UserRole.company_admin) {
+      payload.companyId = author.companyAdmin?.company!.id;
+    }
+    if (author.role === UserRole.business_instructors) {
+      payload.companyId = author.businessInstructor?.company!.id;
+    }
+
+    // Validate company
+    company = await prisma.company.findFirst({
+      where: { id: payload.companyId, isDeleted: false },
+      include: {
+        author: {
+          select: {
+            user: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!company) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    }
+    if (company.isActive === false) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Your company is not active now!',
+      );
+    }
+
+    companyAuthor = await prisma.user.findFirst({
+      where: {
+        id: company.author.user.id,
+        role: UserRole.company_admin,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+    });
+    if (!companyAuthor) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
+    }
+  }
+
+  //3. upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -30,27 +102,33 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
     })) as string;
   }
 
+  // 4. create record
   const result = await prisma.event.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
   }
+
   return result;
 };
 
 const getAllFromDB = async (
   params: IEventFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy?: { companyId?: string; authorId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.EventWhereInput[] = [
-    { authorId: userId, isDeleted: false },
-  ];
+  const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
+  // Filter either by authorId or companyId
+  if (filterBy && filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if (filterBy && filterBy.companyId) {
+    andConditions.push({ companyId: filterBy.companyId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -107,9 +185,52 @@ const getAllFromDB = async (
   };
 };
 
+const eventFilterData = async () => {
+  const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
+
+  const whereConditions: Prisma.EventWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.event.groupBy({
+    by: ['category'],
+    where: whereConditions,
+    _count: { category: true },
+    orderBy: {
+      category: 'asc', // alphabetically
+    },
+  });
+
+  // Format result: unique categories + their counts
+  const categories = result.map(item => ({
+    name: item.category,
+    count: item._count.category,
+  }));
+
+  // === Languages ===
+  const languages = await prisma.event.groupBy({
+    by: ['language'],
+    where: whereConditions,
+    _count: { language: true },
+    orderBy: { language: 'asc' },
+  });
+
+  const formattedLanguages = languages.map(item => ({
+    name: item.language,
+    count: item._count.language,
+  }));
+
+  return {
+    data: {
+      categories,
+      languages: formattedLanguages,
+    },
+  };
+};
+
 const getByIdFromDB = async (id: string): Promise<Event | null> => {
   const result = await prisma.event.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {
@@ -120,14 +241,13 @@ const getByIdFromDB = async (id: string): Promise<Event | null> => {
         },
       },
       eventSchedule: true,
-      eventSpeaker: true
+      eventSpeaker: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Event not found!');
   }
-
   return result;
 };
 
@@ -137,9 +257,9 @@ const updateIntoDB = async (
   file: any,
 ): Promise<Event> => {
   const event = await prisma.event.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!event || event?.isDeleted) {
+  if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found!');
   }
 
@@ -164,9 +284,9 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string): Promise<Event> => {
   const event = await prisma.event.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!event || event?.isDeleted) {
+  if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found!');
   }
 
@@ -186,6 +306,7 @@ const deleteFromDB = async (id: string): Promise<Event> => {
 export const EventService = {
   insertIntoDB,
   getAllFromDB,
+  eventFilterData,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

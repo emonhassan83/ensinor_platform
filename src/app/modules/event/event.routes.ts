@@ -22,10 +22,18 @@ router.post(
 
 router.get('/', EventController.getAllFromDB);
 
+router.get('/filter-data', EventController.eventFilterData);
+
 router.get(
-  '/my-event',
+  '/user/my-events',
   auth(UserRole.super_admin, UserRole.company_admin),
   EventController.getMyEventFromDB,
+);
+
+router.get(
+  '/company/:companyId',
+  auth(UserRole.company_admin),
+  EventController.getCompanyEventFromDB,
 );
 
 router.get('/:id', EventController.getByIdFromDB);
