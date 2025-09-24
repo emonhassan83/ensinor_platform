@@ -19,7 +19,9 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateService.getAllFromDB(filters, options, { authorId: req.user!.userId });
+  const result = await CertificateService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -34,7 +36,9 @@ const getByMyCertificateFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateService.getAllFromDB(filters, options, { userId: req.user!.userId });
+  const result = await CertificateService.getAllFromDB(filters, options, {
+    userId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -59,12 +63,24 @@ const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CertificateService.updateIntoDB(
     req.params.id,
     req.body,
-    req.files
+    req.files,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Certificate data updated!',
+    data: result,
+  });
+});
+
+const certificateCompletedIntoDB = catchAsync(async (req, res) => {
+  const result = await CertificateService.certificateCompletedIntoDB(
+    req.params.id,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Certificate creation completed!',
     data: result,
   });
 });
@@ -85,5 +101,6 @@ export const CertificateController = {
   getByMyCertificateFromDB,
   getByIdFromDB,
   updateIntoDB,
+  certificateCompletedIntoDB,
   deleteFromDB,
 };

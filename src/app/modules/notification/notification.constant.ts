@@ -55,6 +55,9 @@ export const messages = {
     newRequest: 'Certificate request submitted!',
     statusChanged: 'Certificate request status changed!'
   },
+  certificate: {
+    completed: '🎉 Certificate Completed!'
+  },
 
   subscription: {
     newPlan: 'New subscription plan added.',

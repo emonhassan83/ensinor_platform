@@ -73,6 +73,17 @@ router.put(
   CertificateController.updateIntoDB,
 );
 
+router.patch(
+  '/completed/:id',
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  CertificateController.certificateCompletedIntoDB,
+);
+
 router.delete(
   '/:id',
   auth(
