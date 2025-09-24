@@ -4,9 +4,11 @@ import { IOrder, IOrderFilterRequest } from './orders.interface';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import {
+  Coupon,
   OrderModelType,
   OrderStatus,
   Prisma,
+  PromoCode,
   UserStatus,
 } from '@prisma/client';
 import { orderSearchAbleFields } from './orders.constants';
@@ -43,7 +45,7 @@ const modelConfig: Record<
 };
 
 const createOrders = async (payload: IOrder) => {
-  const { userId, modelType } = payload;
+  const { userId, modelType, couponCode, promoCode, affiliateId } = payload;
 
   // ✅ Validate user
   const user = await prisma.user.findUnique({
@@ -85,32 +87,109 @@ const createOrders = async (payload: IOrder) => {
     );
   }
 
-  // ✅ Special case for book documents and assign author
-  if (modelType === OrderModelType.book) {
-    payload.documents = entity.file;
+  let baseAmount = entity[config.priceField];
+  let discount = 0;
+  let finalAmount = baseAmount;
+
+  // ✅ Coupon/Promo Validation
+  let isInstructorPromo = false;
+
+  if (couponCode) {
+    const coupon: Coupon | null = await prisma.coupon.findFirst({
+      where: {
+        code: couponCode,
+        isActive: true,
+        expireAt: { gte: new Date() },
+      },
+    });
+    if (!coupon)
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid/Expired coupon!');
+
+    // Now check usage
+    if (coupon.maxUsage && coupon.usedCount >= coupon.maxUsage) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon usage limit reached!');
+    }
+
+    discount = (baseAmount * coupon.discount) / 100;
+    finalAmount = baseAmount - discount;
+
+    await prisma.coupon.update({
+      where: { id: coupon.id },
+      data: { usedCount: { increment: 1 } },
+    });
+
+    // Check if instructor promo
+    isInstructorPromo = coupon.authorId === payload.authorId;
   }
-  if (modelType === OrderModelType.course) {
-    payload.authorId = entity.instructorId;
+
+  if (promoCode) {
+    const promo: PromoCode | null = await prisma.promoCode.findFirst({
+      where: {
+        code: promoCode,
+        isActive: true,
+        expireAt: { gte: new Date() },
+      },
+    });
+    if (!promo)
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid/Expired promo!');
+
+    if (promo.maxUsage && promo.usedCount >= promo.maxUsage) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Promo code usage limit reached!',
+      );
+    }
+
+    discount = (baseAmount * promo.discount) / 100;
+    finalAmount = baseAmount - discount;
+
+    await prisma.promoCode.update({
+      where: { id: promo.id },
+      data: { usedCount: { increment: 1 } },
+    });
+
+    isInstructorPromo = promo.authorId === payload.authorId;
+  }
+
+  // ✅ Revenue Split Logic
+  let instructorShare = 0;
+  let platformShare = 0;
+  let affiliateShare = 0;
+
+  if (affiliateId) {
+    const affiliateCut = finalAmount * 0.2; // 20%
+    affiliateShare = affiliateCut;
+    const remaining = finalAmount - affiliateCut;
+    instructorShare = remaining * 0.5;
+    platformShare = remaining * 0.5;
+  } else if (isInstructorPromo) {
+    instructorShare = finalAmount * 0.97;
+    platformShare = finalAmount * 0.03;
   } else {
-    payload.authorId = entity.authorId;
+    instructorShare = finalAmount * 0.5;
+    platformShare = finalAmount * 0.5;
   }
 
-  // ✅ Assign price & author
-  payload.amount = entity[config.priceField];
+    // 8️⃣ Create order
+  const orderData = {
+    userId,
+    authorId: payload.authorId,
+    modelType,
+    bookId: payload.bookId,
+    courseId: payload.courseId,
+    courseBundleId: payload.courseBundleId,
+    eventId: payload.eventId,
+    amount: baseAmount,
+    discount,
+    finalAmount,
+    instructorShare,
+    platformShare,
+    affiliateShare,
+    transactionId: payload.transactionId,
+    documents: payload.documents,
+  };
 
-  // ✅ Increment popularity (atomic update)
-  await config.model.update({
-    where: { id: referenceId },
-    data: {
-      [config.popularityField]: { increment: 1 },
-    },
-  });
-
-  // ✅ Create the order
-  const result = await prisma.order.create({
-    data: payload,
-  });
-
+  const result = await prisma.order.create({ data: orderData });
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Shop order creation failed!');
   }

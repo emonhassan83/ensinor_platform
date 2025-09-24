@@ -1,4 +1,4 @@
-import { Coupon, Prisma, UserStatus } from '@prisma/client';
+import { Coupon, CouponModel, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { ICoupon, ICouponFilterRequest } from './coupon.interface';
@@ -46,7 +46,7 @@ const insertIntoDB = async (payload: ICoupon) => {
   let referenceWhere: any = { authorId, isActive: true };
 
   switch (modelType) {
-    case 'books':
+    case CouponModel.books:
       if (!bookId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -63,7 +63,7 @@ const insertIntoDB = async (payload: ICoupon) => {
 
       // Check active coupon for this book
       const existingBookCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: 'books', bookId },
+        where: { ...referenceWhere, modelType: CouponModel.books, bookId },
       });
       if (existingBookCoupon)
         throw new ApiError(
@@ -72,7 +72,7 @@ const insertIntoDB = async (payload: ICoupon) => {
         );
       break;
 
-    case 'courses':
+    case CouponModel.courses:
       if (!courseId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -89,7 +89,7 @@ const insertIntoDB = async (payload: ICoupon) => {
 
       // Check active coupon for this course
       const existingCourseCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: 'courses', courseId },
+        where: { ...referenceWhere, modelType: CouponModel.courses, courseId },
       });
       if (existingCourseCoupon)
         throw new ApiError(
@@ -98,7 +98,7 @@ const insertIntoDB = async (payload: ICoupon) => {
         );
       break;
 
-    case 'events':
+    case CouponModel.events:
       if (!eventId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -115,7 +115,7 @@ const insertIntoDB = async (payload: ICoupon) => {
 
       // Check active coupon for this event
       const existingEventCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: 'events', eventId },
+        where: { ...referenceWhere, modelType: CouponModel.events, eventId },
       });
       if (existingEventCoupon)
         throw new ApiError(
@@ -137,7 +137,6 @@ const insertIntoDB = async (payload: ICoupon) => {
 
   // ✅ Create coupon
   const result = await prisma.coupon.create({ data: payload });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon creation failed!');
   }
@@ -202,23 +201,28 @@ const getAllFromDB = async (
         select: {
           id: true,
           name: true,
-          email: true,
           photoUrl: true,
         },
       },
       course: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true
         },
       },
       book: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true
         },
       },
       event: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true
         },
       },
     },
@@ -267,10 +271,10 @@ const updateIntoDB = async (
   id: string,
   payload: Partial<ICoupon>,
 ): Promise<Coupon> => {
-  const event = await prisma.coupon.findUnique({
+  const coupon = await prisma.coupon.findFirst({
     where: { id },
   });
-  if (!event) {
+  if (!coupon) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Coupon not found!');
   }
 
@@ -286,10 +290,10 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<Coupon> => {
-  const event = await prisma.coupon.findUniqueOrThrow({
+  const coupon = await prisma.coupon.findFirst({
     where: { id },
   });
-  if (!event) {
+  if (!coupon) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Coupon not found!');
   }
 

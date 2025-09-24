@@ -3,6 +3,7 @@ import {
   ChatType,
   CoursesStatus,
   EnrolledCourse,
+  PlatformType,
   Prisma,
   UserStatus,
 } from '@prisma/client';
@@ -42,7 +43,6 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   });
   if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'User not found!');
 
-  
   // 3. Check if user is already enrolled in this course
   const existingEnrollment = await prisma.enrolledCourse.findFirst({
     where: { userId, courseId, isDeleted: false },
@@ -133,6 +133,34 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     'https://dashboard.ensinor.com', // replace with actual dashboard URL
   );
 
+  // 9. --- Monthly Streak Bonus Check ---
+  if (course.price > 0) {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date(startOfMonth);
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+    // Count paid enrollments for this user in current month
+    const monthlyPurchases = await prisma.enrolledCourse.count({
+      where: {
+        userId,
+        isDeleted: false,
+        createdAt: { gte: startOfMonth, lt: endOfMonth },
+        course: { price: { gt: 0 } }, // only paid courses
+      },
+    });
+
+    if (monthlyPurchases > 1) {
+      // Give bonus points once per new purchase after first
+      await prisma.user.update({
+        where: { id: userId },
+        data: { points: { increment: 50 } },
+      });
+    }
+  }
+
   return enrolledCourse;
 };
 
@@ -175,7 +203,7 @@ const enrollBundleCourses = async (payload: {
     throw new ApiError(httpStatus.BAD_REQUEST, 'No valid courses found!');
   }
 
- // 4. Fetch existing enrollments
+  // 4. Fetch existing enrollments
   const existingEnrollments = await prisma.enrolledCourse.findMany({
     where: { userId, courseId: { in: courseIds } },
     select: { courseId: true },
@@ -278,6 +306,34 @@ const enrollBundleCourses = async (payload: {
       course.title,
       `https://dashboard.ensinor.com/courses/${course.id}`,
     );
+  }
+
+  // 13. Monthly Streak Bonus Check (for bundle purchases) ---
+  const paidCourses = filteredCourses.filter(c => c.price > 0);
+  if (paidCourses.length > 0) {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date(startOfMonth);
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+    const monthlyPurchases = await prisma.enrolledCourse.count({
+      where: {
+        userId,
+        isDeleted: false,
+        createdAt: { gte: startOfMonth, lt: endOfMonth },
+        course: { price: { gt: 0 } },
+      },
+    });
+
+    if (monthlyPurchases > paidCourses.length) {
+      // of have one paid course here
+      await prisma.user.update({
+        where: { id: userId },
+        data: { points: { increment: 50 } },
+      });
+    }
   }
 
   return filteredCourses;
@@ -486,7 +542,7 @@ const watchLectureIntoDB = async (payload: {
   const finalUpdate = await prisma.enrolledCourse.update({
     where: { id: enrolledCourseId },
     data: {
-      completedRate: completedRate
+      completedRate: completedRate,
     },
   });
 
@@ -527,8 +583,94 @@ const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
     );
   }
 
-  //  update the completed all table
+  // --- POINTS ALLOCATION ---
+  let awardedPoints = 0;
 
+  const durationMins = result.learningTime ?? 0; // course duration in minutes
+  const price = result.course?.price ?? 0; // course price
+
+  // Find current user info (to check freePoints cap)
+  const currentUser = await prisma.user.findUnique({
+    where: { id: enrollCourse.user.id },
+    select: { points: true, freePoints: true },
+  });
+
+  if (!currentUser) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'User not found for awarding points',
+    );
+  }
+
+  // Case 1: Paid course
+  if (price > 0) {
+    awardedPoints = durationMins >= 600 || price >= 30 ? 200 : 100;
+
+    await prisma.user.update({
+      where: { id: enrollCourse.user.id },
+      data: {
+        points: { increment: awardedPoints },
+      },
+    });
+  }
+
+  // Case 2: Free course
+  else {
+    // Award 50 points per free course, cap at 250
+    if (currentUser.freePoints < 250) {
+      // Ensure we don’t cross the 250 cap
+      const remainingCap = 250 - currentUser.freePoints;
+      const pointsToAdd = Math.min(50, remainingCap);
+
+      await prisma.user.update({
+        where: { id: enrollCourse.user.id },
+        data: {
+          points: { increment: pointsToAdd },
+          freePoints: { increment: pointsToAdd },
+        },
+      });
+
+      awardedPoints = pointsToAdd;
+    } else {
+      // Cap already reached, no points awarded
+      awardedPoints = 0;
+    }
+  }
+
+  //  update the completed all table
+  if (
+    result.course.platform === PlatformType.company &&
+    result.course.companyId
+  ) {
+    await prisma.company.update({
+      where: { id: result.course.companyId },
+      data: { completed: { increment: 1 } },
+    });
+  }
+  // check user employee or student
+  const employee = await prisma.employee.findUnique({
+    where: { userId: enrollCourse.user.id },
+  });
+
+  if (employee) {
+    // employee completed increment
+    await prisma.employee.update({
+      where: { userId: enrollCourse.user.id },
+      data: { courseCompleted: { increment: 1 } },
+    });
+  } else {
+    // student completed increment
+    const student = await prisma.student.findUnique({
+      where: { userId: enrollCourse.user.id },
+    });
+
+    if (student) {
+      await prisma.student.update({
+        where: { userId: enrollCourse.user.id },
+        data: { courseCompleted: { increment: 1 } },
+      });
+    }
+  }
 
   return result;
 };

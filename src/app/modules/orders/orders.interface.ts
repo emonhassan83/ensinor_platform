@@ -13,9 +13,14 @@ export interface IOrder {
   modelType: OrderModelType
   bookId?: string
   courseId?: string
+  eventId?: string
   courseBundleId?: string
+  couponCode?: string;
+  promoCode?: string;
+  affiliateId?: string
   amount: number
   paymentMethod: PaymentMethod
+  discount?: number
   documents?: string
   transactionId?: string
 }

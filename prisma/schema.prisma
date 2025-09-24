@@ -588,25 +588,32 @@ model Order {
   courseId       String?
   courseBundleId String?
   eventId        String?
-  amount         Float
-  status         OrderStatus    @default(pending)
-  paymentStatus  PaymentStatus  @default(unpaid)
-  paymentMethod  PaymentMethod  @default(Stripe)
-  transactionId  String?
-  documents      String?
-  isDeleted      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
 
-  user          User            @relation("UserOrder", fields: [userId], references: [id])
-  author        User            @relation("AuthorOrder", fields: [authorId], references: [id])
-  affiliateSale AffiliateSale[]
+  amount          Float
+  discount        Float? 
+  finalAmount     Float // after discount
+  instructorShare Float
+  platformShare   Float
+  affiliateShare  Float? @default(0)
 
+  status        OrderStatus   @default(pending)
+  paymentStatus PaymentStatus @default(unpaid)
+  paymentMethod PaymentMethod @default(Stripe)
+  transactionId String?
+  documents     String?
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user         User          @relation("UserOrder", fields: [userId], references: [id])
+  author       User          @relation("AuthorOrder", fields: [authorId], references: [id])
   book         Book?         @relation(fields: [bookId], references: [id])
   course       Course?       @relation(fields: [courseId], references: [id])
   courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
   event        Event?        @relation(fields: [eventId], references: [id])
-  payment      Payment[]
+
+  payment       Payment[]
+  affiliateSale AffiliateSale[]
 
   @@map("orders")
 }
@@ -902,22 +909,22 @@ model EventSpeaker {
 }
 
 model EventBooking {
-  id            String        @id @default(uuid())
-  eventId       String
-  userId        String
-  authorId      String
-  name          String
-  phone         String
-  email         String
-  organization  String
-  profession    String
-  city          String
-  country       String
-  amount        Float
-  document      String?
-  isDeleted     Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String   @id @default(uuid())
+  eventId      String
+  userId       String
+  authorId     String
+  name         String
+  phone        String
+  email        String
+  organization String
+  profession   String
+  city         String
+  country      String
+  amount       Float
+  document     String?
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   event  Event @relation(fields: [eventId], references: [id])
   user   User  @relation("userEventBooking", fields: [userId], references: [id])
@@ -957,21 +964,21 @@ model Coupon {
 }
 
 model PromoCode {
-  id        String      @id @default(uuid())
+  id        String         @id @default(uuid())
   authorId  String
-  modelType CouponModel
+  modelType PromoCodeModel
   bookId    String?
   courseId  String?
   eventId   String?
   name      String
-  code      String      @unique
+  code      String         @unique
   discount  Float
   maxUsage  Int?
-  usedCount Int         @default(0)
+  usedCount Int            @default(0)
   expireAt  DateTime
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   author User?   @relation(fields: [authorId], references: [id])
   usedBy User[]  @relation("PromoCodeUsedBy")
@@ -1712,6 +1719,12 @@ enum CourseLevel {
 }
 
 enum CouponModel {
+  courses
+  events
+  books
+}
+
+enum PromoCodeModel {
   courses
   events
   books

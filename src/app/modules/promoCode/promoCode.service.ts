@@ -1,4 +1,4 @@
-import { Prisma, PromoCode, UserStatus } from '@prisma/client';
+import { Prisma, PromoCode, PromoCodeModel, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IPromoCode, IPromoCodeFilterRequest } from './promoCode.interface';
@@ -49,7 +49,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
   let referenceWhere: any = { authorId, isActive: true };
 
   switch (modelType) {
-    case 'books':
+    case PromoCodeModel.books:
       if (!bookId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -66,7 +66,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
       // Check active promo for this book
       const existingBookPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: 'books', bookId },
+        where: { ...referenceWhere, modelType: PromoCodeModel.books, bookId },
       });
       if (existingBookPromo)
         throw new ApiError(
@@ -75,7 +75,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
         );
       break;
 
-    case 'courses':
+    case PromoCodeModel.courses:
       if (!courseId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -92,7 +92,11 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
       // Check active promo for this course
       const existingCoursePromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: 'courses', courseId },
+        where: {
+          ...referenceWhere,
+          modelType: PromoCodeModel.courses,
+          courseId,
+        },
       });
       if (existingCoursePromo)
         throw new ApiError(
@@ -101,7 +105,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
         );
       break;
 
-    case 'events':
+    case PromoCodeModel.events:
       if (!eventId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -118,7 +122,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
       // Check active promo for this event
       const existingEventPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: 'events', eventId },
+        where: { ...referenceWhere, modelType: PromoCodeModel.events, eventId },
       });
       if (existingEventPromo)
         throw new ApiError(
@@ -140,7 +144,6 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
   // ✅ Create PromoCode
   const result = await prisma.promoCode.create({ data: payload });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'PromoCode creation failed!');
   }
@@ -205,23 +208,28 @@ const getAllFromDB = async (
         select: {
           id: true,
           name: true,
-          email: true,
           photoUrl: true,
         },
       },
       course: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
         },
       },
       book: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
         },
       },
       event: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
         },
       },
     },
@@ -270,7 +278,7 @@ const updateIntoDB = async (
   id: string,
   payload: Partial<IPromoCode>,
 ): Promise<PromoCode> => {
-  const promoCode = await prisma.promoCode.findUnique({
+  const promoCode = await prisma.promoCode.findFirst({
     where: { id },
   });
   if (!promoCode) {
@@ -289,7 +297,7 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<PromoCode> => {
-  const promoCode = await prisma.promoCode.findUniqueOrThrow({
+  const promoCode = await prisma.promoCode.findFirst({
     where: { id },
   });
   if (!promoCode) {
