@@ -14,20 +14,13 @@ import { certificateRequestSearchAbleFields } from './certificateRequest.constan
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
+import {
+  sendCertificateRequestNotificationToAuthor,
+  sendCertificateStatusNotificationToUser,
+} from './certificateRequest.utils';
 
 const insertIntoDB = async (payload: ICertificateRequest) => {
-  const { userId, authorId, courseId } = payload;
-
-  const author = await prisma.user.findFirst({
-    where: {
-      id: authorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!author) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate author not found!');
-  }
+  const { userId, courseId } = payload;
 
   const user = await prisma.user.findFirst({
     where: {
@@ -46,24 +39,65 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
-      authorId,
       isDeleted: false,
+    },
+    include: {
+      instructor: true,
     },
   });
   if (!course) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
   }
 
-  const result = await prisma.certificateRequest.create({
-    data: payload,
+  // Validate enrollment
+  const enrollment = await prisma.enrolledCourse.findFirst({
+    where: { userId, courseId, isDeleted: false },
   });
+  if (!enrollment) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'User is not enrolled in this course!',
+    );
+  }
+  console.log(enrollment.isComplete);
 
+  // Check if course is completed
+  if (enrollment.isComplete === false) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Cannot request certificate. Course is not completed!',
+    );
+  }
+
+  // Check if a pending certificate request already exists
+  const existingRequest = await prisma.certificateRequest.findFirst({
+    where: {
+      userId,
+      courseId,
+      status: CertificateRequestStatus.denied,
+    },
+  });
+  if (existingRequest) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'A pending certificate request already exists for this course!',
+    );
+  }
+
+  // Create certificate request
+  const result = await prisma.certificateRequest.create({
+    data: { ...payload, authorId: course.instructorId },
+  });
   if (!result) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Certificate request creation failed!',
     );
   }
+
+  // Notify course author
+  await sendCertificateRequestNotificationToAuthor(course.instructor, result);
+
   return result;
 };
 
@@ -126,7 +160,7 @@ const getAllFromDB = async (
           },
 
     include: {
-      author: {
+      user: {
         select: {
           id: true,
           name: true,
@@ -164,7 +198,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (
   id: string,
-): Promise<CertificateRequest | null> => {
+): Promise<any> => {
   const result = await prisma.certificateRequest.findUnique({
     where: { id },
     include: {
@@ -174,9 +208,28 @@ const getByIdFromDB = async (
           name: true,
           email: true,
           photoUrl: true,
+          role: true,
         },
       },
-      course: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+      course: {
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          level: true,
+          hasCertificate: true,
+          duration: true,
+          lectures: true,
+        },
+      },
     },
   });
 
@@ -187,7 +240,70 @@ const getByIdFromDB = async (
     );
   }
 
-  return result;
+  // student = authorId
+  const studentId = result.userId;
+  const courseId = result.courseId;
+
+  // enrollment info
+  const enrollment = await prisma.enrolledCourse.findFirst({
+    where: { userId: studentId, courseId, isDeleted: false },
+    select: {
+      id: true,
+      completedRate: true,
+      courseMark: true,
+      grade: true,
+      learningTime: true,
+      lectureWatched: true,
+      isComplete: true,
+      lastActivity: true,
+    },
+  });
+
+  // assignment submissions for this course
+  const assignments = await prisma.assignmentSubmission.findMany({
+    where: {
+      userId: studentId,
+      assignment: { courseId },
+      isDeleted: false,
+    },
+    select: {
+      id: true,
+      assignmentId: true,
+      marksObtained: true,
+      totalMarks: true,
+      grade: true,
+      submittedAt: true,
+      isChecked: true,
+      feedback: true,
+    },
+  });
+
+  // quiz attempts for this course
+  const quizzes = await prisma.quizAttempt.findMany({
+    where: {
+      userId: studentId,
+      quiz: { courseId },
+      isDeleted: false,
+    },
+    select: {
+      id: true,
+      quizId: true,
+      marksObtained: true,
+      totalMarks: true,
+      grade: true,
+      correctRate: true,
+      timeTaken: true,
+      lastAttempt: true,
+      isCompleted: true,
+    },
+  });
+
+  return {
+    ...result,
+    enrollment,
+    assignments,
+    quizzes,
+  };
 };
 
 const updateIntoDB = async (
@@ -198,6 +314,7 @@ const updateIntoDB = async (
 
   const certificateRequest = await prisma.certificateRequest.findUnique({
     where: { id },
+    include: { author: true },
   });
   if (!certificateRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Certificate request not found!');
@@ -214,7 +331,11 @@ const updateIntoDB = async (
     );
   }
 
-  // sent notification to user
+  // Notify student about status change
+  await sendCertificateStatusNotificationToUser(
+    certificateRequest.author,
+    result,
+  );
 
   return result;
 };

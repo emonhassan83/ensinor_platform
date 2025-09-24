@@ -51,6 +51,11 @@ export const messages = {
     checked: 'Assignment checked!',
   },
 
+  certificateRequest: {
+    newRequest: 'Certificate request submitted!',
+    statusChanged: 'Certificate request status changed!'
+  },
+
   subscription: {
     newPlan: 'New subscription plan added.',
     warningForPlan: 'Alert for add new plan',

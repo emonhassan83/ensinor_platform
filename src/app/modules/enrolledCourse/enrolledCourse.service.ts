@@ -42,7 +42,19 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   });
   if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'User not found!');
 
-  // 3. Create enrolled course
+  
+  // 3. Check if user is already enrolled in this course
+  const existingEnrollment = await prisma.enrolledCourse.findFirst({
+    where: { userId, courseId, isDeleted: false },
+  });
+  if (existingEnrollment) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'User is already enrolled in this course!',
+    );
+  }
+
+  // 4. Create enrolled course
   const enrolledCourse = await prisma.enrolledCourse.create({
     data: {
       userId,
@@ -53,7 +65,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     },
   });
 
-  // 4. Increment user courseEnrolled
+  // 5. Increment user courseEnrolled
   if (user.role === 'student') {
     await prisma.student.update({
       where: { userId },
@@ -66,7 +78,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     });
   }
 
-  // 5. Increment instructor / business instructor / company based on platform
+  // 6. Increment instructor / business instructor / company based on platform
   if (course.platform === 'admin') {
     // increment instructor enrolled
     await prisma.instructor.update({
@@ -88,7 +100,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     }
   }
 
-  // 6. Auto-join student into course chats (discussion + announcement)
+  // 7. Auto-join student into course chats (discussion + announcement)
   const chats = await prisma.chat.findMany({
     where: {
       courseId: course.id,
@@ -113,7 +125,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     }
   }
 
-  // 7. Send congratulatory email
+  // 8. Send congratulatory email
   await sendCourseEnrollmentEmail(
     user.email,
     user.name,
@@ -163,19 +175,20 @@ const enrollBundleCourses = async (payload: {
     throw new ApiError(httpStatus.BAD_REQUEST, 'No valid courses found!');
   }
 
-  // 4. Check existing enrollments
+ // 4. Fetch existing enrollments
   const existingEnrollments = await prisma.enrolledCourse.findMany({
     where: { userId, courseId: { in: courseIds } },
     select: { courseId: true },
   });
-  const existingSet = new Set(existingEnrollments.map(e => e.courseId));
+  const alreadyEnrolledSet = new Set(existingEnrollments.map(e => e.courseId));
 
-  const filteredCourses = courses.filter(c => !existingSet.has(c.id));
+  // 5. Filter courses that are not already enrolled
+  const filteredCourses = courses.filter(c => !alreadyEnrolledSet.has(c.id));
   if (filteredCourses.length === 0) {
     return { success: false, message: 'All courses already enrolled' };
   }
 
-  // 5. Prepare enroll data
+  // 6. Prepare enroll data
   const enrollData = filteredCourses.map(c => ({
     userId,
     courseId: c.id,
@@ -184,13 +197,13 @@ const enrollBundleCourses = async (payload: {
     courseCategory: c.category,
   }));
 
-  // 6. Bulk insert enrolled courses
+  // 7. Bulk insert enrolled courses
   await prisma.enrolledCourse.createMany({
     data: enrollData,
     skipDuplicates: true,
   });
 
-  // 7. Update student or employee profile courseEnrolled
+  // 8. Update student or employee profile courseEnrolled
   const incrementCount = filteredCourses.length;
   if (user.student) {
     await prisma.student.update({
@@ -204,7 +217,7 @@ const enrollBundleCourses = async (payload: {
     });
   }
 
-  // 8. Update instructor / business instructor / company enrolled counts
+  // 9. Update instructor / business instructor / company enrolled counts
   for (const c of filteredCourses) {
     if (c.platform === 'admin') {
       // Instructor enrolled increment
@@ -226,13 +239,13 @@ const enrollBundleCourses = async (payload: {
     }
   }
 
-  // 9. Increment bundle enrollments
+  // 10. Increment bundle enrollments
   await prisma.courseBundle.update({
     where: { id: bundleId },
     data: { enrollments: { increment: 1 } },
   });
 
-  // 10. Auto-join user into all chats (discussion + announcement) of each course
+  // 11. Auto-join user into all chats (discussion + announcement) of each course
   for (const course of filteredCourses) {
     const chats = await prisma.chat.findMany({
       where: {
@@ -258,7 +271,7 @@ const enrollBundleCourses = async (payload: {
       }
     }
 
-    // send congratulation email for each course
+    //12. send congratulation email for each course
     await sendCourseEnrollmentEmail(
       user.email,
       user.name,

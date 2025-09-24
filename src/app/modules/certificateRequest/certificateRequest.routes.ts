@@ -15,13 +15,13 @@ router.post(
 );
 
 router.get(
-  '/my-requests',
+  '/user/my-requests',
   auth(UserRole.student, UserRole.employee),
   CertificateRequestController.getByUserIdFromDB,
 );
 
 router.get(
-  '/author/:authorId',
+  '/author/my-requests',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,

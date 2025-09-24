@@ -41,7 +41,7 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   const result = await CertificateRequestService.getAllFromDB(
     filters,
     options,
-    { userId: req.params.authorId },
+    { authorId: req.user!.userId },
   );
 
   sendResponse(res, {
