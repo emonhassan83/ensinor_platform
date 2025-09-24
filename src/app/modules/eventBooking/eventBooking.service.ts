@@ -27,6 +27,22 @@ const insertIntoDB = async (payload: IEventBooking) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
+  // Check if user already booked the same event at the same time
+  const existingBooking = await prisma.eventBooking.findFirst({
+    where: {
+      eventId,
+      userId,
+      isDeleted: false,
+    },
+  });
+
+  if (existingBooking) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'You have already booked this event at this time!',
+    );
+  }
+
   const result = await prisma.eventBooking.create({
     data: {
       ...payload,

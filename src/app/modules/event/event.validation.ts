@@ -7,10 +7,6 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
-    companyId: z
-      .string({ required_error: 'Company is required' })
-      .uuid('company must be a valid UUID')
-      .optional(),
     title: z.string({ required_error: 'Title is required!' }),
     type: z.nativeEnum(EventType),
     platform: z.nativeEnum(PlatformType),

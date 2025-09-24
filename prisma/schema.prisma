@@ -914,9 +914,6 @@ model EventBooking {
   city          String
   country       String
   amount        Float
-  status        OrderStatus   @default(pending)
-  paymentStatus PaymentStatus @default(unpaid)
-  transactionId String?
   document      String?
   isDeleted     Boolean       @default(false)
   createdAt     DateTime      @default(now())

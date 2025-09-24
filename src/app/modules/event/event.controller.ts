@@ -69,7 +69,7 @@ const getCompanyEventFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Author Events data fetched!',
+    message: 'Company Events data fetched!',
     meta: result.meta,
     data: result.data,
   });
