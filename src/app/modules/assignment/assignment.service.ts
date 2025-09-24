@@ -1,10 +1,5 @@
 import httpStatus from 'http-status';
-import {
-  Assignment,
-  Batch,
-  Prisma,
-  UserStatus,
-} from '@prisma/client';
+import { Assignment, Batch, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IAssignment, IAssignmentFilterRequest } from './assignment.interface';
@@ -12,6 +7,7 @@ import { assignmentSearchAbleFields } from './assignment.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import { sendAssignmentPublishedNotifYToEnrolledUsers } from './assignment.utils';
 
 const insertIntoDB = async (payload: IAssignment, file: any) => {
   const { authorId, courseId } = payload;
@@ -48,10 +44,28 @@ const insertIntoDB = async (payload: IAssignment, file: any) => {
   const result = await prisma.assignment.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Assignment creation failed!');
   }
+
+  // 5. Fetch all enrolled users for this course
+  const enrolledUsers = await prisma.enrolledCourse.findMany({
+    where: {
+      courseId,
+      isDeleted: false,
+    },
+    select: { userId: true },
+  });
+
+  // notify enrolled users
+  if (enrolledUsers.length > 0) {
+    await sendAssignmentPublishedNotifYToEnrolledUsers(
+      enrolledUsers.map(e => e.userId),
+      result,
+      course,
+    );
+  }
+
   return result;
 };
 
@@ -138,7 +152,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<Assignment | null> => {
   const result = await prisma.assignment.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {

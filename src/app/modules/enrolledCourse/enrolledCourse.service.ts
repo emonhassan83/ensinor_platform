@@ -47,7 +47,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     data: {
       userId,
       courseId,
-      authorId: course.authorId,
+      authorId: course.instructorId,
       platform: course.platform,
       courseCategory: course.category,
     },
@@ -70,7 +70,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   if (course.platform === 'admin') {
     // increment instructor enrolled
     await prisma.instructor.update({
-      where: { userId: course.authorId },
+      where: { userId: course.instructorId },
       data: { enrolled: { increment: 1 } },
     });
   } else if (course.platform === 'company') {
@@ -263,7 +263,7 @@ const enrollBundleCourses = async (payload: {
       user.email,
       user.name,
       course.title,
-      `https://dashboard.ensinor.com/courses/${course.id}`
+      `https://dashboard.ensinor.com/courses/${course.id}`,
     );
   }
 

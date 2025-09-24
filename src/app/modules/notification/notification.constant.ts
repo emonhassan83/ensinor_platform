@@ -43,6 +43,9 @@ export const messages = {
   enrolledCourse: {
     completed: 'Course completed submission!',
   },
+  assignment: {
+    published: 'Assignment published!',
+  },
 
   subscription: {
     newPlan: 'New subscription plan added.',

@@ -372,7 +372,7 @@ const getAllFilterDataFromDB = async () => {
 
 const getByIdFromDB = async (id: string): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {
@@ -391,10 +391,11 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
         },
       },
       resource: true,
+      assignment: true,
     },
   });
 
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
   }
 
@@ -407,9 +408,9 @@ const updateIntoDB = async (
   file: any,
 ): Promise<Course> => {
   const course = await prisma.course.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!course || course?.isDeleted) {
+  if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
@@ -438,108 +439,101 @@ const changeStatusIntoDB = async (
 ): Promise<Course> => {
   const { status } = payload;
 
-  const course = await prisma.course.findUnique({
-    where: { id, isDeleted: false },
-  });
-  if (!course) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
-  }
-
-  const prevStatus = course.status;
-
-  const result = await prisma.course.update({
-    where: { id },
-    data: { status },
-  });
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course status not updated!');
-  }
-
-  // Only on pending → approved
-  if (
-    prevStatus === CoursesStatus.pending &&
-    status === CoursesStatus.approved
-  ) {
-    // Check if either discussion OR announcement already exists
-    const existingChats = await prisma.chat.findMany({
-      where: {
-        courseId: course.id,
-        type: { in: [ChatType.group, ChatType.announcement] },
-        isDeleted: false,
-      },
-      select: { type: true },
+  return await prisma.$transaction(async prismaTx => {
+    // 1. Fetch course
+    const course = await prismaTx.course.findUnique({
+      where: { id, isDeleted: false },
     });
-
-    const hasGroup = existingChats.some(c => c.type === ChatType.group);
-    const hasAnnouncement = existingChats.some(c => c.type === ChatType.announcement);
-
-    // 1. Discussion Chat (create only if not exists)
-    if (!hasGroup) {
-      const groupChat = await prisma.chat.create({
-        data: {
-          type: ChatType.group,
-          groupName: `${course.title} Discussion`,
-          groupImage: course.thumbnail || null,
-          courseId: course.id,
-          isReadOnly: false,
-        },
-      });
-
-      await prisma.chatParticipant.createMany({
-        data: [
-          {
-            userId: course.instructorId!,
-            chatId: groupChat.id,
-            role: ChatRole.admin,
-          },
-          {
-            userId: course.authorId!,
-            chatId: groupChat.id,
-            role: ChatRole.admin,
-          },
-        ],
-      });
+    if (!course) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
     }
 
-    // 2. Announcement Chat (create only if not exists)
-    if (!hasAnnouncement) {
-      const announcementChat = await prisma.chat.create({
-        data: {
-          type: ChatType.announcement,
-          groupName: `${course.title} Announcement`,
-          groupImage: course.thumbnail || null,
-          courseId: course.id,
-          isReadOnly: true,
-        },
-      });
+    const prevStatus = course.status;
 
-      await prisma.chatParticipant.createMany({
-        data: [
-          {
-            userId: course.authorId!,
-            chatId: announcementChat.id,
-            role: ChatRole.admin,
-          },
-          {
-            userId: course.instructorId!,
-            chatId: announcementChat.id,
-          },
-        ],
-      });
+    // 2. Update course status
+    const result = await prismaTx.course.update({
+      where: { id },
+      data: { status },
+    });
+    if (!result) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course status not updated!');
     }
-  }
 
-  // sent notify to author when changed status
-  await sendNotifYToUser(status, course.instructorId!);
+    // 3. Only on pending → approved
+    if (
+      prevStatus === CoursesStatus.pending &&
+      status === CoursesStatus.approved
+    ) {
+      // Check existing chats
+      const existingChats = await prismaTx.chat.findMany({
+        where: {
+          courseId: course.id,
+          type: { in: [ChatType.group, ChatType.announcement] },
+          isDeleted: false,
+        },
+        select: { type: true },
+      });
 
-  return result;
+      const hasGroup = existingChats.some(c => c.type === ChatType.group);
+      const hasAnnouncement = existingChats.some(
+        c => c.type === ChatType.announcement,
+      );
+
+      // 3a. Discussion Chat
+      if (!hasGroup) {
+        await prismaTx.chat.create({
+          data: {
+            type: ChatType.group,
+            groupName: `${course.title} Discussion`,
+            groupImage: course.thumbnail || null,
+            courseId: course.id,
+            isReadOnly: false,
+            participants: {
+              createMany: {
+                data: [
+                  { userId: course.instructorId!, role: ChatRole.admin },
+                  { userId: course.authorId!, role: ChatRole.admin },
+                ],
+              },
+            },
+          },
+        });
+      }
+
+      // 3b. Announcement Chat
+      if (!hasAnnouncement) {
+        await prismaTx.chat.create({
+          data: {
+            type: ChatType.announcement,
+            groupName: `${course.title} Announcement`,
+            groupImage: course.thumbnail || null,
+            courseId: course.id,
+            isReadOnly: true,
+            participants: {
+              createMany: {
+                data: [
+                  { userId: course.authorId!, role: ChatRole.admin },
+                  { userId: course.instructorId! },
+                ],
+              },
+            },
+          },
+        });
+      }
+    }
+
+    // 4. Send notify to instructor
+    await sendNotifYToUser(status, course.instructorId!);
+
+    return result;
+  });
 };
 
 const deleteFromDB = async (id: string): Promise<Course> => {
   const course = await prisma.course.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!course || course?.isDeleted) {
+  if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
