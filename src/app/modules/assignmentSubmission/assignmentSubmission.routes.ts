@@ -70,7 +70,7 @@ router.get(
 );
 
 router.put(
-  '/:id',
+  '/checked/:id',
   auth(
     UserRole.company_admin,
     UserRole.business_instructors,
@@ -78,10 +78,8 @@ router.put(
     UserRole.employee,
     UserRole.student,
   ),
-  upload.single('file'),
-  parseData(),
   validateRequest(AssignmentSubmissionValidation.updateValidationSchema),
-  AssignmentSubmissionController.updateIntoDB,
+  AssignmentSubmissionController.checkedAssignmentIntoDB,
 );
 
 router.delete(

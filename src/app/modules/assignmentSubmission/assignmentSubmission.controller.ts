@@ -105,11 +105,10 @@ const getByIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await AssignmentSubmissionService.updateIntoDB(
+const checkedAssignmentIntoDB = catchAsync(async (req, res) => {
+  const result = await AssignmentSubmissionService.checkedAssignmentIntoDB(
     req.params.id,
-    req.body,
-    req.file,
+    req.body
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -136,6 +135,6 @@ export const AssignmentSubmissionController = {
   getCourseAssignmentSubmission,
   getMyAssignmentSubmission,
   getByIdFromDB,
-  updateIntoDB,
+  checkedAssignmentIntoDB,
   deleteFromDB,
 };

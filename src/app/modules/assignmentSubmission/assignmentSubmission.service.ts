@@ -1,5 +1,10 @@
 import httpStatus from 'http-status';
-import { AssignmentSubmission, Prisma, UserStatus } from '@prisma/client';
+import {
+  AssignmentSubmission,
+  CourseGrade,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -10,6 +15,17 @@ import { assignmentSubmissionSearchAbleFields } from './assignmentSubmission.con
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import {
+  sendAssignmentCheckedNotifYToUser,
+  sendAssignmentSubmissionNotifYToAuthor,
+} from './assignmentSubmission.utils';
+import { sendAssignmentCheckedEmail } from '../../utils/email/sentAssignmentCheckedEmail';
+import config from '../../config';
+
+interface CheckedPayload {
+  marksObtained: number;
+  feedback: string;
+}
 
 const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
   const { assignmentId, userId } = payload;
@@ -37,7 +53,23 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
-  // 3. upload to image
+  // 3. Prevent duplicate submission
+  const existingSubmission = await prisma.assignmentSubmission.findFirst({
+    where: {
+      assignmentId,
+      userId,
+      isDeleted: false,
+    },
+  });
+
+  if (existingSubmission) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'You have already submitted this assignment. Please use resubmission instead.',
+    );
+  }
+
+  // 4. upload to image
   let fileUrl: string | undefined;
   if (file) {
     fileUrl = (await uploadToS3({
@@ -46,10 +78,10 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
     })) as string;
   }
 
-  // 4. Check deadline
+  // 5. Check deadline
   const isLate = assignment.deadline ? new Date() > assignment.deadline : false;
 
-  // 5. Create submission (or update if already exists)
+  // 6. Create submission (or update if already exists)
   const result = await prisma.assignmentSubmission.create({
     data: {
       ...payload,
@@ -64,11 +96,19 @@ const insertIntoDB = async (payload: IAssignmentSubmission, file: any) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Assignment submission failed!');
   }
 
-  // 6. Increment global attempt only if it's a fresh submission
+  // 7. Increment global attempt only if it's a fresh submission
   await prisma.assignment.update({
     where: { id: assignment.id },
     data: { attempt: { increment: 1 } },
   });
+
+  // 8. Notify assignment author about submission
+  await sendAssignmentSubmissionNotifYToAuthor(
+    user,
+    assignment,
+    assignment.authorId,
+    'submitted',
+  );
 
   return result;
 };
@@ -93,9 +133,14 @@ const resubmitAssignmentIntoDB = async (
     where: { id: submissionId, userId, isDeleted: false },
     include: { assignment: true },
   });
-
   if (!existingSubmission) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Submission not found!');
+  }
+  if (existingSubmission.isReSubmission) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'Already resubmit this assignment!',
+    );
   }
 
   const assignment = existingSubmission.assignment;
@@ -126,6 +171,14 @@ const resubmitAssignmentIntoDB = async (
       feedback: null,
     },
   });
+
+  // 6. Notify assignment author about resubmission
+  await sendAssignmentSubmissionNotifYToAuthor(
+    user,
+    assignment,
+    assignment.authorId,
+    're-submitted',
+  );
 
   return updatedSubmission;
 };
@@ -238,14 +291,16 @@ const getByIdFromDB = async (
   return result;
 };
 
-const updateIntoDB = async (
-  id: string,
-  payload: Partial<IAssignmentSubmission>,
-  file: any,
+const checkedAssignmentIntoDB = async (
+  submissionId: string,
+  payload: CheckedPayload,
 ): Promise<AssignmentSubmission> => {
+  // 1. Find the assignment submission
   const assignmentSubmission = await prisma.assignmentSubmission.findUnique({
-    where: { id, isDeleted: false },
+    where: { id: submissionId },
+    include: { assignment: true, user: true },
   });
+
   if (!assignmentSubmission) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
@@ -253,26 +308,65 @@ const updateIntoDB = async (
     );
   }
 
-  // upload to image
-  if (file) {
-    payload.fileUrl = (await uploadToS3({
-      file,
-      fileName: `images/assignment/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
-  }
+  const assignment = assignmentSubmission.assignment;
+  const user = assignmentSubmission.user;
 
-  const result = await prisma.assignmentSubmission.update({
-    where: { id },
-    data: payload,
+  // 2. Calculate grade using grading system
+  let gradingSystem = await prisma.gradingSystem.findFirst({
+    where: { courseId: assignment.courseId, isDeleted: false },
+    include: { grades: true },
   });
-  if (!result) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Assignment submission not updated!',
-    );
+
+  if (!gradingSystem) {
+    gradingSystem = await prisma.gradingSystem.findFirst({
+      where: { isDefault: true, isDeleted: false },
+      include: { grades: true },
+    });
   }
 
-  return result;
+  let grade: CourseGrade = CourseGrade.NA;
+  const percent =
+    assignmentSubmission.totalMarks > 0
+      ? (payload.marksObtained / assignmentSubmission.totalMarks) * 100
+      : 0;
+
+  if (gradingSystem && gradingSystem.grades.length > 0) {
+    const matchedGrade = gradingSystem.grades.find(
+      g => percent >= g.minScore && percent <= g.maxScore,
+    );
+    grade = matchedGrade
+      ? (matchedGrade.gradeLabel as CourseGrade)
+      : CourseGrade.NA;
+  } else {
+    grade = percent >= 70 ? CourseGrade.PASS : CourseGrade.FAIL;
+  }
+
+  // 3. Update submission
+  const updatedSubmission = await prisma.assignmentSubmission.update({
+    where: { id: submissionId },
+    data: {
+      marksObtained: payload.marksObtained,
+      feedback: payload.feedback,
+      grade,
+      isChecked: true,
+    },
+  });
+
+  // 4. Send notification to student
+  await sendAssignmentCheckedNotifYToUser(user, assignment, updatedSubmission);
+
+  // 5. Send email to student
+  await sendAssignmentCheckedEmail(
+    user.email,
+    user.name,
+    assignment.title,
+    payload.marksObtained,
+    grade,
+    payload.feedback,
+    `${config.client_url}/dashboard/courses/${assignment.courseId}`,
+  );
+
+  return updatedSubmission;
 };
 
 const deleteFromDB = async (id: string): Promise<AssignmentSubmission> => {
@@ -310,6 +404,6 @@ export const AssignmentSubmissionService = {
   resubmitAssignmentIntoDB,
   getAllFromDB,
   getByIdFromDB,
-  updateIntoDB,
+  checkedAssignmentIntoDB,
   deleteFromDB,
 };

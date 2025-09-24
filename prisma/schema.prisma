@@ -771,6 +771,7 @@ model AssignmentSubmission {
   submittedAt    DateTime     @default(now())
   isLate         Boolean      @default(false)
   isReSubmission Boolean      @default(false)
+  isChecked      Boolean      @default(false)
   isDeleted      Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

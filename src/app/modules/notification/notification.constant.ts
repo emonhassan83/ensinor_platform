@@ -43,8 +43,12 @@ export const messages = {
   enrolledCourse: {
     completed: 'Course completed submission!',
   },
+  
   assignment: {
     published: 'Assignment published!',
+    submitted: 'Assignment submitted!',
+    resubmitted: 'Assignment resubmitted!',
+    checked: 'Assignment checked!',
   },
 
   subscription: {
