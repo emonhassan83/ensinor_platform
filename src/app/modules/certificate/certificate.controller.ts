@@ -24,22 +24,22 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Certificate by userId data fetched!',
+    message: 'Certificate by authorId data fetched!',
     meta: result.meta,
     data: result.data,
   });
 });
 
-const getByCourseIdFromDB = catchAsync(async (req, res) => {
+const getByMyCertificateFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, certificateFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CertificateService.getAllFromDB(filters, options, { courseId: req.params.courseId });
+  const result = await CertificateService.getAllFromDB(filters, options, { userId: req.user!.userId });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Certificate by courseId data fetched!',
+    message: 'My certificate data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -82,7 +82,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CertificateController = {
   insertIntoDB,
   getByAuthorIdFromDB,
-  getByCourseIdFromDB,
+  getByMyCertificateFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

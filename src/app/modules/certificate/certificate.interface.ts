@@ -9,6 +9,7 @@ export type ICertificateFilterRequest = {
 };
 
 export type ICertificate = {
+  userId: string;
   authorId: string;
   courseId: string;
   company: string;

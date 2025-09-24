@@ -94,7 +94,8 @@ model User {
   invitation                 Invitation[]
   enrolledCourseUser         EnrolledCourse[]       @relation("EnrolledUser")
   enrolledCourseAuthor       EnrolledCourse[]       @relation("CourseAuthor")
-  certificate                Certificate[]
+  userCertificate            Certificate[]          @relation("UserCertificate")
+  authorCertificate          Certificate[]          @relation("AuthorCertificate")
   wishlist                   Wishlist[]
   withdrawRequest            WithdrawRequest[]
   gradingSystem              GradingSystem[]
@@ -804,22 +805,25 @@ model CertificateRequest {
 model Certificate {
   id           String   @id @default(uuid())
   authorId     String
+  userId       String
   courseId     String
-  company      String
-  logo         String
-  student      String
-  courseName   String
-  instructor   String
-  studyHour    Float
-  topics       String[]
-  completeDate String
-  reference    String
-  signature    String
+  company      String?
+  logo         String?
+  student      String?
+  courseName   String?
+  instructor   String?
+  studyHour    Float    @default(0.0)
+  topics       String[] @default([])
+  completeDate String?
+  reference    String?
+  signature    String?
+  isCompleted  Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   course Course @relation(fields: [courseId], references: [id])
-  author User   @relation(fields: [authorId], references: [id])
+  author User   @relation("AuthorCertificate", fields: [authorId], references: [id])
+  user   User   @relation("UserCertificate", fields: [userId], references: [id])
 
   @@map("certificates")
 }
@@ -1626,7 +1630,7 @@ enum PlatformType {
 
 enum CertificateRequestStatus {
   pending
-  completed
+  approved
   denied
 }
 

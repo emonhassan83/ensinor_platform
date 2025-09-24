@@ -30,8 +30,8 @@ export const sendCertificateStatusNotificationToUser = async (
 ) => {
   let statusText = '';
   switch (certificateRequest.status) {
-    case CertificateRequestStatus.completed:
-      statusText = 'completed';
+    case CertificateRequestStatus.approved:
+      statusText = 'approved';
       break;
     case CertificateRequestStatus.denied:
       statusText = 'denied';

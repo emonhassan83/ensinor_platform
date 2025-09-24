@@ -331,6 +331,28 @@ const updateIntoDB = async (
     );
   }
 
+   // 3. If approved → create certificate automatically
+  if (status === CertificateRequestStatus.approved) {
+    // Ensure no duplicate certificate
+    const existingCertificate = await prisma.certificate.findFirst({
+      where: {
+        userId: certificateRequest.authorId,
+        courseId: certificateRequest.courseId,
+      },
+    });
+
+    if (!existingCertificate) {
+      await prisma.certificate.create({
+        data: {
+          userId: certificateRequest.authorId,
+          authorId: certificateRequest.userId,
+          courseId: certificateRequest.courseId,
+        },
+      });
+    }
+  }
+
+
   // Notify student about status change
   await sendCertificateStatusNotificationToUser(
     certificateRequest.author,

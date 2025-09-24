@@ -13,37 +13,71 @@ import httpStatus from 'http-status';
 import { UploadedFiles } from '../../interfaces/common.interface';
 
 const insertIntoDB = async (payload: ICertificate, files: any) => {
-  const { authorId, courseId } = payload;
+  const { userId, courseId } = payload;
 
+  // 1. Fetch course
   const course = await prisma.course.findFirst({
-    where: {
-      id: courseId,
-      isDeleted: false,
-    },
+    where: { id: courseId, isDeleted: false },
   });
   if (!course) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Courses not found!');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
   }
 
+  // 2. Fetch user (student)
   const user = await prisma.user.findFirst({
     where: {
-      id: authorId,
+      id: userId,
       isDeleted: false,
       status: UserStatus.active,
     },
   });
   if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate user not found!');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Student not found!');
   }
 
-  // upload thumbnail and file
+  // 3. Validate enrollment
+  const enrollment = await prisma.enrolledCourse.findFirst({
+    where: { userId, courseId, isDeleted: false },
+  });
+  if (!enrollment) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'User is not enrolled in this course!',
+    );
+  }
+
+  // 4. Check if course is completed
+  if (!enrollment.isComplete) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Cannot create certificate. Course is not completed!',
+    );
+  }
+
+  // 5. Check for existing certificate (prevent duplicate)
+  const existingCertificate = await prisma.certificate.findFirst({
+    where: { userId, courseId },
+  });
+  if (existingCertificate) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Certificate already issued for this course!',
+    );
+  }
+
+  // 6. Auto-assign authorId from course instructorId
+  payload.authorId = course.instructorId;
+
+  // 7. Handle uploads
   if (files) {
     const { logo, signature } = files as UploadedFiles;
 
     if (logo?.length) {
       const uploadedLogo = await uploadToS3({
         file: logo[0],
-        fileName: `images/certificate/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+        fileName: `images/certificate/logo/${Math.floor(
+          100000 + Math.random() * 900000,
+        )}`,
       });
       payload.logo = uploadedLogo as string;
     }
@@ -51,26 +85,29 @@ const insertIntoDB = async (payload: ICertificate, files: any) => {
     if (signature?.length) {
       const uploadedSignature = await uploadToS3({
         file: signature[0],
-        fileName: `images/certificate/signature/${Math.floor(100000 + Math.random() * 900000)}`,
+        fileName: `images/certificate/signature/${Math.floor(
+          100000 + Math.random() * 900000,
+        )}`,
       });
       payload.signature = uploadedSignature as string;
     }
   }
 
+  // 8. Create certificate
   const result = await prisma.certificate.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate creation failed!');
   }
+
   return result;
 };
 
 const getAllFromDB = async (
   params: ICertificateFilterRequest,
   options: IPaginationOptions,
-  filterBy: { authorId?: string; courseId?: string },
+  filterBy: { authorId?: string; userId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
@@ -81,8 +118,8 @@ const getAllFromDB = async (
   if (filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
   }
-  if (filterBy.courseId) {
-    andConditions.push({ courseId: filterBy.courseId });
+  if (filterBy.userId) {
+    andConditions.push({ userId: filterBy.userId });
   }
 
   // Search across Package and nested User fields
@@ -126,7 +163,7 @@ const getAllFromDB = async (
           },
 
     include: {
-      author: {
+      user: {
         select: {
           id: true,
           name: true,
@@ -138,11 +175,6 @@ const getAllFromDB = async (
         select: {
           id: true,
           title: true,
-          thumbnail: true,
-          shortDescription: true,
-          category: true,
-          level: true,
-          language: true,
         },
       },
     },
@@ -166,7 +198,7 @@ const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
   const result = await prisma.certificate.findUnique({
     where: { id },
     include: {
-       author: {
+      author: {
         select: {
           id: true,
           name: true,

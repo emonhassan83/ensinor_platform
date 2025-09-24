@@ -14,7 +14,7 @@ import { TLoginUser } from './auth.interface';
 import { generateOtp } from '../../utils/generateOtp';
 import moment from 'moment';
 import ApiError from '../../errors/ApiError';
-import { RegisterWith, UserRole } from '@prisma/client';
+import { RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import { IUser } from '../user/user.interface';
 import prisma from '../../utils/prisma';
 
@@ -593,27 +593,41 @@ const registerWithFacebook = async (payload: Partial<IUser>) => {
 
 const changePassword = async (
   userData: JwtPayload,
-  payload: { oldPassword: string; newPassword: string },
+  payload: {
+    oldPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  },
 ) => {
+  const { oldPassword, newPassword, confirmPassword } = payload;
   //* checking if the user is exist
   const user = await prisma.user.findUnique({
-    where: { email: userData.email, isDeleted: true },
+    where: {
+      email: userData.email,
+      status: UserStatus.active,
+      isDeleted: true,
+    },
   });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
+  // if new pass and confirm pass not matched
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'New password and confirmation password do not match. Please re-enter your password.',
+    );
+  }
+
   //* checking if the password is correct
-  const isPasswordMatched = await bcrypt.compare(
-    payload.oldPassword,
-    user.password!,
-  );
+  const isPasswordMatched = await bcrypt.compare(oldPassword, user.password!);
   if (!isPasswordMatched)
     throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !');
 
   //* hash new password
   const newHashedPassword = await bcrypt.hash(
-    payload.newPassword,
+    newPassword,
     Number(config.bcrypt_salt_rounds),
   );
 

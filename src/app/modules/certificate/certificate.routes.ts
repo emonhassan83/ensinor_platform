@@ -29,20 +29,20 @@ router.post(
 );
 
 router.get(
-  '/my-certificate',
+  '/author/my-certificate',
   auth(UserRole.student, UserRole.employee),
   CertificateController.getByAuthorIdFromDB,
 );
 
 router.get(
-  '/course/:courseId',
+  '/user/my-certificate',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  CertificateController.getByCourseIdFromDB,
+  CertificateController.getByMyCertificateFromDB,
 );
 
 router.get(
