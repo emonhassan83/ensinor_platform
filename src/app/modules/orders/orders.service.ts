@@ -86,12 +86,16 @@ const createOrders = async (payload: IOrder) => {
       `Reference ${modelType} does not exist!`,
     );
   }
+  if (modelConfig.book) {
+    payload.documents = entity.file;
+  }
 
   let baseAmount = entity[config.priceField];
   let discount = 0;
   let finalAmount = baseAmount;
 
   // ✅ Coupon/Promo Validation
+  let isInstructorCoupon = false;
   let isInstructorPromo = false;
 
   if (couponCode) {
@@ -119,7 +123,7 @@ const createOrders = async (payload: IOrder) => {
     });
 
     // Check if instructor promo
-    isInstructorPromo = coupon.authorId === payload.authorId;
+    isInstructorCoupon = coupon.authorId === payload.authorId;
   }
 
   if (promoCode) {
@@ -162,18 +166,23 @@ const createOrders = async (payload: IOrder) => {
     const remaining = finalAmount - affiliateCut;
     instructorShare = remaining * 0.5;
     platformShare = remaining * 0.5;
-  } else if (isInstructorPromo) {
+  } else if (isInstructorPromo || promoCode) {
     instructorShare = finalAmount * 0.97;
     platformShare = finalAmount * 0.03;
+  } else if (isInstructorCoupon || couponCode) {
+    // Coupon usage always 50/50
+    instructorShare = finalAmount * 0.5;
+    platformShare = finalAmount * 0.5;
   } else {
+    // Regular promo or no promo
     instructorShare = finalAmount * 0.5;
     platformShare = finalAmount * 0.5;
   }
 
-    // 8️⃣ Create order
+  // 8️⃣ Create order
   const orderData = {
     userId,
-    authorId: payload.authorId,
+    authorId: entity.authorId,
     modelType,
     bookId: payload.bookId,
     courseId: payload.courseId,
@@ -267,19 +276,25 @@ const getAllOrders = async (
       },
       course: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
           category: true,
         },
       },
       courseBundle: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
           category: true,
         },
       },
       book: {
         select: {
+          id: true,
           title: true,
+          thumbnail: true,
           category: true,
         },
       },
