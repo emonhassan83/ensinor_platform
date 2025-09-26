@@ -1,6 +1,8 @@
 import {
   Affiliate,
   AffiliateLink,
+  AffiliateModel,
+  BookStatus,
   CoursesStatus,
   Prisma,
   UserStatus,
@@ -21,6 +23,7 @@ import config from '../../config';
 const createAffiliateAccount = async (payload: IAffiliateAccount) => {
   const { userId } = payload;
 
+  // Check if user exists
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
@@ -32,10 +35,18 @@ const createAffiliateAccount = async (payload: IAffiliateAccount) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
+  // Check if affiliate account already exists
+  const existingAffiliate = await prisma.affiliate.findUnique({
+    where: { userId },
+  });
+  if (existingAffiliate) {
+    return existingAffiliate;
+  }
+
+  // Create new affiliate account
   const result = await prisma.affiliate.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
@@ -68,49 +79,138 @@ const getAffiliateAccount = async (
       'Oops! Affiliate account not found!',
     );
   }
-
   return result;
 };
 
 const insertIntoDB = async (payload: IAffiliates) => {
-  const { affiliateId, courseId } = payload;
+  const { affiliateId, modelType, bookId, courseId, eventId } = payload;
 
-  // 1️⃣ Validate affiliate exists
+  // 1️⃣ Validate affiliate account exists
   const affiliate = await prisma.affiliate.findFirst({
     where: { id: affiliateId },
+    include: { user: true },
   });
   if (!affiliate) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate account not found!');
   }
 
-  // 2️⃣ Validate course exists
-  const course = await prisma.course.findFirst({
-    where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
-  });
-  if (!course) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Course not found or not available!',
-    );
+  // 2️⃣ Validate model-specific reference + check duplicate affiliate link
+  switch (modelType) {
+    case AffiliateModel.books: {
+      if (!bookId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Book ID is required for BOOK affiliate!',
+        );
+      }
+
+      const book = await prisma.book.findFirst({
+        where: { id: bookId, status: BookStatus.published, isDeleted: false },
+      });
+      if (!book) throw new ApiError(httpStatus.BAD_REQUEST, 'Book not found!');
+
+      // ✅ Check if affiliate link already exists for this book
+      const existingBookAffiliate = await prisma.affiliateLink.findFirst({
+        where: { affiliateId, modelType: AffiliateModel.books, bookId },
+      });
+      if (existingBookAffiliate) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An affiliate link already exists for this book!',
+        );
+      }
+      break;
+    }
+
+    case AffiliateModel.courses: {
+      if (!courseId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Course ID is required for COURSE affiliate!',
+        );
+      }
+
+      const course = await prisma.course.findFirst({
+        where: {
+          id: courseId,
+          status: CoursesStatus.approved,
+          isDeleted: false,
+        },
+      });
+      if (!course) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
+      }
+
+      // ✅ Check if affiliate link already exists for this course
+      const existingCourseAffiliate = await prisma.affiliateLink.findFirst({
+        where: { affiliateId, modelType: AffiliateModel.courses, courseId },
+      });
+      if (existingCourseAffiliate) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An affiliate link already exists for this course!',
+        );
+      }
+      break;
+    }
+
+    case AffiliateModel.events: {
+      if (!eventId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Event ID is required for EVENT affiliate!',
+        );
+      }
+
+      const event = await prisma.event.findFirst({
+        where: { id: eventId, isDeleted: false },
+      });
+      if (!event) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Event not found!');
+      }
+
+      // ✅ Check if affiliate link already exists for this event
+      const existingEventAffiliate = await prisma.affiliateLink.findFirst({
+        where: { affiliateId, modelType: AffiliateModel.events, eventId },
+      });
+      if (existingEventAffiliate) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'An affiliate link already exists for this event!',
+        );
+      }
+      break;
+    }
+
+    default:
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Invalid affiliate model type!',
+      );
   }
 
-  // 3️⃣ Prevent duplicate affiliate link for the same affiliate & course
+  // 3️⃣ Check duplicate affiliate link globally (safety net)
   const existingLink = await prisma.affiliateLink.findFirst({
     where: {
       affiliateId,
       courseId,
+      bookId,
+      eventId,
     },
   });
-
   if (existingLink) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Affiliate link already exists for this course!',
-    );
+    return existingLink;
   }
 
-  // 4️⃣ Generate affiliate link
-  const affiliateLink = `${config.client_url}/course/${courseId}?aff=${affiliateId}`;
+  // 4️⃣ Generate affiliate link dynamically
+  let affiliateLink = '';
+  if (courseId) {
+    affiliateLink = `${config.client_url}/course/${courseId}?aff=${affiliateId}`;
+  } else if (bookId) {
+    affiliateLink = `${config.client_url}/book/${bookId}?aff=${affiliateId}`;
+  } else if (eventId) {
+    affiliateLink = `${config.client_url}/event/${eventId}?aff=${affiliateId}`;
+  }
 
   // 5️⃣ Create new affiliate link
   const result = await prisma.affiliateLink.create({
@@ -133,14 +233,28 @@ const insertIntoDB = async (payload: IAffiliates) => {
 const getAllFromDB = async (
   params: IAffiliatesFilterRequest,
   options: IPaginationOptions,
-  affiliateId?: string,
+  authorId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
+  let affiliate: Affiliate | null = null;
+  if (authorId) {
+    // Validate affiliate account for the author
+    affiliate = await prisma.affiliate.findFirst({
+      where: { userId: authorId },
+    });
+    if (!affiliate) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Affiliate account not found for the author!',
+      );
+    }
+  }
+
   const andConditions: Prisma.AffiliateLinkWhereInput[] = [];
-  if (affiliateId) {
-    andConditions.push({ affiliateId });
+  if (affiliate) {
+    andConditions.push({ affiliateId: affiliate.id });
   }
 
   // Search across Package and nested User fields
@@ -185,6 +299,19 @@ const getAllFromDB = async (
     include: {
       course: {
         select: {
+          id: true,
+          title: true,
+        },
+      },
+      book: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+      event: {
+        select: {
+          id: true,
           title: true,
         },
       },
@@ -201,7 +328,7 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: result,
+    data: { affiliate, affiliateLinks: result },
   };
 };
 
@@ -215,13 +342,14 @@ const getByIdFromDB = async (id: string): Promise<AffiliateLink | null> => {
             select: {
               id: true,
               name: true,
-              email: true,
               photoUrl: true,
             },
           },
         },
       },
       course: true,
+      book: true,
+      event: true,
     },
   });
 

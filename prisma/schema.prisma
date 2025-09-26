@@ -107,7 +107,7 @@ model User {
   zoomAccount                ZoomAccount[]
   promoCode                  PromoCode[]
   usePromoCode               PromoCode[]            @relation("PromoCodeUsedBy")
-  affiliate                  Affiliate[]
+  affiliate                  Affiliate?
   meetingAssignmentsAuthored MeetingAssignment[]    @relation("MeetingAssignmentsAuthored")
   meetingAssignmentsJoined   MeetingAssignment[]    @relation("MeetingAssignmentsJoined")
   review                     Review[]
@@ -991,8 +991,8 @@ model PromoCode {
 
 model Affiliate {
   id             String   @id @default(uuid())
-  userId         String
-  commissionRate Float    @default(0.15) // 15% default
+  userId         String   @unique
+  commissionRate Float    @default(0.2) // 20% default
   totalClicks    Int      @default(0)
   totalSales     Int      @default(0)
   totalEarnings  Float    @default(0)

@@ -40,14 +40,11 @@ router.get(
 );
 
 router.get(
-  '/affiliate-link/:affiliateId',
+  '/affiliate-link/my-affiliate-links',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.employee,
     UserRole.instructor,
-    UserRole.student,
   ),
   AffiliateController.getMyAffiliateFromDB,
 );
