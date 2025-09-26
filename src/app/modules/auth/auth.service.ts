@@ -605,7 +605,7 @@ const changePassword = async (
     where: {
       email: userData.email,
       status: UserStatus.active,
-      isDeleted: true,
+      isDeleted: false,
     },
   });
   if (!user) {
