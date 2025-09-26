@@ -75,6 +75,18 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const clickContentIntoDB = catchAsync(async (req, res) => {
+  const result = await AffiliateService.clickContentIntoDB(
+    req.params.id,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Affiliate content clicked!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await AffiliateService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -92,5 +104,6 @@ export const AffiliateController = {
   getMyAffiliateFromDB,
   getByIdFromDB,
   updateIntoDB,
+  clickContentIntoDB,
   deleteFromDB,
 };

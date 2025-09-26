@@ -507,7 +507,6 @@ model Course {
   certificate        Certificate[]
   gradingSystem      GradingSystem[]
   affiliateLink      AffiliateLink[]
-  affiliateSale      AffiliateSale[]
   meetingAssignment  MeetingAssignment[]
   order              Order[]
   coupon             Coupon[]
@@ -613,7 +612,7 @@ model Order {
   event        Event?        @relation(fields: [eventId], references: [id])
 
   payment       Payment[]
-  affiliateSale AffiliateSale[]
+  affiliateSale AffiliateSale?
 
   @@map("orders")
 }
@@ -1031,14 +1030,13 @@ model AffiliateLink {
 model AffiliateSale {
   id          String   @id @default(uuid())
   affiliateId String
-  courseId    String
-  orderId     String
+  authorId    String 
+  orderId     String   @unique
   commission  Float
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   affiliate Affiliate @relation(fields: [affiliateId], references: [id])
-  course    Course    @relation(fields: [courseId], references: [id])
   order     Order     @relation(fields: [orderId], references: [id])
 
   @@map("affiliate_sales")

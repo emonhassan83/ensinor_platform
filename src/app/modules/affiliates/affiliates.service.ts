@@ -381,6 +381,31 @@ const updateIntoDB = async (
   return result;
 };
 
+const clickContentIntoDB = async (
+  id: string
+): Promise<AffiliateLink> => {
+  const affiliateLink = await prisma.affiliateLink.findUnique({
+    where: { id },
+  });
+  if (!affiliateLink) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate link not found!');
+  }
+
+  const result = await prisma.affiliateLink.update({
+    where: { id },
+    data: {
+      clicks: {
+        increment: 1,
+      },
+    },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate link not updated!');
+  }
+
+  return result;
+};
+
 const deleteFromDB = async (id: string): Promise<AffiliateLink> => {
   const affiliateLink = await prisma.affiliateLink.findUniqueOrThrow({
     where: { id },
@@ -406,5 +431,6 @@ export const AffiliateService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  clickContentIntoDB,
   deleteFromDB,
 };
