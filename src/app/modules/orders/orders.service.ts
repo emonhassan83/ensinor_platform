@@ -79,6 +79,9 @@ const createOrders = async (payload: IOrder) => {
   // ✅ Fetch referenced entity
   const entity = await config.model.findFirst({
     where: { id: referenceId, isDeleted: false },
+    include: {
+      instructor: modelType === OrderModelType.course ? true : false,
+    },
   });
   if (!entity) {
     throw new ApiError(
@@ -86,9 +89,11 @@ const createOrders = async (payload: IOrder) => {
       `Reference ${modelType} does not exist!`,
     );
   }
+  // Check if user already purchased the entity
   if (modelConfig.book) {
     payload.documents = entity.file;
   }
+  
 
   let baseAmount = entity[config.priceField];
   let discount = 0;
@@ -153,6 +158,16 @@ const createOrders = async (payload: IOrder) => {
     });
 
     isInstructorPromo = promo.authorId === payload.authorId;
+  }
+
+  // Check if affiliate
+  if (affiliateId) {
+    const affiliate = await prisma.affiliate.findUnique({
+      where: { id: affiliateId },
+    });
+    if (!affiliate) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate not found!');
+    }
   }
 
   // ✅ Revenue Split Logic

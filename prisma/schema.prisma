@@ -99,7 +99,7 @@ model User {
   wishlist                   Wishlist[]
   withdrawRequest            WithdrawRequest[]
   gradingSystem              GradingSystem[]
-  bundlesAuthored            CourseBundle[]         @relation("BundleAuthor")
+  authorCourseBundle         CourseBundle[]         @relation("BundleAuthor")
   verification               Verification?
   companyRequest             CompanyRequest[]
   usersOnArticles            UsersOnArticles[]
@@ -123,6 +123,7 @@ model User {
   assignmentAuthor           AssignmentSubmission[] @relation("assignmentAuthorUser")
   assignmentSubmission       AssignmentSubmission[] @relation("assignmentSubmissionUser")
   bankDetail                 BankDetail?
+  affiliateSale              AffiliateSale[]
 
   @@map("users")
 }
@@ -539,7 +540,7 @@ model CourseContent {
 
 model CourseBundle {
   id             String       @id @default(uuid())
-  authorId       String?
+  authorId       String
   companyId      String?
   platform       PlatformType
   title          String
@@ -556,8 +557,8 @@ model CourseBundle {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  author  User?    @relation("BundleAuthor", fields: [authorId], references: [id])
-  company Company? @relation(fields: [companyId], references: [id])
+  author     User     @relation("BundleAuthor", fields: [authorId], references: [id])
+  company    Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
@@ -589,7 +590,7 @@ model Order {
   eventId        String?
 
   amount          Float
-  discount        Float? 
+  discount        Float?
   finalAmount     Float // after discount
   instructorShare Float
   platformShare   Float
@@ -1030,12 +1031,13 @@ model AffiliateLink {
 model AffiliateSale {
   id          String   @id @default(uuid())
   affiliateId String
-  authorId    String 
+  authorId    String
   orderId     String   @unique
-  commission  Float
+  commission  Float    @default(0.0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  author    User      @relation(fields: [authorId], references: [id])
   affiliate Affiliate @relation(fields: [affiliateId], references: [id])
   order     Order     @relation(fields: [orderId], references: [id])
 

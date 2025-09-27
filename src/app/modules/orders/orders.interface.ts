@@ -10,6 +10,7 @@ export type IOrderFilterRequest = {
 export interface IOrder {
   userId: string
   authorId: string
+  instructorId?: string
   modelType: OrderModelType
   bookId?: string
   courseId?: string

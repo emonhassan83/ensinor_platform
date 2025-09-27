@@ -4,7 +4,7 @@ export type IAffiliateSaleFilterRequest = {
 
 export type IAffiliateSale = {
   affiliateId: string;
-  courseId: string;
+  authorId: string;
   orderId: string;
   commission: number;
 };

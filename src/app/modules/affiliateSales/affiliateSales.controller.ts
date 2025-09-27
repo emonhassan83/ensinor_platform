@@ -16,11 +16,11 @@ const insertIntoDB = catchAsync(async (req, res) => {
 });
 
 
-const getAllByCourseFromDB = catchAsync(async (req, res) => {
+const getAllByOrderFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, affiliateSaleSearchAbleFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AffiliateSaleService.getAllFromDB(filters, options);
+  const result = await AffiliateSaleService.getAllFromDB(filters, options,  { orderId: req.params.orderId });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -35,7 +35,7 @@ const getMyAffiliateFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, affiliateSaleSearchAbleFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await AffiliateSaleService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await AffiliateSaleService.getAllFromDB(filters, options, { authorId: req.user!.userId });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -68,7 +68,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const AffiliateSaleController = {
   insertIntoDB,
-  getAllByCourseFromDB,
+  getAllByOrderFromDB,
   getMyAffiliateFromDB,
   getByIdFromDB,
   deleteFromDB,
