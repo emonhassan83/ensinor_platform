@@ -1,4 +1,4 @@
-import { Employee, Instructor, Prisma, User, UserStatus } from '@prisma/client';
+import { Instructor, Prisma, User, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IInstructorFilterRequest } from './instructors.interface';
@@ -127,6 +127,24 @@ const getAllFromDB = async (
   };
 };
 
+const instructorCategories = async () => {
+  const andConditions: Prisma.InstructorWhereInput[] = [];
+
+  const whereConditions: Prisma.InstructorWhereInput =
+    andConditions.length > 0 ? { AND: andConditions } : {};
+
+  return await prisma.instructor.findMany({
+    where: whereConditions,
+    distinct: ['designation'],
+    orderBy: {
+      designation: 'asc', 
+    },
+    select: {
+      designation: true,
+    },
+  });
+};
+
 const getByIdFromDB = async (id: string): Promise<Instructor | null> => {
   const result = await prisma.instructor.findUnique({
     where: { id },
@@ -221,6 +239,7 @@ const deleteFromDB = async (id: string): Promise<User> => {
 };
 
 export const InstructorService = {
+  instructorCategories,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

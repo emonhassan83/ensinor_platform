@@ -5,22 +5,31 @@ import pick from '../../utils/pick';
 import { instructorsFilterableFields } from './instructors.constant';
 import sendResponse from '../../utils/sendResponse';
 
-const getAllFromDB = catchAsync(
-  async (req, res) => {
-    const filters = pick(req.query, instructorsFilterableFields);
-    const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+const instructorCategories = catchAsync(async (req, res) => {
+  const result = await InstructorService.instructorCategories();
 
-    const result = await InstructorService.getAllFromDB(filters, options);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Instructor categories fetched!',
+    data: result,
+  });
+});
 
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: 'Instructor data fetched!',
-      meta: result.meta,
-      data: result.data,
-    });
-  },
-);
+const getAllFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, instructorsFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await InstructorService.getAllFromDB(filters, options);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Instructor data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
 
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await InstructorService.getByIdFromDB(req.params.id);
@@ -33,7 +42,11 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await InstructorService.updateIntoDB(req.params.id, req.body, req.file);
+  const result = await InstructorService.updateIntoDB(
+    req.params.id,
+    req.body,
+    req.file,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -53,8 +66,9 @@ const deleteFromDB = catchAsync(async (req, res) => {
 });
 
 export const InstructorController = {
+  instructorCategories,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
-  deleteFromDB
+  deleteFromDB,
 };

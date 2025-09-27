@@ -13,6 +13,8 @@ const upload = multer({ storage });
 
 router.get('/', InstructorController.getAllFromDB);
 
+router.get('/categories', InstructorController.instructorCategories);
+
 router.get('/:id', InstructorController.getByIdFromDB);
 
 router.put(
