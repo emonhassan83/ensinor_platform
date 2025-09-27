@@ -263,7 +263,7 @@ const getEnrolledTrends = async (year: number) => {
 
   // 🔹 Fetch enrollment data grouped by month & type
   const grouped = await prisma.enrolledCourse.groupBy({
-    by: ['type'],
+    by: ['platform'],
     _count: { id: true },
     where: {
       createdAt: { gte: yearStart, lte: yearEnd },
@@ -278,7 +278,7 @@ const getEnrolledTrends = async (year: number) => {
       isDeleted: false,
     },
     select: {
-      type: true,
+      platform: true,
       createdAt: true,
       course: {
         select: { price: true },
@@ -287,10 +287,10 @@ const getEnrolledTrends = async (year: number) => {
   });
 
   // Helper to map data into chart-friendly format
-  const buildTrend = (type: 'platform' | 'business') =>
+  const buildTrend = (type: 'admin' | 'company') =>
     filteredMonths.map((month, index) => {
       const monthData = enrolledCourses.filter(
-        e => e.type === type && new Date(e.createdAt).getMonth() === index,
+        e => e.platform === type && new Date(e.createdAt).getMonth() === index,
       );
 
       const enrolled = monthData.length;
@@ -307,8 +307,8 @@ const getEnrolledTrends = async (year: number) => {
     });
 
   return {
-    platform: buildTrend('platform'),
-    business: buildTrend('business'),
+    platform: buildTrend('admin'),
+    business: buildTrend('company'),
   };
 };
 
@@ -513,20 +513,20 @@ const getCoInstructorEarningOverview = async (coInstructorId: string, year: numb
     where: {
       isPaid: true,
       isDeleted: false,
-      coInstructorEarning: { gt: 0 },
+      coInstructorPool: { gt: 0 },
       createdAt: { gte: yearStart, lte: yearEnd },
       order: {
         courseId: { in: courseIds },
       },
     },
-    _sum: { coInstructorEarning: true },
+    _sum: { coInstructorPool: true },
   });
 
   const earningOverview = filteredMonths.map((month, index) => {
     const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
     return {
       month,
-      amount: row?._sum.coInstructorEarning ?? 0,
+      amount: row?._sum.coInstructorPool ?? 0,
     };
   });
 
@@ -1162,11 +1162,11 @@ const coInstructorMetaData = async (
 
   // --- Revenue ---
   const totalRevenue = await prisma.payment.aggregate({
-    _sum: { coInstructorEarning: true },
+    _sum: { coInstructorPool: true },
     where: {
       isPaid: true,
       isDeleted: false,
-      coInstructorEarning: { gt: 0 },
+      coInstructorPool: { gt: 0 },
       order: {
         courseId: {
           in: (
@@ -1179,7 +1179,7 @@ const coInstructorMetaData = async (
       },
     },
   });
-  const revenue = Math.round(totalRevenue._sum.coInstructorEarning ?? 0);
+  const revenue = Math.round(totalRevenue._sum.coInstructorPool ?? 0);
 
   // --- Selected Year for Chart ---
   const selectedEarningYear = year

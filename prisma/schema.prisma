@@ -1585,7 +1585,6 @@ enum NewsletterCategory {
   blogs
   activityBased
   subscription
-  greeting
 }
 
 enum RecurrenceType {

@@ -2,6 +2,7 @@ import {
   CoInstructor,
   CoursesStatus,
   Prisma,
+  UserRole,
   UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
@@ -20,35 +21,78 @@ import { sendCoInstructorNotification } from './coInstructors.utils';
 const inviteCoInstructor = async (payload: ICoInstructors) => {
   const { invitedById, coInstructorId, courseId } = payload;
 
-  // Check course belongs to inviter
+  // 1️⃣ Validate inviter (must be active instructor/business instructor)
+  const inviter = await prisma.user.findFirst({
+    where: {
+      id: invitedById,
+      status: UserStatus.active,
+      isDeleted: false,
+      role: { in: [UserRole.instructor, UserRole.business_instructors] }, // adjust your roles enum
+    },
+  });
+  if (!inviter) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Inviter not found or not eligible');
+  }
+
+  // 2️⃣ Validate course
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
-      instructorId: invitedById,
       status: CoursesStatus.approved,
       isDeleted: false,
     },
+    include: { coInstructor: true },
   });
-  if (!course)
+  if (!course) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found or inactive');
+  }
+
+  // 3️⃣ Validate inviter authority:
+  //    - Either course main instructor
+  //    - Or already an existing co-instructor of the course
+  const isMainInstructor = course.instructorId === invitedById;
+  const isExistingCoInstructor = course.coInstructor.some(
+    (ci) => ci.coInstructorId === invitedById && !ci.isDeleted,
+  );
+
+  if (!isMainInstructor && !isExistingCoInstructor) {
     throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Course not found or access denied',
+      httpStatus.FORBIDDEN,
+      'Only main or existing co-instructors can invite',
     );
+  }
 
-  // Check inviter exists
-  const inviter = await prisma.user.findUnique({
-    where: { id: invitedById, status: UserStatus.active, isDeleted: false },
-  });
-  if (!inviter) throw new ApiError(httpStatus.NOT_FOUND, 'Inviter not found');
-
-  // Check co-instructor exists
-  const coInstructorUser = await prisma.user.findUnique({
+  // 4️⃣ Validate co-instructor user
+  const coInstructorUser = await prisma.user.findFirst({
     where: { id: coInstructorId, status: UserStatus.active, isDeleted: false },
   });
-  if (!coInstructorUser)
+  if (!coInstructorUser) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Co-Instructor user not found');
+  }
 
-  // Create co-instructor entry
+  // 5️⃣ Max 5 co-instructors per course
+  const coInstructorCount = await prisma.coInstructor.count({
+    where: { courseId, isDeleted: false },
+  });
+  if (coInstructorCount >= 5) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Maximum 5 co-instructors allowed per course',
+    );
+  }
+
+  // 6️⃣ Prevent duplicate invitation
+  const existingCoInstructor = await prisma.coInstructor.findFirst({
+    where: { courseId, coInstructorId, isDeleted: false },
+  });
+  if (existingCoInstructor) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      'This co-instructor is already invited to the course',
+    );
+  }
+
+  // 7️⃣ Create co-instructor entry
   const coInstructor = await prisma.coInstructor.create({
     data: payload,
   });
@@ -56,7 +100,7 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     throw new ApiError(httpStatus.CONFLICT, 'Co-Instructor creation failed!');
   }
 
-  // Send email
+  // 8️⃣ Send email + notification
   await sendCoInstructorInvitationEmail(
     coInstructorUser.email,
     coInstructorUser.name,
@@ -64,7 +108,6 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     course.title,
   );
 
-  // sent notification to invitee
   await sendCoInstructorNotification(inviter, coInstructor.id, 'invitation');
 
   return coInstructor;

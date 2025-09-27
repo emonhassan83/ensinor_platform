@@ -1,4 +1,9 @@
-import { GradingSystem, Prisma } from '@prisma/client';
+import {
+  CoursesStatus,
+  GradingSystem,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -16,9 +21,9 @@ const insertIntoDB = async (payload: IGradingSystem, currentUser: any) => {
 
   // 1. Validate user existence
   const author = await prisma.user.findUnique({
-    where: { id: authorId },
+    where: { id: authorId, status: UserStatus.active, isDeleted: false },
   });
-  if (!author || author.isDeleted) {
+  if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
@@ -40,9 +45,9 @@ const insertIntoDB = async (payload: IGradingSystem, currentUser: any) => {
   // 3. If not default, validate course existence
   if (!payload.isDefault) {
     const course = await prisma.course.findUnique({
-      where: { id: courseId },
+      where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
     });
-    if (!course || course.isDeleted) {
+    if (!course) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
     }
 
@@ -96,11 +101,11 @@ const addGrade = async (payload: IGrade) => {
 
   // 1️⃣ Validate grading system existence
   const gradingSystem = await prisma.gradingSystem.findUnique({
-    where: { id: gradingSystemId },
+    where: { id: gradingSystemId, isDeleted: false },
     include: { grades: true },
   });
 
-  if (!gradingSystem || gradingSystem.isDeleted) {
+  if (!gradingSystem) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
   }
 
@@ -273,9 +278,9 @@ const updateIntoDB = async (
   payload: Partial<IGradingSystem>,
 ): Promise<GradingSystem> => {
   const gradeSystem = await prisma.gradingSystem.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!gradeSystem || gradeSystem?.isDeleted) {
+  if (!gradeSystem) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
   }
 
@@ -320,10 +325,10 @@ const deleteFromDB = async (id: string): Promise<GradingSystem> => {
   const result = await prisma.$transaction(async tx => {
     // 1. Fetch the grading system
     const gradeSystem = await tx.gradingSystem.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
     });
 
-    if (!gradeSystem || gradeSystem.isDeleted) {
+    if (!gradeSystem) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Grading system not found!');
     }
 

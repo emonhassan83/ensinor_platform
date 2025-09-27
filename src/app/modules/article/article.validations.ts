@@ -7,9 +7,6 @@ const createValidationSchema = z.object({
       .uuid('receiver must be a valid UUID'),
     title: z.string({ required_error: 'Article title is required' }),
     category: z.string({ required_error: 'Article category is required' }),
-    thumbnail: z
-      .string({ required_error: 'Article thumbnail is required' })
-      .optional(),
     description: z.string({
       required_error: 'Article description is required',
     }),

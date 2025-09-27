@@ -24,6 +24,17 @@ const insertIntoDB = async (payload: IBankDetails) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
 
+  // Prevent multiple bank details for the same author
+  const existingBank = await prisma.bankDetail.findUnique({
+    where: { authorId, isDeleted: false },
+  });
+  if (existingBank) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'This author already has bank details.',
+    );
+  }
+
   const result = await prisma.bankDetail.create({
     data: payload,
   });
@@ -86,6 +97,7 @@ const getAllFromDB = async (
         select: {
           id: true,
           name: true,
+          email: true,
           photoUrl: true,
         },
       },
@@ -129,7 +141,6 @@ const getByIdFromDB = async (id: string) => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Bank detail not found');
   }
-
   return result;
 };
 

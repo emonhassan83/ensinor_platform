@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin),
   upload.single('image'),
   parseData(),
   validateRequest(ArticleValidation.createValidationSchema),
@@ -22,7 +22,7 @@ router.post(
 
 router.put(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin),
   upload.single('image'),
   parseData(),
   validateRequest(ArticleValidation.updateValidationSchema),
@@ -50,7 +50,7 @@ router.get('/', ArticleController.getAllFromDB);
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin),
   ArticleController.deleteFromDB,
 );
 

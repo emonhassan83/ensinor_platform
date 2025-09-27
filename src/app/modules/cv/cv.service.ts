@@ -1,13 +1,7 @@
-import {
-  CV,
-  Prisma,
-} from '@prisma/client';
+import { CV, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import {
-  ICV,
-  ICVFilterRequest,
-} from './cv.interface';
+import { ICV, ICVFilterRequest } from './cv.interface';
 import { cvSearchAbleFields } from './cv.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
@@ -20,10 +14,20 @@ const insertIntoDB = async (payload: ICV, file: any) => {
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
+      status: UserStatus.active,
+      isDeleted: false,
     },
   });
-  if (!user || user?.isDeleted) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'CV author not found!');
+  }
+
+  // Check if CV already exists for this user
+  const existingCV = await prisma.cV.findUnique({
+    where: { userId },
+  });
+  if (existingCV) {
+    return existingCV;
   }
 
   // upload to image
@@ -100,12 +104,12 @@ const getAllFromDB = async (
           id: true,
           name: true,
           email: true,
-          photoUrl: true
-        }
+          photoUrl: true,
+        },
       },
       educations: true,
       experiences: true,
-      certificates: true
+      certificates: true,
     },
   });
 
@@ -127,13 +131,13 @@ const getByIdFromDB = async (id: string): Promise<CV | null> => {
   const result = await prisma.cV.findUnique({
     where: { id },
     include: {
-     user: {
+      user: {
         select: {
           id: true,
           name: true,
           email: true,
-          photoUrl: true
-        }
+          photoUrl: true,
+        },
       },
     },
   });

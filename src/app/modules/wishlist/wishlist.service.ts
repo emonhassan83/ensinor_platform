@@ -1,4 +1,4 @@
-import { CoursesStatus, Prisma, UserStatus, Wishlist } from '@prisma/client';
+import { BookStatus, CoursesStatus, Prisma, UserStatus, Wishlist } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IWishlist, IWishlistFilterRequest } from './wishlist.interface';
@@ -46,7 +46,7 @@ const insertIntoDB = async (payload: IWishlist) => {
       );
     }
     const book = await prisma.book.findFirst({
-      where: { id: bookId, isDeleted: false },
+      where: { id: bookId, status: BookStatus.published, isDeleted: false },
     });
     if (!book) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
@@ -70,11 +70,10 @@ const insertIntoDB = async (payload: IWishlist) => {
     );
   }
 
-  // ✅ Insert into DB
+  // Insert into DB
   const result = await prisma.wishlist.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Wishlist creation failed!');
   }
@@ -85,12 +84,15 @@ const insertIntoDB = async (payload: IWishlist) => {
 const getAllFromDB = async (
   params: IWishlistFilterRequest,
   options: IPaginationOptions,
-  reference?: string,
+  userId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.WishlistWhereInput[] = [];
+  if (userId) {
+    andConditions.push({ userId });
+  }
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -249,7 +251,7 @@ const updateIntoDB = async (
   payload: Partial<IWishlist>,
 ): Promise<Wishlist> => {
   const wishlist = await prisma.wishlist.findUnique({
-    where: { id },
+    where: { id},
   });
   if (!wishlist) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Wishlist not found!');
