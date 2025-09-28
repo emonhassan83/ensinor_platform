@@ -9,14 +9,6 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(
-    UserRole.student,
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.employee,
-    UserRole.company_admin,
-    UserRole.super_admin
-  ),
   validateRequest(CompanyRequestValidation.createValidationSchema),
   CompanyRequestController.insertIntoDB,
 );
@@ -35,21 +27,11 @@ router.get(
 
 router.patch(
   '/:id',
-   auth(UserRole.super_admin),
+  auth(UserRole.super_admin),
   validateRequest(CompanyRequestValidation.updateValidationSchema),
   CompanyRequestController.updateIntoDB,
 );
 
-router.delete(
-  '/:id',
-  auth(
-    UserRole.student,
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.employee,
-    UserRole.company_admin,
-  ),
-  CompanyRequestController.deleteFromDB,
-);
+router.delete('/:id', CompanyRequestController.deleteFromDB);
 
 export const CompanyRequestRoutes = router;

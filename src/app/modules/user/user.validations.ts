@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UserStatus } from '@prisma/client';
+import { CompanyType, UserStatus } from '@prisma/client';
 
 // ----------------------
 // Company Admin Creation
@@ -26,14 +26,12 @@ const createCompanyAdmin = z.object({
     organizationEmail: z
       .string()
       .email({ message: 'Invalid organization email!' }),
-    companyType: z.string({ required_error: 'Company type is required!' }),
+    companyType: z.nativeEnum(CompanyType),
     phoneNumber: z.string({ required_error: 'Phone number is required!' }),
-    role: z.string({ required_error: 'Role is required!' }),
-    companySize: z.number({ required_error: 'Company size is required!' }),
-    numberOfPeopleToTrain: z.number({
+    companySize: z.string({ required_error: 'Company size is required!' }),
+    numberOfPeopleToTrain: z.string({
       required_error: 'Number of people to train is required!',
     }),
-    trainingNeeds: z.number({ required_error: 'Training needs is required!' }),
     description: z.string({ required_error: 'Description is required!' }),
   }),
 });

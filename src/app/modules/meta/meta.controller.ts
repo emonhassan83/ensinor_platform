@@ -3,6 +3,17 @@ import httpStatus from 'http-status';
 import sendResponse from '../../utils/sendResponse';
 import { MetaService } from './meta.service';
 
+const websiteBannerMeta = catchAsync(async (req, res) => {
+  const result = await MetaService.websiteBannerMeta();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Website meta data retrieval successfully!',
+    data: result,
+  });
+});
+
 const superAdminMetaDashboard = catchAsync(async (req, res) => {
   const result = await MetaService.superAdminMetaDashboard(req.user, req.query);
 
@@ -135,6 +146,7 @@ const studentMetaData = catchAsync(async (req, res) => {
 });
 
 export const MetaController = {
+  websiteBannerMeta,
   superAdminMetaDashboard,
   superAdminRevenueAnalysis,
   superAdminEnrolmentAnalysis,

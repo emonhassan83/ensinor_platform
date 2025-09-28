@@ -34,8 +34,7 @@ const registerAUser = catchAsync(async (req: Request, res: Response) => {
 const invitationCompanyAdmin = catchAsync(
   async (req: Request, res: Response) => {
     const result = await UserServices.invitationCompanyAdmin(
-      req.body,
-      req.user!.userId,
+      req.body
     );
     const { id, name, email, photoUrl, contactNo, status } = result;
 

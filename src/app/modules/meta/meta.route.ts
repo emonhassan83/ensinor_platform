@@ -5,6 +5,8 @@ import { UserRole } from '@prisma/client';
 
 const router = express.Router();
 
+router.get('/website/web-meta', MetaController.websiteBannerMeta);
+
 router.get(
   '/super-admin/dashboard-analysis',
   auth(UserRole.super_admin),
@@ -71,10 +73,6 @@ router.get(
   MetaController.coInstructorMetaData,
 );
 
-router.get(
-  '/student',
-  auth(UserRole.student),
-  MetaController.studentMetaData,
-);
+router.get('/student', auth(UserRole.student), MetaController.studentMetaData);
 
 export const MetaRoutes = router;

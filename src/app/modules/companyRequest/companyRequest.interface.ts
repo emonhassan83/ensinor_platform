@@ -1,3 +1,5 @@
+import { CompanyType } from "@prisma/client";
+
 export type ICompanyRequestFilterRequest = {
   searchTerm?: string | undefined;
   name?: string | undefined;
@@ -8,15 +10,11 @@ export type ICompanyRequestFilterRequest = {
 };
 
 export type ICompanyRequest = {
-  userId: string;
   name: string;
-  platformType: string;
   organizationEmail: string;
-  companyType: string;
+  platformType: CompanyType;
   phoneNumber: string;
-  role: string;
-  companySize: number;
-  numberOfPeopleToTrain: number;
-  trainingNeeds: number;
+  companySize: string;
+  numberOfPeopleToTrain: string;
   description: string;
 };

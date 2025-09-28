@@ -118,24 +118,10 @@ const registerAUser = async (
 };
 
 const invitationCompanyAdmin = async (
-  payload: ICompanyAdmin,
-  userId: string,
+  payload: ICompanyAdmin
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
-
-  const author = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      role: UserRole.super_admin,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!author) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
-  }
-
   const result = await prisma.$transaction(async transactionClient => {
     // 1️⃣ Create User
     const user = await transactionClient.user.create({
@@ -177,11 +163,6 @@ const invitationCompanyAdmin = async (
 
     return user;
   });
-
-  // 4️⃣ Send notify to invitee
-  if (author && result) {
-    await sendInvitationNotification(author, result.id, 'company_admin');
-  }
 
   return result;
 };

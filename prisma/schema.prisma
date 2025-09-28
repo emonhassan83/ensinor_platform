@@ -101,7 +101,6 @@ model User {
   gradingSystem              GradingSystem[]
   authorCourseBundle         CourseBundle[]         @relation("BundleAuthor")
   verification               Verification?
-  companyRequest             CompanyRequest[]
   usersOnArticles            UsersOnArticles[]
   cv                         CV?
   zoomAccount                ZoomAccount[]
@@ -217,7 +216,7 @@ model Company {
   id           String   @id @default(uuid())
   userId       String   @unique
   name         String
-  industryType String
+  industryType CompanyType
   logo         String?
   color        String?
   employee     Int      @default(0)
@@ -245,21 +244,16 @@ model Company {
 
 model CompanyRequest {
   id                    String     @id @default(uuid())
-  userId                String
   name                  String
   organizationEmail     String     @unique
-  platformType          String     @default("")
+  platformType          CompanyType
   phoneNumber           String
-  role                  String
-  companySize           Int
-  numberOfPeopleToTrain Int
-  trainingNeeds         Int
+  companySize           String
+  numberOfPeopleToTrain String
   description           String
   status                UserStatus @default(pending)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
-
-  user User @relation(references: [id], fields: [userId])
 
   @@map("company_requests")
 }
@@ -1636,6 +1630,12 @@ enum PaymentType {
 enum PlatformType {
   company
   admin
+}
+
+enum CompanyType {
+  ngo
+  sme
+  enterprise
 }
 
 enum CertificateRequestStatus {

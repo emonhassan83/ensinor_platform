@@ -21,7 +21,6 @@ router.post(
 
 router.post(
   '/company-admin-invitation',
-  auth(UserRole.super_admin),
   validateRequest(UserValidation.createCompanyAdmin),
   UserController.invitationCompanyAdmin,
 );

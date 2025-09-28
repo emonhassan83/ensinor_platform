@@ -21,32 +21,19 @@ import {
   sendCompanyApprovalEmail,
   sendCompanyDenialEmail,
 } from '../../utils/email/sentCompanyStatusEmail';
-import { sendNotifYToAdmin, sendNotifYToUser } from './companyRequest.utils';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
-  const user = await prisma.user.findUnique({
-    where: {
-      id: payload.userId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
-  }
-
   // check previous status validation
   const existingPendingRequest = await prisma.companyRequest.findFirst({
     where: {
-      userId: payload.userId,
-      status: UserStatus.pending,
+      organizationEmail: payload.organizationEmail,
     },
   });
 
   if (existingPendingRequest) {
     throw new ApiError(
       httpStatus.CONFLICT,
-      'You already have a pending company request. Please wait until it is approved or rejected.',
+      'You already have a company request with this email.',
     );
   }
 
@@ -63,16 +50,6 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
 
   const result = await prisma.companyRequest.create({
     data: payload,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
-      },
-    },
   });
 
   if (!result) {
@@ -81,9 +58,6 @@ const insertIntoDB = async (payload: ICompanyRequest) => {
       'Company request creation failed!',
     );
   }
-
-  // here sent notify to admin
-  await sendNotifYToAdmin(user);
 
   return result;
 };
@@ -136,16 +110,6 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
-      },
-    },
   });
 
   const total = await prisma.companyRequest.count({
@@ -165,24 +129,11 @@ const getAllFromDB = async (
 const getByIdFromDB = async (id: string): Promise<CompanyRequest | null> => {
   const result = await prisma.companyRequest.findUnique({
     where: { id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-          dateOfBirth: true,
-          contactNo: true,
-          city: true,
-          country: true,
-          role: true,
-          status: true,
-        },
-      },
-    },
   });
 
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
+  }
   return result;
 };
 
@@ -194,7 +145,6 @@ const updateIntoDB = async (
 
   const request = await prisma.companyRequest.findUnique({
     where: { id },
-    include: { user: true },
   });
   if (!request) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
@@ -209,7 +159,6 @@ const updateIntoDB = async (
       const updatedRequest = await transactionClient.companyRequest.update({
         where: { id },
         data: { status: UserStatus.active },
-        include: { user: true },
       });
 
       const user = await transactionClient.user.create({
@@ -268,20 +217,7 @@ const updateIntoDB = async (
   const result = await prisma.companyRequest.update({
     where: { id },
     data: { status },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
-      },
-    },
   });
-
-  // sent notification to user
-  await sendNotifYToUser(status, result.userId);
 
   return result;
 };
@@ -300,9 +236,6 @@ const deleteFromDB = async (id: string): Promise<CompanyRequest> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company request not found!');
   }
-
-  // sent notification to user
-  await sendNotifYToUser('deleted', result.userId);
 
   return result;
 };

@@ -533,6 +533,83 @@ const getCoInstructorEarningOverview = async (coInstructorId: string, year: numb
   return earningOverview;
 };
 
+const websiteBannerMeta = async () => {
+  // 1. Total student
+  const totalStudent = await prisma.user.count({
+    where: { role: UserRole.student, isDeleted: false },
+  });
+
+  // 2. Success students
+  const successStudent = await prisma.enrolledCourse.groupBy({
+    by: ['userId'],
+    where: { isComplete: true, isDeleted: false },
+    _count: { _all: true },
+  });
+
+  // 3. Total instructor
+  const totalInstructor = await prisma.user.count({
+    where: { role: UserRole.instructor, isDeleted: false },
+  });
+
+  // 4. Total course
+  const totalCourse = await prisma.course.count({
+    where: { status: CoursesStatus.approved, isDeleted: false },
+  });
+
+  // 5. Total review
+  const totalReview = await prisma.review.count({
+    where: { isDeleted: false },
+  });
+
+  // 6. Avg rating
+  const reviewAgg = await prisma.review.aggregate({
+    where: { isDeleted: false },
+    _avg: { rating: true },
+  });
+  const avgRating = reviewAgg._avg.rating || 0;
+
+  // 7. Total certificates achieved
+  const totalCertificates = await prisma.certificate.count({
+    where: { isCompleted: true },
+  });
+
+  // 8. Total enrolled course completed user count
+  const completedUsers = await prisma.enrolledCourse.groupBy({
+    by: ['userId'],
+    where: { isComplete: true, isDeleted: false },
+    _count: { _all: true },
+  });
+  const totalCompletedUsers = completedUsers.length;
+
+  // 9. Satisfaction rate (positive reviews / total reviews)
+  const positiveReviews = await prisma.review.count({
+    where: { isDeleted: false, rating: { gte: 4 } },
+  });
+  const satisfactionRate =
+    totalReview > 0 ? (positiveReviews / totalReview) * 100 : 0;
+
+  // 10. Total enrolled users (unique student count)
+  const enrolledUsers = await prisma.enrolledCourse.groupBy({
+    by: ['userId'],
+    where: { isDeleted: false },
+    _count: { _all: true },
+  });
+  const totalEnrolledUsers = enrolledUsers.length;
+
+  return {
+    totalStudent,
+    successStudent: successStudent.length,
+    totalInstructor,
+    totalCourse,
+    totalReview,
+    avgRating,
+    totalCertificates,
+    totalCompletedUsers,
+    satisfactionRate,
+    totalEnrolledUsers,
+  };
+};
+
 const superAdminMetaDashboard = async (
   user: any,
   query: Record<string, unknown>,
@@ -1292,6 +1369,7 @@ const studentMetaData = async (user: any) => {
 };
 
 export const MetaService = {
+  websiteBannerMeta,
   superAdminMetaDashboard,
   superAdminRevenueAnalysis,
   superAdminEnrollmentAnalysis,
