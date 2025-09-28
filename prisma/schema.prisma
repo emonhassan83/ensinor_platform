@@ -123,6 +123,7 @@ model User {
   assignmentSubmission       AssignmentSubmission[] @relation("assignmentSubmissionUser")
   bankDetail                 BankDetail?
   affiliateSale              AffiliateSale[]
+  cart                       Cart[]
 
   @@map("users")
 }
@@ -213,22 +214,22 @@ model CompanyAdmin {
 }
 
 model Company {
-  id           String   @id @default(uuid())
-  userId       String   @unique
+  id           String      @id @default(uuid())
+  userId       String      @unique
   name         String
   industryType CompanyType
   logo         String?
   color        String?
-  employee     Int      @default(0)
-  instructor   Int      @default(0)
-  size         Int      @default(0)
-  courses      Int      @default(0)
-  enrolled     Int      @default(0)
-  completed    Int      @default(0)
-  isActive     Boolean  @default(false)
-  isDeleted    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  employee     Int         @default(0)
+  instructor   Int         @default(0)
+  size         Int         @default(0)
+  courses      Int         @default(0)
+  enrolled     Int         @default(0)
+  completed    Int         @default(0)
+  isActive     Boolean     @default(false)
+  isDeleted    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   author             CompanyAdmin         @relation(references: [id], fields: [userId])
   course             Course[]
@@ -243,17 +244,17 @@ model Company {
 }
 
 model CompanyRequest {
-  id                    String     @id @default(uuid())
+  id                    String      @id @default(uuid())
   name                  String
-  organizationEmail     String     @unique
+  organizationEmail     String      @unique
   platformType          CompanyType
   phoneNumber           String
   companySize           String
   numberOfPeopleToTrain String
   description           String
-  status                UserStatus @default(pending)
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  status                UserStatus  @default(pending)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
 
   @@map("company_requests")
 }
@@ -453,6 +454,7 @@ model Book {
   wishlist      Wishlist[]
   resource      Resource[]
   affiliateLink AffiliateLink[]
+  cart          Cart[]
 
   @@map("books")
 }
@@ -512,6 +514,7 @@ model Course {
   coInstructor       CoInstructor[]
   assignment         Assignment[]
   chat               Chat[]
+  cart               Cart[]
 
   @@map("courses")
 }
@@ -551,8 +554,8 @@ model CourseBundle {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  author     User     @relation("BundleAuthor", fields: [authorId], references: [id])
-  company    Company? @relation(fields: [companyId], references: [id])
+  author  User     @relation("BundleAuthor", fields: [authorId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
@@ -571,6 +574,23 @@ model CourseBundleCourses {
 
   @@id([bundleId, courseId])
   @@map("course_bundle_courses")
+}
+
+model Cart {
+  id        String         @id @default(uuid())
+  userId    String
+  modelType CartModelType
+  bookId    String?
+  courseId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  book   Book?   @relation(fields: [bookId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+
+  @@map("carts")
 }
 
 model Order {
@@ -1532,6 +1552,11 @@ enum RegisterWith {
 enum CourseType {
   internal
   external
+}
+
+enum CartModelType {
+  book
+  course
 }
 
 enum OrderModelType {
