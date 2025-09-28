@@ -15,6 +15,17 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const getTrendingBooks = catchAsync(async (req, res) => {
+  const result = await ShopService.getTrendingBooks();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Trending books data fetched!',
+    data: result,
+  });
+});
+
 const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, shopFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -124,6 +135,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const ShopController = {
   insertIntoDB,
+  getTrendingBooks,
   getAllFromDB,
   getAllCategoriesFromDB,
   getMyShopFromDB,

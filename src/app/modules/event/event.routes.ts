@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-    auth(
+  auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
@@ -24,6 +24,8 @@ router.post(
   validateRequest(EventValidation.createValidationSchema),
   EventController.insertIntoDB,
 );
+
+router.get('/trending', EventController.getTrendingEvents);
 
 router.get('/', EventController.getAllFromDB);
 
@@ -50,7 +52,7 @@ router.get('/:id', EventController.getByIdFromDB);
 
 router.put(
   '/:id',
-    auth(
+  auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
@@ -64,7 +66,7 @@ router.put(
 
 router.delete(
   '/:id',
-    auth(
+  auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,

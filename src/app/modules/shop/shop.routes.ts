@@ -28,6 +28,8 @@ router.post(
   ShopController.insertIntoDB,
 );
 
+router.get('/trending', ShopController.getTrendingBooks);
+
 router.get('/', ShopController.getAllFromDB);
 
 router.get('/categories', ShopController.getAllCategoriesFromDB);

@@ -148,6 +148,30 @@ const insertIntoDB = async (payload: IShop, files: any) => {
   return result;
 };
 
+const getTrendingBooks = async () => {
+  const andConditions: Prisma.BookWhereInput[] = [{ isDeleted: false }];
+  const whereConditions: Prisma.BookWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.book.findMany({
+    where: whereConditions,
+    take: 5,
+    orderBy: {
+      sales: 'desc',
+    },
+    include: {
+      author: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  });
+
+  return result;
+};
+
 const getAllFromDB = async (
   params: IShopFilterRequest,
   options: IPaginationOptions,
@@ -381,6 +405,7 @@ const deleteFromDB = async (id: string): Promise<Book> => {
 
 export const ShopService = {
   insertIntoDB,
+  getTrendingBooks,
   getAllFromDB,
   getAllCategoryFromDB,
   getByIdFromDB,

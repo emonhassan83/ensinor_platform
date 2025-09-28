@@ -15,6 +15,17 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const getTrendingEvents = catchAsync(async (req, res) => {
+  const result = await EventService.getTrendingEventsFromDB();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Trending events data fetched!',
+    data: result,
+  });
+});
+
 const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, eventFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -111,6 +122,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EventController = {
   insertIntoDB,
+  getTrendingEvents,
   getAllFromDB,
   eventFilterData,
   getMyEventFromDB,

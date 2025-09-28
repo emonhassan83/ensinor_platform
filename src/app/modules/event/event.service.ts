@@ -113,6 +113,24 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
   return result;
 };
 
+const getTrendingEventsFromDB = async () => {
+  const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
+
+  const whereConditions: Prisma.EventWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.event.findMany({
+    where: whereConditions,
+    take: 5,
+    orderBy: {
+      registered: 'desc',
+    },
+  });
+
+  return result;
+};
+
 const getAllFromDB = async (
   params: IEventFilterRequest,
   options: IPaginationOptions,
@@ -306,6 +324,7 @@ const deleteFromDB = async (id: string): Promise<Event> => {
 export const EventService = {
   insertIntoDB,
   getAllFromDB,
+  getTrendingEventsFromDB,
   eventFilterData,
   getByIdFromDB,
   updateIntoDB,
