@@ -1,3 +1,3 @@
-export const cartSearchableFields: string[] = ['title', 'category'];
+export const cartSearchableFields: string[] = [];
 
-export const cartFilterableFields: string[] = ['searchTerm', 'category'];
+export const cartFilterableFields: string[] = ['searchTerm', 'modelType'];

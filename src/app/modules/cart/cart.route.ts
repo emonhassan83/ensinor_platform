@@ -1,57 +1,23 @@
 import express from 'express';
 import validateRequest from '../../middlewares/validateRequest';
-import { ArticleValidation } from './cart.validations';
+import { CartValidation } from './cart.validations';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
-import { ArticleController } from './cart.controller';
-import multer, { memoryStorage } from 'multer';
-import parseData from '../../middlewares/parseData';
+import { CartController } from './cart.controller';
 
 const router = express.Router();
-const storage = memoryStorage();
-const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
-  upload.single('image'),
-  parseData(),
-  validateRequest(ArticleValidation.createValidationSchema),
-  ArticleController.insertIntoDB,
+  auth(UserRole.student),
+  validateRequest(CartValidation.createValidationSchema),
+  CartController.insertIntoDB,
 );
 
-router.put(
-  '/:id',
-  auth(UserRole.super_admin),
-  upload.single('image'),
-  parseData(),
-  validateRequest(ArticleValidation.updateValidationSchema),
-  ArticleController.updateIntoDB,
-);
+router.get('/:id', auth(UserRole.student), CartController.getByIdFromDB);
 
-router.patch(
-  '/seen/:id',
-  auth(
-    UserRole.super_admin,
-    UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.employee,
-    UserRole.instructor,
-    UserRole.student,
-  ),
-  ArticleController.seenArticleIntoDB,
-);
+router.get('/', auth(UserRole.student), CartController.getAllFromDB);
 
-router.get('/categories', ArticleController.getAllCategoriesFromDB);
+router.delete('/:id', auth(UserRole.student), CartController.deleteFromDB);
 
-router.get('/:id', ArticleController.getByIdFromDB);
-
-router.get('/', ArticleController.getAllFromDB);
-
-router.delete(
-  '/:id',
-  auth(UserRole.super_admin),
-  ArticleController.deleteFromDB,
-);
-
-export const ArticleRoutes = router;
+export const CartRoutes = router;

@@ -2,13 +2,13 @@ import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import prisma from '../../utils/prisma';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { Prisma, UserRole, UserStatus } from '@prisma/client';
+import { BookStatus, CartModelType, CoursesStatus, Prisma, UserRole, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { cartSearchableFields } from './cart.constant';
 import { ICart, ICartFilterRequest } from './cart.interface';
 
 const insertIntoDB = async (payload: ICart) => {
-  const { userId } = payload;
+  const { userId, bookId, courseId, modelType } = payload;
 
   const author = await prisma.user.findFirst({
     where: {
@@ -20,6 +20,65 @@ const insertIntoDB = async (payload: ICart) => {
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  // === Validate book or course existence ===
+    // === Validate book or course existence ===
+  let book: any = null;
+  let course: any = null;
+
+  if (bookId) {
+    book = await prisma.book.findFirst({
+      where: { id: bookId, status: BookStatus.published, isDeleted: false },
+    });
+    if (!book) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Book not found!');
+    }
+  }
+
+  if (courseId) {
+    course = await prisma.course.findFirst({
+      where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
+    });
+    if (!course) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+    }
+  }
+
+
+  // === Check if the item already exists in the cart ===
+  const existingCart = await prisma.cart.findFirst({
+    where: {
+      userId,
+    },
+    include: { book: true, course: true },
+  });
+
+  if (existingCart) {
+    // === Rule 1: Prevent mixed modelTypes ===
+    if (existingCart.modelType !== modelType) {
+      await prisma.cart.deleteMany({ where: { userId } });
+    } else {
+      // === Rule 2: If course but different authorId or instructorId, replace ===
+      if (modelType === CartModelType.course && course) {
+        if (
+          existingCart.course?.authorId !== course.authorId ||
+          existingCart.course?.instructorId !== course.instructorId
+        ) {
+          await prisma.cart.deleteMany({ where: { userId } });
+        }
+      }
+
+      // === Rule 3 (Modified): If book but different authorId OR companyId, replace ===
+      if (modelType === CartModelType.book && book) {
+        if (
+          existingCart.book?.authorId !== book.authorId ||
+          existingCart.book?.companyId !== book.companyId
+        ) {
+          await prisma.cart.deleteMany({ where: { userId } });
+        }
+      }
+    }
   }
 
   const result = await prisma.cart.create({
@@ -80,11 +139,35 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
     include: {
-      user: {
+      course: {
         select: {
           id: true,
-          name: true,
-          photoUrl: true,
+          title: true,
+          thumbnail: true,
+          price: true,
+          avgRating: true,
+          ratingCount: true,
+          createdAt: true,
+          instructor: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      book: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail: true,
+          category: true,
+          price: true,
+          createdAt: true,
+          author: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },
@@ -103,30 +186,11 @@ const getAllFromDB = async (
   };
 };
 
-const getAllCategoriesFromDB = async () => {
-  const andConditions: Prisma.ArticleWhereInput[] = [{ isDeleted: false }];
-
-  const whereConditions: Prisma.ArticleWhereInput =
-    andConditions.length > 0 ? { AND: andConditions } : {};
-
-  return await prisma.article.findMany({
-    where: whereConditions,
-    distinct: ['category'],
-    orderBy: {
-      category: 'asc', // ✅ sort alphabetically by category
-    },
-    select: {
-      id: true,
-      category: true,
-    },
-  });
-};
-
 const getByIdFromDB = async (id: string) => {
-  const result = await prisma.article.findUnique({
+  const result = await prisma.cart.findUnique({
     where: { id },
     include: {
-      author: {
+      user: {
         select: {
           id: true,
           name: true,
@@ -134,40 +198,38 @@ const getByIdFromDB = async (id: string) => {
           photoUrl: true,
         },
       },
+      course: true,
+      book: true,
     },
   });
 
-  if (!result || result.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Article not found');
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Book not found!');
   }
-
   return result;
 };
 
 const deleteFromDB = async (id: string) => {
-  const article = await prisma.article.findUnique({
+  const cart = await prisma.cart.findUnique({
     where: { id },
   });
-  if (!article || article?.isDeleted) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Article not found!');
+  if (!cart) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Cart not found!');
   }
 
-  const result = await prisma.article.update({
+  const result = await prisma.cart.delete({
     where: { id },
-    data: { isDeleted: true },
   });
 
-  if (!result || result?.isDeleted) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Article deletion failed');
+  if (!result) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cart deletion failed');
   }
-
   return result;
 };
 
 export const CartServices = {
   insertIntoDB,
   getAllFromDB,
-  getAllCategoriesFromDB,
   getByIdFromDB,
   deleteFromDB,
 };
