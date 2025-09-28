@@ -577,7 +577,7 @@ model CourseBundleCourses {
 }
 
 model Cart {
-  id        String         @id @default(uuid())
+  id        String        @id @default(uuid())
   userId    String
   modelType CartModelType
   bookId    String?
@@ -630,6 +630,20 @@ model Order {
   affiliateSale AffiliateSale?
 
   @@map("orders")
+}
+
+model Items {
+  id             String         @id @default(uuid())
+  modelType      OrderModelType
+  courseId       String
+  bookId         String
+  courseBundleId String?
+  eventId        String?
+  orderId        String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@map("items")
 }
 
 model Quiz {

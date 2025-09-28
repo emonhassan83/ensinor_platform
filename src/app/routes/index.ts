@@ -62,6 +62,7 @@ import { PaymentRoutes } from '../modules/payment/payment.route';
 import { QuizAnswerRoutes } from '../modules/quizAnswer/quizAnswer.routes';
 import { MetaRoutes } from '../modules/meta/meta.route';
 import { ReportsRoutes } from '../modules/reports/reports.route';
+import { CartRoutes } from '../modules/cart/cart.route';
 
 const router = express.Router();
 
@@ -129,6 +130,10 @@ const moduleRoutes = [
   {
     path: '/course-bundle',
     route: CourseBundleRoutes,
+  },
+  {
+    path: '/cart',
+    route: CartRoutes,
   },
   {
     path: '/quiz',
