@@ -220,6 +220,70 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   return result;
 };
 
+const getPopularCoursesFromDB = async (
+  params: ICourseFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
+
+  // Search across Package and nested User fields
+  if (searchTerm) {
+    andConditions.push({
+      OR: courseSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
+
+  // Filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  const whereConditions: Prisma.CourseWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.course.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? {
+            [options.sortBy]: options.sortOrder,
+          }
+        : {
+            enrollments: 'desc',
+          },
+  });
+
+  const total = await prisma.course.count({
+    where: whereConditions,
+  });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
+};
+
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
@@ -281,7 +345,7 @@ const getAllFromDB = async (
             [options.sortBy]: options.sortOrder,
           }
         : {
-            createdAt: 'desc',
+            avgRating: 'desc',
           },
   });
 
@@ -555,6 +619,7 @@ const deleteFromDB = async (id: string): Promise<Course> => {
 
 export const CourseService = {
   insertIntoDB,
+  getPopularCoursesFromDB,
   getAllFromDB,
   getAllFilterDataFromDB,
   getByIdFromDB,

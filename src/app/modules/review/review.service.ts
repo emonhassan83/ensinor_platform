@@ -53,26 +53,26 @@ const insertIntoDB = async (payload: IReview) => {
   });
 
   // Step 5: Recalculate Author Rating
-  const authorIdOfCourse = course.authorId;
+  const instructorIdOfCourse = course.instructorId;
 
-  const authorCourses = await prisma.course.findMany({
-    where: { authorId: authorIdOfCourse, isDeleted: false },
+  const instructorCourses = await prisma.course.findMany({
+    where: { instructorId: instructorIdOfCourse, isDeleted: false },
     select: { avgRating: true, ratingCount: true },
   });
 
-  const totalRatings = authorCourses.reduce((sum, c) => sum + c.ratingCount, 0);
-  const totalWeightedRating = authorCourses.reduce(
+  const totalRatings = instructorCourses.reduce((sum, c) => sum + c.ratingCount, 0);
+  const totalWeightedRating = instructorCourses.reduce(
     (sum, c) => sum + c.avgRating * c.ratingCount,
     0,
   );
 
-  const authorAvgRating = totalRatings ? totalWeightedRating / totalRatings : 0;
+  const instructorAvgRating = totalRatings ? totalWeightedRating / totalRatings : 0;
 
-  if (authorIdOfCourse) {
+  if (instructorIdOfCourse) {
     await prisma.user.update({
-      where: { id: authorIdOfCourse },
+      where: { id: instructorIdOfCourse },
       data: {
-        avgRating: parseFloat(authorAvgRating.toFixed(1)),
+        avgRating: parseFloat(instructorAvgRating.toFixed(1)),
         ratingCount: totalRatings,
       },
     });

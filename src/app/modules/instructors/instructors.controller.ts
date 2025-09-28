@@ -16,6 +16,21 @@ const instructorCategories = catchAsync(async (req, res) => {
   });
 });
 
+const expertInstructors = catchAsync(async (req, res) => {
+  const filters = pick(req.query, instructorsFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await InstructorService.getAllFromDB(filters, options);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Expert instructors data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, instructorsFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -67,6 +82,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const InstructorController = {
   instructorCategories,
+  expertInstructors,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

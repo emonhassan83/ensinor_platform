@@ -26,7 +26,7 @@ const createCompanyAdmin = z.object({
     organizationEmail: z
       .string()
       .email({ message: 'Invalid organization email!' }),
-    companyType: z.nativeEnum(CompanyType),
+    industryType: z.nativeEnum(CompanyType),
     phoneNumber: z.string({ required_error: 'Phone number is required!' }),
     companySize: z.string({ required_error: 'Company size is required!' }),
     numberOfPeopleToTrain: z.string({

@@ -7,6 +7,122 @@ import prisma from '../../utils/prisma';
 import { uploadToS3 } from '../../utils/s3';
 import ApiError from '../../errors/ApiError';
 
+const expertInstructorsFromDB = async (
+  params: IInstructorFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, status, ...filterData } = params;
+
+  const andConditions: Prisma.InstructorWhereInput[] = [];
+
+  // Search across Employee and nested User fields
+  if (searchTerm) {
+    const companyAdminFieldsConditions = (instructorsSearchAbleFields || [])
+      .filter(Boolean)
+      .map(field => ({
+        [field]: { contains: searchTerm, mode: 'insensitive' },
+      }));
+
+    const orConditions: Prisma.InstructorWhereInput[] = [];
+
+    if (companyAdminFieldsConditions.length) {
+      orConditions.push(...companyAdminFieldsConditions);
+    }
+
+    // Nested user search
+    orConditions.push({
+      user: {
+        OR: [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
+    });
+
+    andConditions.push({ OR: orConditions });
+  }
+
+  // Filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  // === FILTER BY USER STATUS ===
+  if (status) {
+    andConditions.push({
+      user: {
+        status: status as UserStatus,
+      },
+    });
+  }
+
+  const whereConditions: Prisma.InstructorWhereInput = { AND: andConditions };
+
+  const instructors = await prisma.instructor.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy: [
+      { avgRating: 'desc' },     
+      { ratingCount: 'desc' },
+    ],
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          status: true
+        },
+      },
+    },
+  });
+
+   // === Get Earnings grouped by instructor (authorId) ===
+  const earnings = await prisma.payment.groupBy({
+    by: ['authorId'],
+    where: {
+      isPaid: true,
+      isDeleted: false,
+    },
+    _sum: {
+      instructorEarning: true,
+    },
+  });
+
+  // === Map Instructor with totalEarning ===
+  const result = instructors.map(inst => {
+    const earningRow = earnings.find(e => e.authorId === inst.userId);
+    const totalEarning = earningRow?._sum.instructorEarning ?? 0;
+
+    return {
+      ...inst,
+      totalEarning,
+    };
+  });
+
+  const total = await prisma.instructor.count({
+    where: whereConditions,
+  });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
+};
+
 const getAllFromDB = async (
   params: IInstructorFilterRequest,
   options: IPaginationOptions,
@@ -240,6 +356,7 @@ const deleteFromDB = async (id: string): Promise<User> => {
 
 export const InstructorService = {
   instructorCategories,
+  expertInstructorsFromDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

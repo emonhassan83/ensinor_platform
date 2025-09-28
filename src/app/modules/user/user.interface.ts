@@ -1,4 +1,4 @@
-import { UserRole, UserStatus } from '@prisma/client';
+import { CompanyType, UserRole, UserStatus } from '@prisma/client';
 
 export type IUserFilterRequest = {
   searchTerm?: string | undefined;
@@ -44,7 +44,7 @@ export type IUserResponse = Omit<IUser, 'password'>;
 export type ICompanyAdmin = {
   name: string;
   organizationEmail: string;
-  companyType: string;
+  industryType: CompanyType;
   phoneNumber: string;
   role: string;
   companySize: number;

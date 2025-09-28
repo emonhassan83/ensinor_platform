@@ -21,7 +21,7 @@ import {
 import { userSearchableFields } from './user.constant';
 import ApiError from '../../errors/ApiError';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { IGenericResponse, ILogUser } from '../../interfaces/common';
+import { IGenericResponse } from '../../interfaces/common';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { generateDefaultPassword } from '../../utils/passwordGenerator';
 import {
@@ -154,7 +154,7 @@ const invitationCompanyAdmin = async (
       data: {
         userId: companyAdmin.id, // relation: Company → CompanyAdmin.id
         name: payload.name,
-        industryType: payload.companyType,
+        industryType: payload.industryType,
       },
     });
 
