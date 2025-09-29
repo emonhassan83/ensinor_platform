@@ -1634,7 +1634,6 @@ enum RecurrenceType {
 
 enum NewsletterStatus {
   active
-  paused
   unsubscribed
 }
 

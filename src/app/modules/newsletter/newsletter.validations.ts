@@ -1,22 +1,63 @@
+import { NewsletterCategory } from '@prisma/client';
 import { z } from 'zod';
 
-const createValidationSchema = z.object({
+const subscribeValidationSchema = z.object({
   body: z.object({
     email: z.string({ required_error: 'Newsletter email is required' }),
-    recurrence: z.string({ required_error: 'Newsletter recurrence is required' }),
+    category: z
+      .array(z.nativeEnum(NewsletterCategory), {
+        required_error: 'Newsletter category is required',
+      })
+      .nonempty({ message: 'At least one category must be selected' }),
+    recurrence: z.string({
+      required_error: 'Newsletter recurrence is required',
+    }),
   }),
 });
 
-const updateValidationSchema = z.object({
+const unsubscribeValidationSchema = z.object({
   body: z.object({
-    email: z.string({ required_error: 'Newsletter email is required' }).optional(),
+    email: z.string({ required_error: 'Newsletter email is required' }),
+  }),
+});
+
+const changeSubscriberValidationSchema = z.object({
+  body: z.object({
+    email: z.string({ required_error: 'Newsletter email is required' }),
+    category: z
+      .array(z.nativeEnum(NewsletterCategory), {
+        required_error: 'Newsletter category is required',
+      })
+      .nonempty({ message: 'At least one category must be selected' })
+      .optional(),
     recurrence: z
       .string({ required_error: 'Newsletter recurrence is required' })
       .optional(),
   }),
 });
 
+const createValidationSchema = z.object({
+  body: z.object({
+    title: z.string({ required_error: 'Newsletter title is required' }),
+    content: z.string({ required_error: 'Newsletter content is required' }),
+    category: z.nativeEnum(NewsletterCategory),
+    scheduleDate: z.date().optional(),
+  }),
+});
+
+const updateValidationSchema = z.object({
+  body: z.object({
+    title: z.string({ required_error: 'Newsletter title is required' }).optional(),
+    content: z.string({ required_error: 'Newsletter content is required' }).optional(),
+    category: z.nativeEnum(NewsletterCategory).optional(),
+    scheduleDate: z.date().optional(),
+  }),
+});
+
 export const NewsletterValidation = {
+  subscribeValidationSchema,
+  unsubscribeValidationSchema,
+  changeSubscriberValidationSchema,
   createValidationSchema,
-  updateValidationSchema,
+  updateValidationSchema
 };

@@ -9,8 +9,27 @@ const router = express.Router();
 
 router.post(
   '/',
+  auth(UserRole.super_admin),
   validateRequest(NewsletterValidation.createValidationSchema),
   NewsletterController.insertIntoDB,
+);
+
+router.post(
+  '/subscribe',
+  validateRequest(NewsletterValidation.subscribeValidationSchema),
+  NewsletterController.subscribeUser,
+);
+
+router.post(
+  '/unsubscribe',
+  validateRequest(NewsletterValidation.unsubscribeValidationSchema),
+  NewsletterController.unsubscribeUser,
+);
+
+router.patch(
+  '/subscribe/change-status',
+  validateRequest(NewsletterValidation.changeSubscriberValidationSchema),
+  NewsletterController.changeStatusIntoDB,
 );
 
 router.put(
@@ -20,15 +39,13 @@ router.put(
   NewsletterController.updateIntoDB,
 );
 
-router.patch(
-  '/status/:id',
+router.get(
+  '/:id',
   auth(UserRole.super_admin),
-  NewsletterController.changeStatusIntoDB,
+  NewsletterController.getByIdFromDB,
 );
 
-router.get('/:id', NewsletterController.getByIdFromDB);
-
-router.get('/', NewsletterController.getAllFromDB);
+router.get('/', auth(UserRole.super_admin), NewsletterController.getAllFromDB);
 
 router.delete(
   '/:id',
