@@ -1,4 +1,4 @@
-import { OrderModelType, PaymentMethod } from "@prisma/client";
+import { OrderModelType, PaymentMethod } from '@prisma/client';
 
 export type IOrderFilterRequest = {
   searchTerm?: string | undefined;
@@ -7,21 +7,25 @@ export type IOrderFilterRequest = {
   status?: string | undefined;
 };
 
+export interface IOrderItem {
+  referenceId: string;
+  modelType: OrderModelType; // 'book' | 'course' | 'courseBundle' | 'event'
+  price: number;
+  quantity?: number;
+}
+
+// 🔹 Order Data (general info)
 export interface IOrder {
-  userId: string
-  authorId: string
-  instructorId?: string
-  modelType: OrderModelType
-  bookId?: string
-  courseId?: string
-  eventId?: string
-  courseBundleId?: string
-  couponCode?: string;
-  promoCode?: string;
-  affiliateId?: string
-  amount: number
-  paymentMethod: PaymentMethod
-  discount?: number
-  documents?: string
-  transactionId?: string
+  orderData: {
+    userId: string;
+    authorId: string;
+    companyId?: string;
+    couponCode?: string;
+    promoCode?: string;
+    affiliateId?: string;
+    amount?: number; 
+    paymentMethod: PaymentMethod;
+    transactionId?: string;
+  };
+  items: IOrderItem[];
 }

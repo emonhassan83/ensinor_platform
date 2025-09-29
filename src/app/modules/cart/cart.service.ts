@@ -22,7 +22,6 @@ const insertIntoDB = async (payload: ICart) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
-  // === Validate book or course existence ===
     // === Validate book or course existence ===
   let book: any = null;
   let course: any = null;
@@ -63,7 +62,8 @@ const insertIntoDB = async (payload: ICart) => {
       if (modelType === CartModelType.course && course) {
         if (
           existingCart.course?.authorId !== course.authorId ||
-          existingCart.course?.instructorId !== course.instructorId
+          existingCart.course?.instructorId !== course.instructorId ||
+          existingCart.course?.companyId !== course.companyId
         ) {
           await prisma.cart.deleteMany({ where: { userId } });
         }

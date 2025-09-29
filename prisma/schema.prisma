@@ -79,7 +79,6 @@ model User {
   userOrder                  Order[]                @relation("UserOrder")
   authorOrder                Order[]                @relation("AuthorOrder")
   courseAuthor               Course[]               @relation("CourseAuthor")
-  courseInstructor           Course[]               @relation("CourseInstructor")
   event                      Event[]
   userEventBooking           EventBooking[]         @relation("userEventBooking")
   authorEventBooking         EventBooking[]         @relation("authorEventBooking")
@@ -239,6 +238,7 @@ model Company {
   employees          Employee[]
   payment            Payment[]
   Book               Book[]
+  order              Order[]
 
   @@map("companies")
 }
@@ -297,7 +297,7 @@ model Invitation {
 model BusinessInstructor {
   id          String   @id @unique @default(uuid())
   userId      String   @unique
-  authorId    String   @unique
+  authorId    String
   companyId   String
   designation String
   university  String?
@@ -448,13 +448,13 @@ model Book {
   author  User     @relation(fields: [authorId], references: [id]) // FK relation to User table
   company Company? @relation(fields: [companyId], references: [id]) // FK relation to Company table
 
-  order         Order[]
   coupon        Coupon[]
   promoCode     PromoCode[]
   wishlist      Wishlist[]
   resource      Resource[]
   affiliateLink AffiliateLink[]
   cart          Cart[]
+  orderItem     OrderItem[]
 
   @@map("books")
 }
@@ -463,7 +463,6 @@ model Book {
 model Course {
   id               String        @id @default(uuid())
   authorId         String
-  instructorId     String
   companyId        String?
   title            String
   shortDescription String
@@ -490,7 +489,6 @@ model Course {
   updatedAt        DateTime      @updatedAt
 
   author     User     @relation("CourseAuthor", fields: [authorId], references: [id])
-  instructor User     @relation("CourseInstructor", fields: [instructorId], references: [id])
   companies  Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many with CourseBundle via join table
@@ -505,7 +503,6 @@ model Course {
   gradingSystem      GradingSystem[]
   affiliateLink      AffiliateLink[]
   meetingAssignment  MeetingAssignment[]
-  order              Order[]
   coupon             Coupon[]
   promoCode          PromoCode[]
   review             Review[]
@@ -515,6 +512,7 @@ model Course {
   assignment         Assignment[]
   chat               Chat[]
   cart               Cart[]
+  orderItem          OrderItem[]
 
   @@map("courses")
 }
@@ -560,7 +558,7 @@ model CourseBundle {
   // Many-to-many handled through join table
   courseBundleCourses CourseBundleCourses[]
   courses             Course[]              @relation("BundleCourses")
-  order               Order[]
+  orderItem           OrderItem[]
 
   @@map("course_bundles")
 }
@@ -594,21 +592,16 @@ model Cart {
 }
 
 model Order {
-  id             String         @id @default(uuid())
-  userId         String
-  authorId       String
-  modelType      OrderModelType
-  bookId         String?
-  courseId       String?
-  courseBundleId String?
-  eventId        String?
-
+  id              String  @id @default(uuid())
+  userId          String
+  authorId        String?
+  companyId       String?
   amount          Float
   discount        Float?
   finalAmount     Float // after discount
   instructorShare Float
   platformShare   Float
-  affiliateShare  Float? @default(0)
+  affiliateShare  Float?  @default(0)
 
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
@@ -619,31 +612,39 @@ model Order {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  user         User          @relation("UserOrder", fields: [userId], references: [id])
-  author       User          @relation("AuthorOrder", fields: [authorId], references: [id])
-  book         Book?         @relation(fields: [bookId], references: [id])
-  course       Course?       @relation(fields: [courseId], references: [id])
-  courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
-  event        Event?        @relation(fields: [eventId], references: [id])
+  user    User     @relation("UserOrder", fields: [userId], references: [id])
+  author  User?     @relation("AuthorOrder", fields: [authorId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
 
-  payment       Payment[]
-  affiliateSale AffiliateSale?
+  payment        Payment[]
+  affiliateSale  AffiliateSale?
+  orderItem      OrderItem[]
 
   @@map("orders")
 }
 
-model Items {
-  id             String         @id @default(uuid())
-  modelType      OrderModelType
-  courseId       String
-  bookId         String
-  courseBundleId String?
-  eventId        String?
-  orderId        String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+model OrderItem {
+  id         String         @id @default(uuid())
+  orderId    String
+  modelType  OrderModelType
+  bookId     String?
+  courseId   String?
+  bundleId   String?
+  eventId    String?
+  price      Float
+  quantity   Int            @default(1)
+  discount   Float?         @default(0)
+  finalPrice Float
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
-  @@map("items")
+  order        Order         @relation(fields: [orderId], references: [id])
+  book         Book?         @relation(fields: [bookId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
+  courseBundle CourseBundle? @relation(fields: [bundleId], references: [id])
+  event        Event?        @relation(fields: [eventId], references: [id])
+
+  @@map("order_items")
 }
 
 model Quiz {
@@ -900,7 +901,7 @@ model Event {
   promoCode         PromoCode[]
   resource          Resource[]
   affiliateLink     AffiliateLink[]
-  order             Order[]
+  orderItem         OrderItem[]
 
   @@map("events")
 }
@@ -1757,21 +1758,21 @@ enum CourseLevel {
 }
 
 enum CouponModel {
-  courses
-  events
-  books
+  course
+  event
+  book
 }
 
 enum PromoCodeModel {
-  courses
-  events
-  books
+  course
+  event
+  book
 }
 
 enum AffiliateModel {
-  courses
-  events
-  books
+  course
+  event
+  book
 }
 
 enum PaymentStatus {

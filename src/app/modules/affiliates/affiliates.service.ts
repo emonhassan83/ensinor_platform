@@ -96,7 +96,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
 
   // 2️⃣ Validate model-specific reference + check duplicate affiliate link
   switch (modelType) {
-    case AffiliateModel.books: {
+    case AffiliateModel.book: {
       if (!bookId) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -111,7 +111,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
 
       // ✅ Check if affiliate link already exists for this book
       const existingBookAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.books, bookId },
+        where: { affiliateId, modelType: AffiliateModel.book, bookId },
       });
       if (existingBookAffiliate) {
         throw new ApiError(
@@ -122,7 +122,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
       break;
     }
 
-    case AffiliateModel.courses: {
+    case AffiliateModel.course: {
       if (!courseId) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -143,7 +143,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
 
       // ✅ Check if affiliate link already exists for this course
       const existingCourseAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.courses, courseId },
+        where: { affiliateId, modelType: AffiliateModel.course, courseId },
       });
       if (existingCourseAffiliate) {
         throw new ApiError(
@@ -154,7 +154,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
       break;
     }
 
-    case AffiliateModel.events: {
+    case AffiliateModel.event: {
       if (!eventId) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -171,7 +171,7 @@ const insertIntoDB = async (payload: IAffiliates) => {
 
       // ✅ Check if affiliate link already exists for this event
       const existingEventAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.events, eventId },
+        where: { affiliateId, modelType: AffiliateModel.event, eventId },
       });
       if (existingEventAffiliate) {
         throw new ApiError(

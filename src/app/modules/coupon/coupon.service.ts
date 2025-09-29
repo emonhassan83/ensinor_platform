@@ -46,7 +46,7 @@ const insertIntoDB = async (payload: ICoupon) => {
   let referenceWhere: any = { authorId, isActive: true };
 
   switch (modelType) {
-    case CouponModel.books:
+    case CouponModel.book:
       if (!bookId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -63,7 +63,7 @@ const insertIntoDB = async (payload: ICoupon) => {
 
       // Check active coupon for this book
       const existingBookCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.books, bookId },
+        where: { ...referenceWhere, modelType: CouponModel.book, bookId },
       });
       if (existingBookCoupon)
         throw new ApiError(
@@ -72,24 +72,24 @@ const insertIntoDB = async (payload: ICoupon) => {
         );
       break;
 
-    case CouponModel.courses:
+    case CouponModel.course:
       if (!courseId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Course ID is required for COURSE coupon!',
         );
       const course = await prisma.course.findFirst({
-        where: { id: courseId, authorId, isDeleted: false },
+        where: { id: courseId, isDeleted: false },
       });
       if (!course)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          'Course not found or does not belong to author!',
+          'Course not found !',
         );
 
       // Check active coupon for this course
       const existingCourseCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.courses, courseId },
+        where: { ...referenceWhere, modelType: CouponModel.course, courseId },
       });
       if (existingCourseCoupon)
         throw new ApiError(
@@ -98,7 +98,7 @@ const insertIntoDB = async (payload: ICoupon) => {
         );
       break;
 
-    case CouponModel.events:
+    case CouponModel.event:
       if (!eventId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -115,7 +115,7 @@ const insertIntoDB = async (payload: ICoupon) => {
 
       // Check active coupon for this event
       const existingEventCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.events, eventId },
+        where: { ...referenceWhere, modelType: CouponModel.event, eventId },
       });
       if (existingEventCoupon)
         throw new ApiError(

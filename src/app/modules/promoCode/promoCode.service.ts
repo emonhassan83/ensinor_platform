@@ -49,7 +49,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
   let referenceWhere: any = { authorId, isActive: true };
 
   switch (modelType) {
-    case PromoCodeModel.books:
+    case PromoCodeModel.book:
       if (!bookId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -66,7 +66,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
       // Check active promo for this book
       const existingBookPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: PromoCodeModel.books, bookId },
+        where: { ...referenceWhere, modelType: PromoCodeModel.book, bookId },
       });
       if (existingBookPromo)
         throw new ApiError(
@@ -75,26 +75,26 @@ const insertIntoDB = async (payload: IPromoCode) => {
         );
       break;
 
-    case PromoCodeModel.courses:
+    case PromoCodeModel.course:
       if (!courseId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Course ID is required for COURSE promo!',
         );
       const course = await prisma.course.findFirst({
-        where: { id: courseId, authorId, isDeleted: false },
+        where: { id: courseId, isDeleted: false },
       });
       if (!course)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          'Course not found or does not belong to author!',
+          'Course not found !',
         );
 
       // Check active promo for this course
       const existingCoursePromo = await prisma.promoCode.findFirst({
         where: {
           ...referenceWhere,
-          modelType: PromoCodeModel.courses,
+          modelType: PromoCodeModel.course,
           courseId,
         },
       });
@@ -105,7 +105,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
         );
       break;
 
-    case PromoCodeModel.events:
+    case PromoCodeModel.event:
       if (!eventId)
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -122,7 +122,7 @@ const insertIntoDB = async (payload: IPromoCode) => {
 
       // Check active promo for this event
       const existingEventPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: PromoCodeModel.events, eventId },
+        where: { ...referenceWhere, modelType: PromoCodeModel.event, eventId },
       });
       if (existingEventPromo)
         throw new ApiError(
