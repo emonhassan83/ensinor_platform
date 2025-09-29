@@ -42,7 +42,7 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
       isDeleted: false,
     },
     include: {
-      instructor: true,
+      author: true,
     },
   });
   if (!course) {
@@ -86,7 +86,7 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
 
   // Create certificate request
   const result = await prisma.certificateRequest.create({
-    data: { ...payload, authorId: course.instructorId },
+    data: { ...payload, authorId: course.authorId },
   });
   if (!result) {
     throw new ApiError(
@@ -96,7 +96,7 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
   }
 
   // Notify course author
-  await sendCertificateRequestNotificationToAuthor(course.instructor, result);
+  await sendCertificateRequestNotificationToAuthor(course.author, result);
 
   return result;
 };

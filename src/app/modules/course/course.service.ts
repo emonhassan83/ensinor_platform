@@ -1,10 +1,12 @@
 import {
   ChatRole,
   ChatType,
+  Company,
   Course,
   CoursesStatus,
   PlatformType,
   Prisma,
+  User,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -20,85 +22,51 @@ import { findAdmin } from '../../utils/findAdmin';
 import { sendNotifYToAdmin, sendNotifYToUser } from './course.utils';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { platform, instructorId, authorId } = payload;
+  const { platform, authorId: inputAuthorId } = payload;
 
-  let resolvedAuthorId: string | undefined = authorId;
-  let resolvedInstructorId: string | undefined = instructorId;
-  let resolvedCompanyId: string | undefined = payload.companyId;
-  let companyAuthor: any = null;
-  let company: any = null;
+  let resolvedAuthorId: string = inputAuthorId;
+  let resolvedCompanyId: string | undefined;
+  let companyAuthor: User | null = null;
+  let company: Company | null = null;
 
-  // 🔹 1. Platform = Admin
-  if (platform === PlatformType.admin) {
-    const superAdmin = await findAdmin();
-    if (!superAdmin)
-      throw new ApiError(httpStatus.NOT_FOUND, 'Super admin not found!');
-
-    if (!resolvedInstructorId) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'InstructorId is required for admin platform.',
-      );
-    }
-
-    resolvedAuthorId = superAdmin.id;
-  }
-
-  // 🔹 2. Platform = Company
+  // 🔹 CASE: Platform = Company
   if (platform === PlatformType.company) {
     const actor = await prisma.user.findFirst({
       where: {
-        id: resolvedAuthorId ?? resolvedInstructorId,
+        id: inputAuthorId,
         status: UserStatus.active,
         isDeleted: false,
       },
       include: {
-        companyAdmin: { select: { company: { select: { id: true } } } },
+        companyAdmin: { include: { company: true } },
         businessInstructor: {
-          select: {
-            company: {
-              select: { id: true, author: { select: { userId: true } } },
-            },
+          include: {
+            company: { include: { author: { include: { user: true } } } },
           },
         },
       },
     });
-    if (!actor)
+
+    if (!actor) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Actor user not found!');
+    }
 
     if (actor.role === UserRole.company_admin) {
-      // Case A: company admin creates course
-      if (!resolvedInstructorId) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'InstructorId is required when company admin creates a course.',
-        );
-      }
+      // company admin → author = self
       resolvedAuthorId = actor.id;
-      resolvedCompanyId = actor.companyAdmin?.company?.id;
+      resolvedCompanyId = actor.companyAdmin?.company?.id ?? undefined;
     } else if (actor.role === UserRole.business_instructors) {
-      // Case B: business instructor creates course
-      resolvedInstructorId = actor.id;
+      // business instructor → company admin becomes author
       resolvedCompanyId = actor.businessInstructor?.company?.id;
 
-      if (!actor.businessInstructor?.company?.author?.userId) {
+      const companyAdminUser = actor.businessInstructor?.company?.author?.user;
+      if (!companyAdminUser) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           'Company admin not linked with this business instructor.',
         );
       }
 
-      // assign company admin (author)
-      const companyAdminUser = await prisma.user.findFirst({
-        where: {
-          id: actor.businessInstructor.company.author.userId,
-          role: UserRole.company_admin,
-          status: UserStatus.active,
-          isDeleted: false,
-        },
-      });
-      if (!companyAdminUser)
-        throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
       resolvedAuthorId = companyAdminUser.id;
       companyAuthor = companyAdminUser;
     } else {
@@ -108,10 +76,10 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       );
     }
 
-    // Validate company
+    // validate company
     company = await prisma.company.findFirst({
       where: { id: resolvedCompanyId, isDeleted: false },
-      include: { author: { select: { user: { select: { id: true } } } } },
+      include: { author: { include: { user: true } } },
     });
     if (!company)
       throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
@@ -119,33 +87,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Company is not active!');
   }
 
-  // 🔹 Validate instructor user
-  const instructorUser = await prisma.user.findFirst({
-    where: {
-      id: resolvedInstructorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!instructorUser)
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'Instructor not found or inactive!',
-    );
-
-  if (
-    ![UserRole.instructor, UserRole.business_instructors].includes(
-      // @ts-ignore
-      instructorUser.role,
-    )
-  ) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'InstructorId must belong to an instructor.',
-    );
-  }
-
-  // 🔹 Upload thumbnail
+  // 🔹 Upload thumbnail (if file provided)
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -153,12 +95,12 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     })) as string;
   }
 
-  // 🔹 Set flags
+  // 🔹 Set free flag if price = 0
   if (typeof payload.price === 'number' && payload.price === 0) {
     payload.isFreeCourse = true;
   }
 
-  // Auto approve if superAdmin author
+  // fetch author user (for notifications)
   const authorUser = await prisma.user.findUnique({
     where: { id: resolvedAuthorId },
   });
@@ -168,47 +110,47 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     const newCourse = await tx.course.create({
       data: {
         ...payload,
-        authorId: resolvedAuthorId as string,
-        instructorId: resolvedInstructorId as string,
+        authorId: resolvedAuthorId,
         companyId: resolvedCompanyId ?? null,
       },
     });
 
-    // Update company counters
+    // update counters
     if (company) {
       await tx.company.update({
         where: { id: company.id },
         data: { courses: { increment: 1 } },
       });
     }
-
-    // Update instructor counters
-    if (resolvedInstructorId) {
-      const businessInstructor = await tx.businessInstructor.findUnique({
-        where: { userId: resolvedInstructorId },
+    
+    // 🔹 Update author profile counters
+    if (platform === PlatformType.admin) {
+      // If platform = admin → Instructor profile update
+      await tx.instructor.updateMany({
+        where: { userId: resolvedAuthorId },
+        data: { courses: { increment: 1 } },
       });
-      if (businessInstructor) {
-        await tx.businessInstructor.update({
-          where: { id: businessInstructor.id },
+    } else if (platform === PlatformType.company) {
+      // If platform = company → check role
+      if (companyAuthor) {
+        // created by business instructor → increment businessInstructor.courses
+        await tx.businessInstructor.updateMany({
+          where: { userId: inputAuthorId },
           data: { courses: { increment: 1 } },
         });
       } else {
-        const instructorRecord = await tx.instructor.findUnique({
-          where: { userId: resolvedInstructorId },
+        // created by company admin → increment companyAdmin.courses
+        await tx.companyAdmin.updateMany({
+          where: { userId: resolvedAuthorId },
+          data: { courses: { increment: 1 } },
         });
-        if (instructorRecord) {
-          await tx.instructor.update({
-            where: { id: instructorRecord.id },
-            data: { courses: { increment: 1 } },
-          });
-        }
       }
     }
 
     return newCourse;
   });
 
-  // 🔹 Send notification
+  // 🔹 Send notifications
   if (platform === PlatformType.admin) {
     const admin = await findAdmin();
     if (!admin) throw new Error('Super admin not found!');
@@ -243,7 +185,6 @@ const getAllFromDB = async (
   options: IPaginationOptions,
   filterBy: {
     authorId?: string;
-    instructorId?: string;
     companyId?: string;
   },
 ) => {
@@ -254,9 +195,6 @@ const getAllFromDB = async (
   // Filter either by authorId, instructorId
   if (filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
-  }
-  if (filterBy.instructorId) {
-    andConditions.push({ instructorId: filterBy.instructorId });
   }
   if (filterBy.companyId) {
     andConditions.push({ companyId: filterBy.companyId });
@@ -508,10 +446,7 @@ const changeStatusIntoDB = async (
             isReadOnly: false,
             participants: {
               createMany: {
-                data: [
-                  { userId: course.instructorId!, role: ChatRole.admin },
-                  { userId: course.authorId!, role: ChatRole.admin },
-                ],
+                data: [{ userId: course.authorId!, role: ChatRole.admin }],
               },
             },
           },
@@ -527,21 +462,13 @@ const changeStatusIntoDB = async (
             groupImage: course.thumbnail || null,
             courseId: course.id,
             isReadOnly: true,
-            participants: {
-              createMany: {
-                data: [
-                  { userId: course.authorId!, role: ChatRole.admin },
-                  { userId: course.instructorId! },
-                ],
-              },
-            },
           },
         });
       }
     }
 
     // 4. Send notify to instructor
-    await sendNotifYToUser(status, course.instructorId!);
+    await sendNotifYToUser(status, course.authorId!);
 
     return result;
   });
@@ -566,7 +493,7 @@ const deleteFromDB = async (id: string): Promise<Course> => {
   }
 
   // sent notify to author when changed status
-  await sendNotifYToUser('deleted', course.instructorId!);
+  await sendNotifYToUser('deleted', course.authorId);
 
   return result;
 };

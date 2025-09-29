@@ -43,7 +43,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   });
   if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'User not found!');
 
-  // 3. Check if user is already enrolled in this course
+  // 3. Check if already enrolled
   const existingEnrollment = await prisma.enrolledCourse.findFirst({
     where: { userId, courseId, isDeleted: false },
   });
@@ -54,53 +54,64 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     );
   }
 
-  // 4. Create enrolled course
-  const enrolledCourse = await prisma.enrolledCourse.create({
-    data: {
-      userId,
-      courseId,
-      authorId: course.instructorId,
-      platform: course.platform,
-      courseCategory: course.category,
-    },
-  });
+  // 4. Transaction → enrolledCourse + increments
+  const enrolledCourse = await prisma.$transaction(async tx => {
+    const newEnroll = await tx.enrolledCourse.create({
+      data: {
+        userId,
+        courseId,
+        authorId: course.authorId,
+        platform: course.platform,
+        courseCategory: course.category,
+      },
+    });
 
-  // 5. Increment user courseEnrolled
-  if (user.role === 'student') {
-    await prisma.student.update({
-      where: { userId },
-      data: { courseEnrolled: { increment: 1 } },
-    });
-  } else if (user.role === 'employee') {
-    await prisma.employee.update({
-      where: { userId },
-      data: { courseEnrolled: { increment: 1 } },
-    });
-  }
-
-  // 6. Increment instructor / business instructor / company based on platform
-  if (course.platform === 'admin') {
-    // increment instructor enrolled
-    await prisma.instructor.update({
-      where: { userId: course.instructorId },
-      data: { enrolled: { increment: 1 } },
-    });
-  } else if (course.platform === 'company') {
-    // increment business instructor enrolled
-    if (course.companyId) {
-      await prisma.businessInstructor.updateMany({
-        where: { authorId: course.authorId, companyId: course.companyId },
-        data: { enrolled: { increment: 1 } },
+    // 5. Increment student/employee counters
+    if (user.role === 'student') {
+      await tx.student.update({
+        where: { userId },
+        data: { courseEnrolled: { increment: 1 } },
       });
-      // increment company enrolled
-      await prisma.company.update({
-        where: { id: course.companyId },
-        data: { enrolled: { increment: 1 } },
+    } else if (user.role === 'employee') {
+      await tx.employee.update({
+        where: { userId },
+        data: { courseEnrolled: { increment: 1 } },
       });
     }
-  }
 
-  // 7. Auto-join student into course chats (discussion + announcement)
+    // 6. Increment instructor / business instructor / company counters
+    if (course.platform === PlatformType.admin) {
+      // Admin platform → Instructor
+      await tx.instructor.updateMany({
+        where: { userId: course.authorId },
+        data: { enrolled: { increment: 1 } },
+      });
+    } else if (course.platform === PlatformType.company) {
+      if (course.companyId) {
+        // Increment BusinessInstructor (enrolled count)
+        await tx.businessInstructor.updateMany({
+          where: { companyId: course.companyId, authorId: course.authorId },
+          data: { enrolled: { increment: 1 } },
+        });
+
+        // Increment Company (enrolled count)
+        await tx.company.update({
+          where: { id: course.companyId },
+          data: { enrolled: { increment: 1 } },
+        });
+
+        // Increment CompanyAdmin (enrolled count)
+        await tx.companyAdmin.updateMany({
+          where: { company: { id: course.companyId } },
+          data: { enrolled: { increment: 1 } },
+        });
+      }
+    }
+
+    return newEnroll;
+  });
+
+  // 7. Auto-join student into chats
   const chats = await prisma.chat.findMany({
     where: {
       courseId: course.id,
@@ -130,10 +141,10 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     user.email,
     user.name,
     course.title,
-    'https://dashboard.ensinor.com', // replace with actual dashboard URL
+    'https://dashboard.ensinor.com',
   );
 
-  // 9. --- Monthly Streak Bonus Check ---
+  // 9. Monthly Streak Bonus
   if (course.price > 0) {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
@@ -142,18 +153,16 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     const endOfMonth = new Date(startOfMonth);
     endOfMonth.setMonth(endOfMonth.getMonth() + 1);
 
-    // Count paid enrollments for this user in current month
     const monthlyPurchases = await prisma.enrolledCourse.count({
       where: {
         userId,
         isDeleted: false,
         createdAt: { gte: startOfMonth, lt: endOfMonth },
-        course: { price: { gt: 0 } }, // only paid courses
+        course: { price: { gt: 0 } },
       },
     });
 
     if (monthlyPurchases > 1) {
-      // Give bonus points once per new purchase after first
       await prisma.user.update({
         where: { id: userId },
         data: { points: { increment: 50 } },

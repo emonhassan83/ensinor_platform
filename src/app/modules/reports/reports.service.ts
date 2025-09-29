@@ -160,7 +160,7 @@ const courseReports = async (
       enrollments: true,
       totalCompleted: true,
       avgRating: true,
-      instructor: {
+      author: {
         select: {
           name: true,
         },

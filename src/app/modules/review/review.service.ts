@@ -53,20 +53,25 @@ const insertIntoDB = async (payload: IReview) => {
   });
 
   // Step 5: Recalculate Author Rating
-  const instructorIdOfCourse = course.instructorId;
+  const instructorIdOfCourse = course.authorId;
 
   const instructorCourses = await prisma.course.findMany({
-    where: { instructorId: instructorIdOfCourse, isDeleted: false },
+    where: { authorId: instructorIdOfCourse, isDeleted: false },
     select: { avgRating: true, ratingCount: true },
   });
 
-  const totalRatings = instructorCourses.reduce((sum, c) => sum + c.ratingCount, 0);
+  const totalRatings = instructorCourses.reduce(
+    (sum, c) => sum + c.ratingCount,
+    0,
+  );
   const totalWeightedRating = instructorCourses.reduce(
     (sum, c) => sum + c.avgRating * c.ratingCount,
     0,
   );
 
-  const instructorAvgRating = totalRatings ? totalWeightedRating / totalRatings : 0;
+  const instructorAvgRating = totalRatings
+    ? totalWeightedRating / totalRatings
+    : 0;
 
   if (instructorIdOfCourse) {
     await prisma.user.update({
@@ -89,7 +94,7 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.ReviewWhereInput[] = [];
+  const andConditions: Prisma.ReviewWhereInput[] = [{ isDeleted: false }];
   if (courseId) {
     andConditions.push({ courseId });
   }
@@ -173,7 +178,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string): Promise<Review | null> => {
   const result = await prisma.review.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {
@@ -209,7 +214,7 @@ const updateIntoDB = async (
   payload: Partial<IReview>,
 ): Promise<Review> => {
   const review = await prisma.review.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
   if (!review) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Review not found!');
@@ -228,7 +233,7 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string): Promise<Review> => {
   const review = await prisma.review.findUniqueOrThrow({
-    where: { id },
+    where: { id, isDeleted: false },
   });
   if (!review) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Review not found!');

@@ -67,7 +67,7 @@ const insertIntoDB = async (payload: ICertificate, files: any) => {
   }
 
   // 6. Auto-assign authorId from course instructorId
-  payload.authorId = course.instructorId;
+  payload.authorId = course.authorId;
 
   // 7. Handle uploads
   if (files) {

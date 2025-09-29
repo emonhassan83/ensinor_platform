@@ -90,23 +90,6 @@ const getMyCourseFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getMyInstructorCourse = catchAsync(async (req, res) => {
-  const filters = pick(req.query, courseFilterableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-
-  const result = await CourseService.getAllFromDB(filters, options, {
-    instructorId: req.user!.userId,
-  });
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'My Courses data fetched!',
-    meta: result.meta,
-    data: result.data,
-  });
-});
-
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.getByIdFromDB(req.params.id);
   sendResponse(res, {
@@ -161,7 +144,6 @@ export const CourseController = {
   getAllFilterDataFromDB,
   getByCompanyFromDB,
   getMyCourseFromDB,
-  getMyInstructorCourse,
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,

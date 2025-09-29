@@ -57,27 +57,6 @@ const insertIntoDB = async (payload: ICart) => {
     // === Rule 1: Prevent mixed modelTypes ===
     if (existingCart.modelType !== modelType) {
       await prisma.cart.deleteMany({ where: { userId } });
-    } else {
-      // === Rule 2: If course but different authorId or instructorId, replace ===
-      if (modelType === CartModelType.course && course) {
-        if (
-          existingCart.course?.authorId !== course.authorId ||
-          existingCart.course?.instructorId !== course.instructorId ||
-          existingCart.course?.companyId !== course.companyId
-        ) {
-          await prisma.cart.deleteMany({ where: { userId } });
-        }
-      }
-
-      // === Rule 3 (Modified): If book but different authorId OR companyId, replace ===
-      if (modelType === CartModelType.book && book) {
-        if (
-          existingCart.book?.authorId !== book.authorId ||
-          existingCart.book?.companyId !== book.companyId
-        ) {
-          await prisma.cart.deleteMany({ where: { userId } });
-        }
-      }
     }
   }
 
@@ -148,7 +127,7 @@ const getAllFromDB = async (
           avgRating: true,
           ratingCount: true,
           createdAt: true,
-          instructor: {
+          author: {
             select: {
               name: true,
             },

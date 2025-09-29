@@ -201,10 +201,14 @@ model SuperAdmin {
 }
 
 model CompanyAdmin {
-  id        String   @id @unique @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @unique @default(uuid())
+  userId      String   @unique
+  avgRating   Float    @default(0.0)
+  ratingCount Int      @default(0)
+  courses     Int      @default(0)
+  enrolled    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   user    User     @relation(references: [id], fields: [userId])
   company Company?
@@ -488,8 +492,8 @@ model Course {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  author     User     @relation("CourseAuthor", fields: [authorId], references: [id])
-  companies  Company? @relation(fields: [companyId], references: [id])
+  author    User     @relation("CourseAuthor", fields: [authorId], references: [id])
+  companies Company? @relation(fields: [companyId], references: [id])
 
   // Many-to-many with CourseBundle via join table
   courseBundleCourses CourseBundleCourses[]
@@ -613,12 +617,12 @@ model Order {
   updatedAt     DateTime      @updatedAt
 
   user    User     @relation("UserOrder", fields: [userId], references: [id])
-  author  User?     @relation("AuthorOrder", fields: [authorId], references: [id])
+  author  User?    @relation("AuthorOrder", fields: [authorId], references: [id])
   company Company? @relation(fields: [companyId], references: [id])
 
-  payment        Payment[]
-  affiliateSale  AffiliateSale?
-  orderItem      OrderItem[]
+  payment       Payment[]
+  affiliateSale AffiliateSale?
+  orderItem     OrderItem[]
 
   @@map("orders")
 }

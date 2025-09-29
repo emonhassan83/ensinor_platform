@@ -121,7 +121,7 @@ const getMostEnrolledCourses = async () => {
       totalCompleted: true,
       avgRating: true,
       ratingCount: true,
-      instructor: {
+      author: {
         select: {
           name: true,
         },
@@ -169,7 +169,7 @@ const getMostInstructorEnrolledCourses = async (instructorId: string) => {
       totalCompleted: true,
       avgRating: true,
       ratingCount: true,
-      instructor: {
+      author: {
         select: {
           name: true,
         },
@@ -1291,7 +1291,7 @@ const coInstructorMetaData = async (
       title: true,
       price: true,
       enrollments: true,
-      instructor: {
+      author: {
         select: {
           name: true,
         },

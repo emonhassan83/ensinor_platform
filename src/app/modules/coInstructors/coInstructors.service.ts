@@ -50,7 +50,7 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
   // 3️⃣ Validate inviter authority:
   //    - Either course main instructor
   //    - Or already an existing co-instructor of the course
-  const isMainInstructor = course.instructorId === invitedById;
+  const isMainInstructor = course.authorId === invitedById;
   const isExistingCoInstructor = course.coInstructor.some(
     (ci) => ci.coInstructorId === invitedById && !ci.isDeleted,
   );

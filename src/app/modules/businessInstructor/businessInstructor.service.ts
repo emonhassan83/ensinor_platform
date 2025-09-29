@@ -100,13 +100,13 @@ const getAllFromDB = async (
     },
   });
 
-  const instructorIds = instructors.map(i => i.id);
+  const authorIds = instructors.map(i => i.id);
 
   // === TOTAL COURSES PER INSTRUCTOR ===
   const courses = await prisma.course.groupBy({
-    by: ['instructorId'],
+    by: ['authorId'],
     where: {
-      instructorId: { in: instructorIds },
+      authorId: { in: authorIds },
       isDeleted: false,
     },
     _count: { id: true },
@@ -115,7 +115,7 @@ const getAllFromDB = async (
 
   const courseMap: Record<string, { totalCourses: number; totalEnrolled: number }> = {};
   courses.forEach(c => {
-    courseMap[c.instructorId!] = {
+    courseMap[c.authorId] = {
       totalCourses: c._count.id || 0,
       totalEnrolled: c._sum.enrollments || 0,
     };
@@ -125,7 +125,7 @@ const getAllFromDB = async (
   const earnings = await prisma.payment.groupBy({
     by: ['authorId'],
     where: {
-      authorId: { in: instructorIds },
+      authorId: { in: authorIds },
       isPaid: true,
       isDeleted: false,
     },
