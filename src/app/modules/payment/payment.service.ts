@@ -45,9 +45,7 @@ const initiatePayment = async (payload: IPayment) => {
     model = await prisma.order.findUnique({ where: { id: payload.orderId } });
     if (!model) throw new ApiError(httpStatus.NOT_FOUND, 'Order not found!');
 
-    const vendorId = model.authorId ?? model.author; // adapt if your field name differs
     const orderAmount = Number(model.amount ?? 0);
-
     if (orderAmount === 0) {
       return {
         message:
@@ -75,18 +73,6 @@ const initiatePayment = async (payload: IPayment) => {
 
       if (subscription?.type) {
         let adminCommissionPercentage = 0;
-        // switch (subscription.type) {
-        //   case 'Free':
-        //   case 'Basic':
-        //   case 'Essential':
-        //     adminCommissionPercentage = 20;
-        //     break;
-        //   case 'Professional':
-        //     adminCommissionPercentage = 10;
-        //     break;
-        //   default:
-        //     adminCommissionPercentage = 0;
-        // }
         const adminCommission = Math.round(
           (orderAmount * adminCommissionPercentage) / 100,
         );

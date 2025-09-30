@@ -63,7 +63,7 @@ const insertIntoDB = async (payload: ICart) => {
       ...(bookId ? { bookId } : {}),
       ...(courseId ? { courseId } : {}),
       ...(bundleCourseId ? { bundleCourseId } : {}),
-      modelType
+      modelType,
     },
   });
 
@@ -86,7 +86,10 @@ const insertIntoDB = async (payload: ICart) => {
 const getAllFromDB = async (userId: string) => {
   const result = await prisma.cart.findMany({
     where: { userId },
-    include: {
+    select: {
+      id: true, // cartId
+      modelType: true,
+      createdAt: true,
       course: {
         select: {
           id: true,
@@ -128,10 +131,12 @@ const getAllFromDB = async (userId: string) => {
     },
   });
 
-  // Group by author with separate arrays
+  // Group by author
   const grouped: Record<string, any> = {};
 
   result.forEach(item => {
+    const cartId = item.id;
+
     if (item.course) {
       const { authorId, author } = item.course;
       if (!grouped[authorId]) {
@@ -143,7 +148,7 @@ const getAllFromDB = async (userId: string) => {
           bookItem: [],
         };
       }
-      grouped[authorId].courseItem.push(item.course);
+      grouped[authorId].courseItem.push({ ...item.course, cartId });
     }
 
     if (item.bundleCourse) {
@@ -157,7 +162,7 @@ const getAllFromDB = async (userId: string) => {
           bookItem: [],
         };
       }
-      grouped[authorId].courseBundleItem.push(item.bundleCourse);
+      grouped[authorId].courseBundleItem.push({ ...item.bundleCourse, cartId });
     }
 
     if (item.book) {
@@ -171,13 +176,12 @@ const getAllFromDB = async (userId: string) => {
           bookItem: [],
         };
       }
-      grouped[authorId].bookItem.push(item.book);
+      grouped[authorId].bookItem.push({ ...item.book, cartId });
     }
   });
 
   return Object.values(grouped);
 };
-
 
 const getByIdFromDB = async (id: string) => {
   const result = await prisma.cart.findUnique({
@@ -221,9 +225,34 @@ const deleteFromDB = async (id: string) => {
   return result;
 };
 
+const deleteMyCartFromDB = async (userId: string) => {
+  // Ensure user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  // Check if cart has items
+  const cartItems = await prisma.cart.findMany({ where: { userId } });
+  if (cartItems.length === 0) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Cart is already empty!');
+  }
+
+  // Delete all cart items
+  const result = await prisma.cart.deleteMany({ where: { userId } });
+  if (result.count === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cart deletion failed!');
+  }
+
+  return result;
+};
+
 export const CartServices = {
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,
   deleteFromDB,
+  deleteMyCartFromDB,
 };

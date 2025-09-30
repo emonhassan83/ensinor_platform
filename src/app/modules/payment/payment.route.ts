@@ -8,7 +8,7 @@ import { OrderValidation } from './payment.validation';
 const router = Router();
 
 router.post(
-  '/',
+  '/checkout',
   validateRequest(OrderValidation.createValidationSchema),
   PaymentController.insertIntoDB,
 );

@@ -45,9 +45,21 @@ const deleteFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const deleteMyCart = catchAsync(async (req, res) => {
+  const result = await CartServices.deleteMyCartFromDB(req.user!.userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: 'My cart delete successfully!',
+    data: result,
+  });
+});
+
 export const CartController = {
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,
   deleteFromDB,
+  deleteMyCart
 };

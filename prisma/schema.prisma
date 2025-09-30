@@ -333,6 +333,7 @@ model CoInstructor {
   coInstructorId String
   revenueShare   Float        @default(0.35)
   permissions    Permission[]
+  totalEarnings  Float        @default(0.00)
   isActive       Boolean      @default(true)
   isDeleted      Boolean      @default(false)
   createdAt      DateTime     @default(now())
@@ -588,19 +589,19 @@ model CourseBundleCourses {
 }
 
 model Cart {
-  id        String        @id @default(uuid())
-  userId    String
-  modelType CartModelType
-  bookId    String?
-  courseId  String?
-  bundleCourseId  String?
+  id             String        @id @default(uuid())
+  userId         String
+  modelType      CartModelType
+  bookId         String?
+  courseId       String?
+  bundleCourseId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user   User          @relation(fields: [userId], references: [id])
-  book   Book?         @relation(fields: [bookId], references: [id])
-  course Course?       @relation(fields: [courseId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  book         Book?         @relation(fields: [bookId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
   bundleCourse CourseBundle? @relation(fields: [bundleCourseId], references: [id])
 
   @@map("carts")
@@ -617,6 +618,7 @@ model Order {
   instructorShare Float
   platformShare   Float
   affiliateShare  Float?  @default(0)
+  coInstructorsShare Float? @default(0)
 
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
@@ -1130,28 +1132,27 @@ model Subscription {
 }
 
 model Payment {
-  id                String           @id @default(uuid())
-  userId            String
-  authorId          String
-  companyId         String?
-  orderId           String?
-  subscriptionId    String?
-  modelType         PaymentModelType
-  type              PaymentType
-  platform          PlatformType
-  transactionId     String           @unique
-  amount            Float            @default(0.00)
-  adminEarning      Float            @default(0.00)
-  instructorEarning Float            @default(0.00)
-  coInstructorPool  Float            @default(0.00)
-  status            PaymentStatus    @default(unpaid)
-  paymentMethod     PaymentMethod
-  paymentIntentId   String?
-  isPaid            Boolean          @default(false)
-  isSellerPaid      Boolean          @default(false)
-  isDeleted         Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                 String           @id @default(uuid())
+  userId             String
+  authorId           String
+  companyId          String?
+  orderId            String?
+  subscriptionId     String?
+  modelType          PaymentModelType
+  type               PaymentType
+  platform           PlatformType
+  transactionId      String           @unique
+  amount             Float            @default(0.00)
+  platformShare      Float            @default(0.00)
+  instructorShare    Float            @default(0.00)
+  coInstructorsShare Float            @default(0.00)
+  status             PaymentStatus    @default(unpaid)
+  paymentMethod      PaymentMethod
+  paymentIntentId    String?
+  isPaid             Boolean          @default(false)
+  isDeleted          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   account             User                  @relation("PaymentUserAccount", references: [id], fields: [userId])
   author              User                  @relation("PaymentAuthorAccount", references: [id], fields: [authorId])

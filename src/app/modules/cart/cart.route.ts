@@ -9,15 +9,33 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(CartValidation.createValidationSchema),
   CartController.insertIntoDB,
 );
 
-router.get('/:id', auth(UserRole.student), CartController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  CartController.getByIdFromDB,
+);
 
-router.get('/', auth(UserRole.student), CartController.getAllFromDB);
+router.get(
+  '/',
+  auth(UserRole.student, UserRole.employee),
+  CartController.getAllFromDB,
+);
 
-router.delete('/:id', auth(UserRole.student), CartController.deleteFromDB);
+router.delete(
+  '/my-cart',
+  auth(UserRole.student, UserRole.employee),
+  CartController.deleteMyCart,
+);
+
+router.delete(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  CartController.deleteFromDB,
+);
 
 export const CartRoutes = router;
