@@ -9,5 +9,6 @@ export type ICart = {
   userId: string;
   modelType: CartModelType;
   courseId?: string;
+  bundleCourseId?: string;
   bookId?: string;
 };

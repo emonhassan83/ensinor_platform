@@ -571,6 +571,7 @@ model CourseBundle {
   orderItem           OrderItem[]
   wishlist            Wishlist[]
   review              Review[]
+  cart                Cart[]
 
   @@map("course_bundles")
 }
@@ -592,13 +593,15 @@ model Cart {
   modelType CartModelType
   bookId    String?
   courseId  String?
+  bundleCourseId  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id])
-  book   Book?   @relation(fields: [bookId], references: [id])
-  course Course? @relation(fields: [courseId], references: [id])
+  user   User          @relation(fields: [userId], references: [id])
+  book   Book?         @relation(fields: [bookId], references: [id])
+  course Course?       @relation(fields: [courseId], references: [id])
+  bundleCourse CourseBundle? @relation(fields: [bundleCourseId], references: [id])
 
   @@map("carts")
 }
@@ -1199,16 +1202,16 @@ model Batch {
 }
 
 model Review {
-  id             String   @id @default(uuid())
+  id             String          @id @default(uuid())
   authorId       String
   courseId       String
   courseBundleId String?
   modelType      ReviewModelType
   rating         Float
   comment        String
-  isDeleted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isDeleted      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   author       User          @relation(fields: [authorId], references: [id])
   course       Course?       @relation(references: [id], fields: [courseId])
@@ -1589,6 +1592,7 @@ enum CourseType {
 enum CartModelType {
   book
   course
+  courseBundle
 }
 
 enum OrderModelType {

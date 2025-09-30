@@ -4,6 +4,7 @@ import {
   Company,
   Course,
   CoursesStatus,
+  CourseType,
   PlatformType,
   Prisma,
   User,
@@ -189,7 +190,11 @@ const getCombineCoursesFromDB = async (
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.CourseWhereInput[] = [
-    { isDeleted: false, status: CoursesStatus.approved },
+    {
+      isDeleted: false,
+      status: CoursesStatus.approved,
+      type: CourseType.external,
+    },
   ];
   const bundleConditions: Prisma.CourseBundleWhereInput[] = [
     { isDeleted: false },
