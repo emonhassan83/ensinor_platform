@@ -1,4 +1,4 @@
-import { PlatformType } from "@prisma/client";
+import { CourseLevel, PlatformType } from "@prisma/client";
 
 export type ICourseBundleFilterRequest = {
   searchTerm?: string | undefined;
@@ -11,9 +11,15 @@ export type ICourseBundle = {
   companyId?: string;
   platform: PlatformType
   title: string;
+  description: string;
   course: string[];
   category: string;
+  level: CourseLevel;
+  language: string;
   price: number;
   thumbnail: string;
   discount?: number
+  duration?: number
+  lectures?: number
+  isFreeCourse?: boolean
 };

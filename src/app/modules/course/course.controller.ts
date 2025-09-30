@@ -45,6 +45,21 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getCombineCourses = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseService.getCombineCoursesFromDB(filters, options);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Combine all courses data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 const getAllFilterDataFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.getAllFilterDataFromDB();
 
@@ -141,6 +156,7 @@ export const CourseController = {
   insertIntoDB,
   getPopularCourses,
   getAllFromDB,
+  getCombineCourses,
   getAllFilterDataFromDB,
   getByCompanyFromDB,
   getMyCourseFromDB,

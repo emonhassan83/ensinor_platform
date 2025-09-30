@@ -543,9 +543,15 @@ model CourseBundle {
   companyId      String?
   platform       PlatformType
   title          String
+  description    String
   category       String
+  level          CourseLevel
+  language       String
   price          Int
   thumbnail      String?
+  isFreeCourse   Boolean      @default(false)
+  lectures       Int          @default(0)
+  duration       Int          @default(0)
   discount       Int          @default(0)
   enrollments    Int          @default(0)
   totalCompleted Int          @default(0)

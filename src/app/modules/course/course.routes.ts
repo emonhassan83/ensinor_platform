@@ -25,7 +25,10 @@ router.post(
   CourseController.insertIntoDB,
 );
 
+router.get('/combine-courses', CourseController.getCombineCourses);
+
 router.get('/popular', CourseController.getPopularCourses);
+
 router.get('/', CourseController.getAllFromDB);
 
 router.get('/filter-data', CourseController.getAllFilterDataFromDB);

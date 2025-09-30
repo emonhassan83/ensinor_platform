@@ -1,3 +1,4 @@
+import { CourseLevel } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -12,10 +13,13 @@ const createValidationSchema = z.object({
         .uuid('author must be a valid UUID'),
     ),
     title: z.string({ required_error: 'Title course bundle is required!' }),
+    description: z.string({ required_error: 'Description is required!' }),
     category: z.string({ required_error: 'Category is required!' }),
     thumbnail: z
       .string({ required_error: 'Course bundle thumbnail is required!' })
       .optional(),
+    level: z.nativeEnum(CourseLevel),
+    language: z.string({ required_error: 'Course language is required!' }),
     discount: z
       .number({
         required_error: 'Course bundle discount is required!',
@@ -29,6 +33,9 @@ const updateValidationSchema = z.object({
   body: z.object({
     title: z
       .string({ required_error: 'Title course bundle is required!' })
+      .optional(),
+    description: z
+      .string({ required_error: 'Description is required!' })
       .optional(),
     category: z.string({ required_error: 'Category is required!' }).optional(),
     price: z

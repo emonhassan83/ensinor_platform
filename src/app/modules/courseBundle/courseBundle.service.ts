@@ -38,6 +38,8 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       companyId: true,
       platform: true,
       price: true,
+      lectures: true,
+      duration: true,
     },
   });
   if (courses.length !== courseIds.length) {
@@ -80,12 +82,21 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
   const discountAmount = (totalCoursePrice * discount) / 100;
   const finalPrice = Math.max(totalCoursePrice - discountAmount, 0);
 
+  // --- Calculate total lectures & duration ---
+  const totalLectures = courses.reduce((sum, c) => sum + (c.lectures || 0), 0);
+  const totalDuration = courses.reduce((sum, c) => sum + (c.duration || 0), 0);
+
   // upload to image
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
       fileName: `images/course-bundles/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
     })) as string;
+  }
+
+   // 🔹 Set free flag if price = 0
+  if (typeof payload.price === 'number' && payload.price === 0) {
+    payload.isFreeCourse = true;
   }
 
   const result = await prisma.courseBundle.create({
@@ -95,6 +106,8 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       discount,
       thumbnail: payload.thumbnail,
       authorId,
+      lectures: totalLectures,
+      duration: totalDuration,
       courseBundleCourses: {
         create: courseIds.map(courseId => ({
           course: { connect: { id: courseId } },

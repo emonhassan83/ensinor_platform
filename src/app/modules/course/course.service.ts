@@ -122,7 +122,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
         data: { courses: { increment: 1 } },
       });
     }
-    
+
     // 🔹 Update author profile counters
     if (platform === PlatformType.admin) {
       // If platform = admin → Instructor profile update
@@ -178,6 +178,126 @@ const getPopularCoursesFromDB = async () => {
   });
 
   return result;
+};
+
+const getCombineCoursesFromDB = async (
+  params: ICourseFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
+  const bundleConditions: Prisma.CourseBundleWhereInput[] = [
+    { isDeleted: false },
+  ];
+
+  // Search filter
+  if (searchTerm) {
+    andConditions.push({
+      OR: courseSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+
+    bundleConditions.push({
+      OR: [
+        { title: { contains: searchTerm, mode: 'insensitive' } },
+        { category: { contains: searchTerm, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  // Extra filters (dynamic)
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+
+    bundleConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  const whereCourse: Prisma.CourseWhereInput = { AND: andConditions };
+  const whereBundle: Prisma.CourseBundleWhereInput = { AND: bundleConditions };
+
+  // --- Queries ---
+  const [courses, courseTotal, bundles, bundleTotal] = await Promise.all([
+    prisma.course.findMany({
+      where: whereCourse,
+      skip,
+      take: limit,
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        description: true,
+        thumbnail: true,
+        price: true,
+        isFreeCourse: true,
+        level: true,
+        language: true,
+        avgRating: true,
+        ratingCount: true,
+        lectures: true,
+        duration: true,
+      },
+    }),
+    prisma.course.count({ where: whereCourse }),
+    prisma.courseBundle.findMany({
+      where: whereBundle,
+      skip,
+      take: limit,
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        description: true,
+        thumbnail: true,
+        price: true,
+        isFreeCourse: true,
+        level: true,
+        language: true,
+        avgRating: true,
+        ratingCount: true,
+        lectures: true,
+        duration: true,
+      },
+    }),
+    prisma.courseBundle.count({ where: whereBundle }),
+  ]);
+
+  return {
+    meta: {
+      page,
+      limit,
+      total: courseTotal + bundleTotal,
+    },
+    data: {
+      ...courses,
+      ...bundles,
+    },
+  };
 };
 
 const getAllFromDB = async (
@@ -256,70 +376,112 @@ const getAllFromDB = async (
 };
 
 const getAllFilterDataFromDB = async () => {
-  const andConditions: Prisma.CourseWhereInput[] = [
-    { status: CoursesStatus.approved, isDeleted: false },
-  ];
-
-  const whereConditions: Prisma.CourseWhereInput = {
-    AND: andConditions,
+  // === Course filters ===
+  const courseWhere: Prisma.CourseWhereInput = {
+    status: CoursesStatus.approved,
+    isDeleted: false,
   };
 
-  // === Categories ===
-  const categories = await prisma.course.groupBy({
+  // === Bundle filters ===
+  const bundleWhere: Prisma.CourseBundleWhereInput = {
+    isDeleted: false,
+  };
+
+  // --- Categories ---
+  const courseCategories = await prisma.course.groupBy({
     by: ['category'],
-    where: whereConditions,
+    where: courseWhere,
     _count: { category: true },
-    orderBy: { category: 'asc' }, // alphabetically
   });
 
-  const formattedCategories = categories.map(item => ({
-    name: item.category,
-    count: item._count.category,
-  }));
+  const bundleCategories = await prisma.courseBundle.groupBy({
+    by: ['category'],
+    where: bundleWhere,
+    _count: { category: true },
+  });
 
-  // === Price (free vs paid) ===
-  const freePaid = await prisma.course.groupBy({
+  const categoryMap: Record<string, number> = {};
+  [...courseCategories, ...bundleCategories].forEach(item => {
+    categoryMap[item.category] =
+      (categoryMap[item.category] || 0) + item._count.category;
+  });
+
+  const formattedCategories = Object.entries(categoryMap).map(
+    ([name, count]) => ({ name, count }),
+  );
+
+  // --- Price (free vs paid) ---
+  const coursePrice = await prisma.course.groupBy({
     by: ['isFreeCourse'],
-    where: whereConditions,
+    where: courseWhere,
     _count: { isFreeCourse: true },
   });
 
-  const priceFilter = {
-    free: freePaid.find(f => f.isFreeCourse === true)?._count.isFreeCourse || 0,
-    paid:
-      freePaid.find(f => f.isFreeCourse === false)?._count.isFreeCourse || 0,
-  };
+  const bundlePrice = await prisma.courseBundle.groupBy({
+    by: ['isFreeCourse'],
+    where: bundleWhere,
+    _count: { isFreeCourse: true },
+  });
 
-  // === Skill Levels ===
-  const levels = await prisma.course.groupBy({
+  const priceMap: { free: number; paid: number } = { free: 0, paid: 0 };
+  [...coursePrice, ...bundlePrice].forEach(item => {
+    if (item.isFreeCourse) {
+      priceMap.free += item._count.isFreeCourse;
+    } else {
+      priceMap.paid += item._count.isFreeCourse;
+    }
+  });
+
+  // --- Levels ---
+  const courseLevels = await prisma.course.groupBy({
     by: ['level'],
-    where: whereConditions,
+    where: courseWhere,
     _count: { level: true },
-    orderBy: { level: 'asc' },
   });
 
-  const formattedLevels = levels.map(item => ({
-    name: item.level,
-    count: item._count.level,
+  const bundleLevels = await prisma.courseBundle.groupBy({
+    by: ['level'],
+    where: bundleWhere,
+    _count: { level: true },
+  });
+
+  const levelMap: Record<string, number> = {};
+  [...courseLevels, ...bundleLevels].forEach(item => {
+    levelMap[item.level] = (levelMap[item.level] || 0) + item._count.level;
+  });
+
+  const formattedLevels = Object.entries(levelMap).map(([name, count]) => ({
+    name,
+    count,
   }));
 
-  // === Languages ===
-  const languages = await prisma.course.groupBy({
+  // --- Languages ---
+  const courseLanguages = await prisma.course.groupBy({
     by: ['language'],
-    where: whereConditions,
+    where: courseWhere,
     _count: { language: true },
-    orderBy: { language: 'asc' },
   });
 
-  const formattedLanguages = languages.map(item => ({
-    name: item.language,
-    count: item._count.language,
-  }));
+  const bundleLanguages = await prisma.courseBundle.groupBy({
+    by: ['language'],
+    where: bundleWhere,
+    _count: { language: true },
+  });
+
+  const langMap: Record<string, number> = {};
+  [...courseLanguages, ...bundleLanguages].forEach(item => {
+    langMap[item.language] =
+      (langMap[item.language] || 0) + item._count.language;
+  });
+
+  const formattedLanguages = Object.entries(langMap).map(
+    ([name, count]) => ({ name, count }),
+  );
 
   return {
     data: {
       categories: formattedCategories,
-      price: priceFilter,
+      price: priceMap,
       levels: formattedLevels,
       languages: formattedLanguages,
     },
@@ -502,6 +664,7 @@ export const CourseService = {
   insertIntoDB,
   getPopularCoursesFromDB,
   getAllFromDB,
+  getCombineCoursesFromDB,
   getAllFilterDataFromDB,
   getByIdFromDB,
   updateIntoDB,
