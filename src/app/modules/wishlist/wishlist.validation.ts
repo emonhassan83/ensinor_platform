@@ -10,6 +10,7 @@ const createValidationSchema = z.object({
       required_error: 'Wishlist modelType is required!',
     }),
     courseId: z.string().uuid('courseId must be a valid UUID').optional(),
+    courseBundleId: z.string().uuid('course bundle Id must be a valid UUID').optional(),
     bookId: z.string().uuid('bookId must be a valid UUID').optional(),
   }),
 });

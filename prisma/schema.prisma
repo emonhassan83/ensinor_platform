@@ -570,6 +570,7 @@ model CourseBundle {
   courses             Course[]              @relation("BundleCourses")
   orderItem           OrderItem[]
   wishlist            Wishlist[]
+  review              Review[]
 
   @@map("course_bundles")
 }
@@ -1198,18 +1199,21 @@ model Batch {
 }
 
 model Review {
-  id        String   @id @default(uuid())
-  authorId  String
-  courseId  String
-  rating    Float
-  comment   String
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  authorId       String
+  courseId       String
+  courseBundleId String?
+  modelType      ReviewModelType
+  rating         Float
+  comment        String
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  author    User        @relation(fields: [authorId], references: [id])
-  course    Course?     @relation(references: [id], fields: [courseId])
-  reviewRef ReviewRef[]
+  author       User          @relation(fields: [authorId], references: [id])
+  course       Course?       @relation(references: [id], fields: [courseId])
+  courseBundle CourseBundle? @relation(references: [id], fields: [courseBundleId])
+  reviewRef    ReviewRef[]
 
   @@map("reviews")
 }
@@ -1697,8 +1701,8 @@ enum CertificateRequestStatus {
 }
 
 enum ReviewModelType {
-  instructor
   course
+  bundle_course
 }
 
 enum NotificationModeType {

@@ -9,5 +9,6 @@ export type IWishlist = {
   userId: string;
   modelType: WishListModelType;
   courseId?: string;
+  courseBundleId?: string;
   bookId?: string;
 };

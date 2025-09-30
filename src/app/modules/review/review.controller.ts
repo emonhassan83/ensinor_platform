@@ -34,7 +34,22 @@ const getAllByCourseFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, reviewFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ReviewService.getAllFromDB(filters, options, req.params.courseId);
+  const result = await ReviewService.getAllFromDB(filters, options, {courseId: req.params.courseId});
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Reviews data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getAllByBundleCourseFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, reviewFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await ReviewService.getAllFromDB(filters, options, {courseBundleId: req.params.courseBundleId});
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -82,6 +97,7 @@ export const ReviewController = {
   insertIntoDB,
   getAllFromDB,
   getAllByCourseFromDB,
+  getAllByBundleCourseFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

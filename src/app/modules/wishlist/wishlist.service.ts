@@ -1,4 +1,11 @@
-import { BookStatus, CoursesStatus, Prisma, UserStatus, Wishlist } from '@prisma/client';
+import {
+  BookStatus,
+  CoursesStatus,
+  Prisma,
+  UserStatus,
+  Wishlist,
+  WishListModelType,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IWishlist, IWishlistFilterRequest } from './wishlist.interface';
@@ -6,10 +13,16 @@ import { wishlistSearchAbleFields } from './wishlist.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
-type WishlistReference = { courseId?: string; bookId?: string };
+
+interface WishlistReference {
+  userId: string;
+  courseId?: string;
+  bookId?: string;
+  courseBundleId?: string;
+}
 
 const insertIntoDB = async (payload: IWishlist) => {
-  const { userId, modelType, courseId, bookId } = payload;
+  const { userId, modelType, courseId, bookId, courseBundleId } = payload;
 
   // 1️⃣ Validate user exists
   const user = await prisma.user.findFirst({
@@ -20,7 +33,7 @@ const insertIntoDB = async (payload: IWishlist) => {
   }
 
   // 2️⃣ Validate reference exists
-  if (modelType === 'course') {
+  if (modelType === WishListModelType.course) {
     if (!courseId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -38,7 +51,25 @@ const insertIntoDB = async (payload: IWishlist) => {
     }
   }
 
-  if (modelType === 'book') {
+  if (modelType === WishListModelType.course_bundle) {
+    if (!courseBundleId) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Course bundle ID is required for course wishlist!',
+      );
+    }
+    const courseBundle = await prisma.courseBundle.findFirst({
+      where: { id: courseId, isDeleted: false },
+    });
+    if (!courseBundle) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Course bundle not found or not approved!',
+      );
+    }
+  }
+
+  if (modelType === WishListModelType.book) {
     if (!bookId) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -153,6 +184,25 @@ const getAllFromDB = async (
           },
         },
       },
+      courseBundle: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          thumbnail: true,
+          language: true,
+          level: true,
+          lectures: true,
+          price: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              photoUrl: true,
+            },
+          },
+        },
+      },
       book: {
         select: {
           id: true,
@@ -219,6 +269,25 @@ const getByIdFromDB = async (id: string): Promise<Wishlist | null> => {
           },
         },
       },
+      courseBundle: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          thumbnail: true,
+          language: true,
+          level: true,
+          lectures: true,
+          price: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              photoUrl: true,
+            },
+          },
+        },
+      },
       book: {
         select: {
           id: true,
@@ -251,7 +320,7 @@ const updateIntoDB = async (
   payload: Partial<IWishlist>,
 ): Promise<Wishlist> => {
   const wishlist = await prisma.wishlist.findUnique({
-    where: { id},
+    where: { id },
   });
   if (!wishlist) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Wishlist not found!');
@@ -287,31 +356,37 @@ const deleteFromDB = async (id: string): Promise<Wishlist> => {
 };
 
 const deleteByReferenceFromDB = async ({
+  userId,
   courseId,
   bookId,
+  courseBundleId,
 }: WishlistReference): Promise<Wishlist> => {
-  if (!courseId && !bookId) {
+  // Must provide at least one reference
+  if (!courseId && !bookId && !courseBundleId) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Either courseId or bookId must be provided!',
+      'Either courseId, bookId, or courseBundleId must be provided!',
     );
   }
 
-  // Build dynamic where condition
-  const whereCondition: any = courseId ? { courseId } : { bookId };
+  // Build dynamic where condition including userId
+  const whereCondition: Prisma.WishlistWhereInput = {
+    userId,
+    OR: [],
+  };
 
-  // Find the wishlist
+  if (courseId) whereCondition.OR!.push({ courseId });
+  if (bookId) whereCondition.OR!.push({ bookId });
+  if (courseBundleId) whereCondition.OR!.push({ courseBundleId });
+
+  // Find the wishlist entry
   const wishlist = await prisma.wishlist.findFirst({ where: whereCondition });
   if (!wishlist) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Wishlist not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Wishlist entry not found!');
   }
 
   // Delete the wishlist
   const result = await prisma.wishlist.delete({ where: { id: wishlist.id } });
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Wishlist deletion failed!');
-  }
-
   return result;
 };
 

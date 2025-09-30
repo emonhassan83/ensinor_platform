@@ -33,6 +33,12 @@ router.delete(
 );
 
 router.delete(
+  '/courseBundle/:courseBundleId',
+  auth(UserRole.student),
+  WishlistController.deleteByReferenceFromDB,
+);
+
+router.delete(
   '/book/:bookId',
   auth(UserRole.student),
   WishlistController.deleteByReferenceFromDB,

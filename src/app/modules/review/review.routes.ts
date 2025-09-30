@@ -18,6 +18,11 @@ router.get('/', ReviewController.getAllFromDB);
 
 router.get('/course/:courseId', ReviewController.getAllByCourseFromDB);
 
+router.get(
+  '/course-bundle/:courseBundleId',
+  ReviewController.getAllByBundleCourseFromDB,
+);
+
 router.get('/:id', ReviewController.getByIdFromDB);
 
 router.put(

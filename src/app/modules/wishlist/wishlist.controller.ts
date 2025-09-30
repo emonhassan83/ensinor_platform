@@ -79,12 +79,20 @@ const deleteFromDB = catchAsync(async (req, res) => {
 });
 
 const deleteByReferenceFromDB = catchAsync(async (req, res) => {
-  const { courseId, bookId } = req.params; 
-  const result = await WishlistService.deleteByReferenceFromDB({ courseId: courseId as string, bookId: bookId as string });
+  const { courseId, bookId, courseBundleId } = req.body; // better in body for optional params
+  const userId = req.user!.userId; // get from logged-in user
+
+  const result = await WishlistService.deleteByReferenceFromDB({
+    userId,
+    courseId,
+    bookId,
+    courseBundleId,
+  });
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Wishlist data deleted!',
+    message: 'Wishlist entry deleted successfully!',
     data: result,
   });
 });
