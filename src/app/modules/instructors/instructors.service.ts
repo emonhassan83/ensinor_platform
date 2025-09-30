@@ -32,6 +32,161 @@ const expertInstructorsFromDB = async () => {
   return result;
 };
 
+const getCombineInstructorFromDB = async (
+  params: IInstructorFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, status, ...filterData } = params;
+
+  // === Instructor Conditions ===
+  const instructorConditions: Prisma.InstructorWhereInput[] = [];
+  // === BusinessInstructor Conditions ===
+  const businessInstructorConditions: Prisma.BusinessInstructorWhereInput[] =
+    [];
+
+  // 🔍 Search filter
+  if (searchTerm) {
+    const fieldConditions = (instructorsSearchAbleFields || []).map(field => ({
+      [field]: { contains: searchTerm, mode: 'insensitive' },
+    }));
+
+    // instructor
+    instructorConditions.push({
+      OR: [
+        ...fieldConditions,
+        {
+          user: {
+            OR: [
+              { name: { contains: searchTerm, mode: 'insensitive' } },
+              { email: { contains: searchTerm, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ],
+    });
+
+    // business_instructor
+    businessInstructorConditions.push({
+      OR: [
+        ...fieldConditions,
+        {
+          user: {
+            OR: [
+              { name: { contains: searchTerm, mode: 'insensitive' } },
+              { email: { contains: searchTerm, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ],
+    });
+  }
+
+  // 🎛 Dynamic filters
+  if (Object.keys(filterData).length > 0) {
+    instructorConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: { equals: (filterData as any)[key] },
+      })),
+    });
+
+    businessInstructorConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: { equals: (filterData as any)[key] },
+      })),
+    });
+  }
+
+  // 🔎 Filter by user status
+  if (status) {
+    instructorConditions.push({ user: { status: status as UserStatus } });
+    businessInstructorConditions.push({
+      user: { status: status as UserStatus },
+    });
+  }
+
+  const whereInstructor: Prisma.InstructorWhereInput = {
+    AND: instructorConditions,
+  };
+  const whereBusinessInstructor: Prisma.BusinessInstructorWhereInput = {
+    AND: businessInstructorConditions,
+  };
+
+  // === Queries parallel ===
+  const [
+    instructors,
+    businessInstructors,
+    instructorTotal,
+    businessInstructorTotal,
+  ] = await Promise.all([
+    prisma.instructor.findMany({
+      where: whereInstructor,
+      skip,
+      take: limit,
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            photoUrl: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.businessInstructor.findMany({
+      where: whereBusinessInstructor,
+      skip,
+      take: limit,
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            photoUrl: true,
+            status: true,
+          },
+        },
+        company: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.instructor.count({ where: whereInstructor }),
+    prisma.businessInstructor.count({ where: whereBusinessInstructor }),
+  ]);
+
+  // === Normalize result with type flag ===
+  const normalizedInstructors = instructors.map(i => ({
+    ...i,
+    type: 'instructor',
+  }));
+
+  const normalizedBusinessInstructors = businessInstructors.map(bi => ({
+    ...bi,
+    type: 'business_instructor',
+  }));
+
+  const combined = [...normalizedInstructors, ...normalizedBusinessInstructors];
+
+  return {
+    meta: {
+      page,
+      limit,
+      total: instructorTotal + businessInstructorTotal,
+    },
+    data: combined,
+  };
+};
+
 const getAllFromDB = async (
   params: IInstructorFilterRequest,
   options: IPaginationOptions,
@@ -152,22 +307,33 @@ const getAllFromDB = async (
   };
 };
 
-const instructorCategories = async () => {
-  const andConditions: Prisma.InstructorWhereInput[] = [];
-
-  const whereConditions: Prisma.InstructorWhereInput =
-    andConditions.length > 0 ? { AND: andConditions } : {};
-
-  return await prisma.instructor.findMany({
-    where: whereConditions,
+const instructorCategories = async (): Promise<string[]> => {
+  // 🔹 Instructor designations
+  const instructors = await prisma.instructor.findMany({
+    where: {
+      designation: { not: '' },
+    },
     distinct: ['designation'],
-    orderBy: {
-      designation: 'asc',
-    },
-    select: {
-      designation: true,
-    },
+    select: { designation: true },
   });
+
+  // 🔹 BusinessInstructor designations
+  const businessInstructors = await prisma.businessInstructor.findMany({
+    where: {
+      designation: { not: '' },
+    },
+    distinct: ['designation'],
+    select: { designation: true },
+  });
+
+  // 🔹 Merge & unique
+  const allDesignations = [
+    ...instructors.map(i => i.designation),
+    ...businessInstructors.map(b => b.designation),
+  ];
+
+  // 🔹 Return unique & sorted
+  return Array.from(new Set(allDesignations)).sort();
 };
 
 const getByIdFromDB = async (id: string): Promise<Instructor | null> => {
@@ -267,6 +433,7 @@ export const InstructorService = {
   instructorCategories,
   expertInstructorsFromDB,
   getAllFromDB,
+  getCombineInstructorFromDB,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

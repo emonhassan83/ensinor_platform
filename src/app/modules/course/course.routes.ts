@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client';
 import { CourseValidation } from './course.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
+import { optionalAuth } from '../../middlewares/optionalAuth';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -25,7 +26,13 @@ router.post(
   CourseController.insertIntoDB,
 );
 
-router.get('/combine-courses', CourseController.getCombineCourses);
+router.get(
+  '/combine-courses',
+  optionalAuth(UserRole.student, UserRole.employee),
+  CourseController.getCombineCourses,
+);
+
+router.get('/author/:authorId', CourseController.getByAuthorId);
 
 router.get('/popular', CourseController.getPopularCourses);
 

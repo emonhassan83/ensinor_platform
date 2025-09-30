@@ -183,14 +183,23 @@ const getPopularCoursesFromDB = async () => {
 const getCombineCoursesFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
+  filterBy?: { userId?: string; authorId?: string }, // authorId
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.CourseWhereInput[] = [
+    { isDeleted: false, status: CoursesStatus.approved },
+  ];
   const bundleConditions: Prisma.CourseBundleWhereInput[] = [
     { isDeleted: false },
   ];
+
+  // Filter by authorId
+  if (filterBy && filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+    bundleConditions.push({ authorId: filterBy.authorId });
+  }
 
   // Search filter
   if (searchTerm) {
@@ -287,16 +296,41 @@ const getCombineCoursesFromDB = async (
     prisma.courseBundle.count({ where: whereBundle }),
   ]);
 
+  // --- Fetch wishlist only if user is logged in ---
+  let wishlistIds: Set<string> = new Set();
+  if (filterBy?.userId) {
+    const wishlists = await prisma.wishlist.findMany({
+      where: {
+        userId: filterBy.userId,
+        OR: [
+          { courseId: { in: courses.map(c => c.id) } },
+          { courseBundleId: { in: bundles.map(b => b.id) } },
+        ],
+      },
+      select: { courseId: true, courseBundleId: true },
+    });
+
+    wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
+  }
+
+  // --- Normalize data and add isWishlist ---
+  const normalizedCourses = courses.map(c => ({
+    ...c,
+    type: 'course',
+    isWishlist: wishlistIds.has(c.id), // true if logged in and in wishlist
+  }));
+
+  const normalizedBundles = bundles.map(b => ({
+    ...b,
+    type: 'bundle',
+    isWishlist: wishlistIds.has(b.id),
+  }));
+
+  const combined = [...normalizedCourses, ...normalizedBundles];
+
   return {
-    meta: {
-      page,
-      limit,
-      total: courseTotal + bundleTotal,
-    },
-    data: {
-      ...courses,
-      ...bundles,
-    },
+    meta: { page, limit, total: courseTotal + bundleTotal },
+    data: combined,
   };
 };
 
@@ -474,9 +508,10 @@ const getAllFilterDataFromDB = async () => {
       (langMap[item.language] || 0) + item._count.language;
   });
 
-  const formattedLanguages = Object.entries(langMap).map(
-    ([name, count]) => ({ name, count }),
-  );
+  const formattedLanguages = Object.entries(langMap).map(([name, count]) => ({
+    name,
+    count,
+  }));
 
   return {
     data: {

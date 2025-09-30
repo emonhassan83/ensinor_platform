@@ -11,6 +11,8 @@ const router = express.Router();
 const storage = memoryStorage();
 const upload = multer({ storage });
 
+router.get('/combine-instructor', InstructorController.getCombineInstructor);
+
 router.get('/expert', InstructorController.expertInstructors);
 
 router.get('/', InstructorController.getAllFromDB);

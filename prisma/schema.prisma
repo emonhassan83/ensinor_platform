@@ -569,6 +569,7 @@ model CourseBundle {
   courseBundleCourses CourseBundleCourses[]
   courses             Course[]              @relation("BundleCourses")
   orderItem           OrderItem[]
+  wishlist            Wishlist[]
 
   @@map("course_bundles")
 }
@@ -1389,17 +1390,19 @@ model Message {
 }
 
 model Wishlist {
-  id        String            @id @default(uuid())
-  userId    String
-  modelType WishListModelType
-  bookId    String?
-  courseId  String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id             String            @id @default(uuid())
+  userId         String
+  modelType      WishListModelType
+  bookId         String?
+  courseId       String?
+  courseBundleId String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id])
-  book   Book?   @relation(fields: [bookId], references: [id])
-  course Course? @relation(fields: [courseId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  book         Book?         @relation(fields: [bookId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
+  courseBundle CourseBundle? @relation(fields: [courseBundleId], references: [id])
 
   @@map("wishlists")
 }
@@ -1826,6 +1829,7 @@ enum ChatType {
 
 enum WishListModelType {
   course
+  course_bundle
   book
 }
 

@@ -49,12 +49,31 @@ const getCombineCourses = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CourseService.getCombineCoursesFromDB(filters, options);
+  const result = await CourseService.getCombineCoursesFromDB(filters, options, {
+    userId: req.user?.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Combine all courses data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByAuthorId = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseService.getCombineCoursesFromDB(filters, options, {
+    authorId: req.params.authorId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Combine all courses data fetched by authorId!',
     meta: result.meta,
     data: result.data,
   });
@@ -157,6 +176,7 @@ export const CourseController = {
   getPopularCourses,
   getAllFromDB,
   getCombineCourses,
+  getByAuthorId,
   getAllFilterDataFromDB,
   getByCompanyFromDB,
   getMyCourseFromDB,
