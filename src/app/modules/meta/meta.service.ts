@@ -347,7 +347,6 @@ const getCourseCategory = async (year: number) => {
   return categoryPercentage;
 };
 
-// 2️⃣ Content Growth Analysis (monthly count based on Order.modelType)
 const getContentGrowth = async (year: number) => {
   const yearStart = startOfYear(new Date(year, 0, 1));
   const yearEnd = endOfYear(new Date(year, 11, 31));
@@ -359,7 +358,11 @@ const getContentGrowth = async (year: number) => {
     },
     select: {
       createdAt: true,
-      modelType: true,
+      orderItem: {
+        select: {
+          modelType: true,
+        },
+      },
     },
   });
 
@@ -373,22 +376,22 @@ const getContentGrowth = async (year: number) => {
   for (let i = 0; i < 12; i++) {
     const monthOrders = orders.filter(o => o.createdAt.getMonth() === i);
 
+    // Flatten all order items for this month
+    const itemsInMonth = monthOrders.flatMap(o => o.orderItem);
+
     growth.course.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter(o => o.modelType === OrderModelType.course)
-        .length,
+      count: itemsInMonth.filter(item => item.modelType === 'course').length,
     });
 
     growth.book.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter(o => o.modelType === OrderModelType.book)
-        .length,
+      count: itemsInMonth.filter(item => item.modelType === 'book').length,
     });
 
     growth.event.push({
       month: months[i].slice(0, 3),
-      count: monthOrders.filter(o => o.modelType === OrderModelType.event)
-        .length,
+      count: itemsInMonth.filter(item => item.modelType === 'event').length,
     });
   }
 
@@ -473,7 +476,7 @@ const getInstructorEarningOverview = async (authorId: string, year: number) => {
       isPaid: true,
       isDeleted: false,
     },
-    _sum: { instructorEarning: true },
+    _sum: { instructorShare: true },
   });
 
   // Map data into chart-friendly format
@@ -481,7 +484,7 @@ const getInstructorEarningOverview = async (authorId: string, year: number) => {
     const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
     return {
       month,
-      amount: row?._sum.instructorEarning ?? 0,
+      amount: row?._sum.instructorShare ?? 0,
     };
   });
 
@@ -513,20 +516,22 @@ const getCoInstructorEarningOverview = async (coInstructorId: string, year: numb
     where: {
       isPaid: true,
       isDeleted: false,
-      coInstructorPool: { gt: 0 },
+      coInstructorsShare: { gt: 0 },
       createdAt: { gte: yearStart, lte: yearEnd },
       order: {
-        courseId: { in: courseIds },
+        orderItem: {
+
+        }
       },
     },
-    _sum: { coInstructorPool: true },
+    _sum: { coInstructorsShare: true },
   });
 
   const earningOverview = filteredMonths.map((month, index) => {
     const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
     return {
       month,
-      amount: row?._sum.coInstructorPool ?? 0,
+      amount: row?._sum.coInstructorsShare ?? 0,
     };
   });
 
@@ -1239,24 +1244,28 @@ const coInstructorMetaData = async (
 
   // --- Revenue ---
   const totalRevenue = await prisma.payment.aggregate({
-    _sum: { coInstructorPool: true },
+    _sum: { coInstructorsShare: true },
     where: {
       isPaid: true,
       isDeleted: false,
-      coInstructorPool: { gt: 0 },
+      coInstructorsShare: { gt: 0 },
       order: {
-        courseId: {
-          in: (
-            await prisma.coInstructor.findMany({
-              where: { coInstructorId: user.id, isDeleted: false },
-              select: { courseId: true },
-            })
-          ).map(c => c.courseId),
+        orderItem: {
+          some: {
+            courseId: {
+              in: (
+                await prisma.coInstructor.findMany({
+                  where: { coInstructorId: user.id, isDeleted: false },
+                  select: { courseId: true },
+                })
+              ).map(c => c.courseId),
+            },
+          },
         },
       },
     },
   });
-  const revenue = Math.round(totalRevenue._sum.coInstructorPool ?? 0);
+  const revenue = Math.round(totalRevenue._sum?.coInstructorsShare ?? 0);
 
   // --- Selected Year for Chart ---
   const selectedEarningYear = year
