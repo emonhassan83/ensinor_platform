@@ -1,6 +1,5 @@
 import {
   BusinessInstructor,
-  CompanyAdmin,
   Prisma,
   User,
   UserStatus,
@@ -45,8 +44,7 @@ const getAllFromDB = async (
     orConditions.push({
       user: {
         OR: [
-          { name: { contains: searchTerm, mode: 'insensitive' } },
-          { email: { contains: searchTerm, mode: 'insensitive' } },
+          { name: { contains: searchTerm, mode: 'insensitive' } }
         ],
       },
     });
@@ -129,12 +127,12 @@ const getAllFromDB = async (
       isPaid: true,
       isDeleted: false,
     },
-    _sum: { instructorEarning: true },
+    _sum: { instructorShare: true },
   });
 
   const earningMap: Record<string, number> = {};
   earnings.forEach(e => {
-    earningMap[e.authorId] = e._sum.instructorEarning || 0;
+    earningMap[e.authorId] = e._sum.instructorShare || 0;
   });
 
   // === MAP RESULTS WITH CALCULATIONS ===

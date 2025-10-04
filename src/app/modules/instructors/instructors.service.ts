@@ -213,8 +213,7 @@ const getAllFromDB = async (
     orConditions.push({
       user: {
         OR: [
-          { name: { contains: searchTerm, mode: 'insensitive' } },
-          { email: { contains: searchTerm, mode: 'insensitive' } },
+          { name: { contains: searchTerm, mode: 'insensitive' } }
         ],
       },
     });
@@ -278,14 +277,14 @@ const getAllFromDB = async (
       isDeleted: false,
     },
     _sum: {
-      instructorEarning: true,
+      instructorShare: true,
     },
   });
 
   // === Map Instructor with totalEarning ===
   const result = instructors.map(inst => {
     const earningRow = earnings.find(e => e.authorId === inst.userId);
-    const totalEarning = earningRow?._sum.instructorEarning ?? 0;
+    const totalEarning = earningRow?._sum.instructorShare ?? 0;
 
     return {
       ...inst,

@@ -21,20 +21,22 @@ const createOrders = async (payload: IOrder) => {
   const user = await prisma.user.findUnique({
     where: { id: orderData.userId },
   });
-  if (!user) throw new ApiError(404, 'User not found');
+  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
 
   let totalAmount = 0;
   let totalDiscount = 0;
-  const orderItems: any[] = [];
+  let coInstructorShare = 0;
 
-  // Track authors & companies
+  const orderItems: any[] = [];
   const authorSet = new Set<string>();
   const companySet = new Set<string>();
+  const coInstructorIdsSet = new Set<string>();
 
   // 2️⃣ Process Each Item
   for (const item of items) {
     const entity = await fetchEntity(item.modelType, item.referenceId);
-    if (!entity) throw new ApiError(400, `${item.modelType} not found`);
+    if (!entity)
+      throw new ApiError(httpStatus.NOT_FOUND, `${item.modelType} not found`);
 
     // Track author & company
     authorSet.add(entity.authorId);
@@ -80,6 +82,26 @@ const createOrders = async (payload: IOrder) => {
     totalAmount += basePrice;
     totalDiscount += discount;
 
+    // 🧮 Check if course has co-instructors
+    if (item.modelType === 'course') {
+      const course = await prisma.course.findUnique({
+        where: { id: item.referenceId },
+        include: { coInstructor: true },
+      });
+
+      if (course && course.coInstructor.length > 0) {
+        const coInstructorCut = finalPrice * 0.35;
+        coInstructorShare += coInstructorCut;
+      }
+
+      // Collect coInstructorIds
+      course!.coInstructor.forEach(ci => {
+        if (ci.isActive && !ci.isDeleted) {
+          coInstructorIdsSet.add(ci.coInstructorId);
+        }
+      });
+    }
+
     orderItems.push({
       modelType: item.modelType,
       bookId: item.modelType === 'book' ? item.referenceId : undefined,
@@ -119,6 +141,8 @@ const createOrders = async (payload: IOrder) => {
       instructorShare,
       platformShare,
       affiliateShare,
+      coInstructorsShare: coInstructorShare,
+      coInstructorIds: Array.from(coInstructorIdsSet),
       orderItem: { createMany: { data: orderItems } },
     },
     include: { orderItem: true },

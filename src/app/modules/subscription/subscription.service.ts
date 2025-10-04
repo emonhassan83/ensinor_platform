@@ -162,35 +162,20 @@ const createSubscription = async (payload: ISubscription) => {
   }
 
   // 5) Merge payload & create subscription inside transaction, update user's packageExpiry
-  const finalType = payload.type ?? 'basic';
+  const finalType = pkg.type ?? 'basic';
 
   const result = await prisma.$transaction(async tx => {
     const created = await tx.subscription.create({
       data: {
-        userId: payload.userId,
-        packageId: payload.packageId,
+        userId: user.id,
+        packageId: pkg.id,
         type: finalType as any,
-        transactionId: payload.transactionId ?? null,
         amount: amount,
         paymentStatus: payload.paymentStatus ?? 'unpaid',
         status: payload.status ?? 'pending',
         expiredAt: expiredAt,
       },
     });
-
-    // // compute finalExpiryDate if user already had packageExpiry in future
-    // let finalExpiryDate = expiredAt;
-    // if (user.packageExpiry && new Date(user.packageExpiry) > now) {
-    //   const additionalMs = expiredAt.getTime() - now.getTime();
-    //   finalExpiryDate = new Date(
-    //     new Date(user.packageExpiry).getTime() + additionalMs,
-    //   );
-    // }
-
-    // await tx.user.update({
-    //   where: { id: user.id },
-    //   data: { packageExpiry: finalExpiryDate },
-    // });
 
     return created;
   });
@@ -208,7 +193,13 @@ const getAllSubscription = async (
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.SubscriptionWhereInput[] = [
-    { userId, isDeleted: false },
+    {
+      userId,
+      status: SubscriptionStatus.active,
+      isExpired: false,
+      paymentStatus: PaymentStatus.paid,
+      isDeleted: false,
+    },
   ];
 
   // Search across Subscription and nested User fields
@@ -254,6 +245,7 @@ const getAllSubscription = async (
       package: {
         select: {
           title: true,
+          type: true,
           billingCycle: true,
         },
       },

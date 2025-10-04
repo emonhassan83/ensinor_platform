@@ -619,6 +619,7 @@ model Order {
   platformShare   Float
   affiliateShare  Float?  @default(0)
   coInstructorsShare Float? @default(0)
+  coInstructorIds   String[]        @default([])
 
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
