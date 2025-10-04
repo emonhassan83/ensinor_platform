@@ -1,3 +1,3 @@
-export const instructorsSearchAbleFields = [''];
+export const instructorsSearchAbleFields = [];
 
-export const instructorsFilterableFields = ['searchTerm', 'status'];
+export const instructorsFilterableFields = ['searchTerm', 'designation', 'status'];

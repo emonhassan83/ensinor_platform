@@ -36,6 +36,7 @@ export const messages = {
 
   course: {
     added: 'New course upload.',
+    assign: 'New Course Assigned',
     changedStatus: 'Your course status changed !',
     deleted: 'Your course deleted.',
   },

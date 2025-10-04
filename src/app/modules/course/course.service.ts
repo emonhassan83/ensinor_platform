@@ -671,6 +671,66 @@ const changeStatusIntoDB = async (
   });
 };
 
+const assignACourseIntoDB = async (
+  id: string,
+  payload: { authorId: string },
+  userId: string,
+): Promise<Course> => {
+  const { authorId } = payload;
+
+  // --- 1️⃣ Validate Company Admin ---
+  const companyAdmin = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      role: UserRole.company_admin,
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+  if (!companyAdmin) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Only company admins can assign courses.',
+    );
+  }
+
+  // --- 2️⃣ Validate Assigned Instructor ---
+  const instructor = await prisma.user.findFirst({
+    where: {
+      id: authorId,
+      role: UserRole.business_instructors,
+      isDeleted: false,
+    },
+  });
+  if (!instructor) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Assigned instructor not found!',
+    );
+  }
+
+  const existingCourse = await prisma.course.findFirst({
+    where: { id, isDeleted: false },
+  });
+  if (!existingCourse) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found.');
+  }
+
+  // --- 4️⃣ Update the Course Author ---
+  const updatedCourse = await prisma.course.update({
+    where: { id },
+    data: {
+      authorId,
+      updatedAt: new Date(),
+    },
+  });
+
+  // sent notification
+  await sendNotifYToUser('assign', instructor.id)
+
+  return updatedCourse;
+};
+
 const deleteFromDB = async (id: string): Promise<Course> => {
   const course = await prisma.course.findUniqueOrThrow({
     where: { id, isDeleted: false },
@@ -704,5 +764,6 @@ export const CourseService = {
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,
+  assignACourseIntoDB,
   deleteFromDB,
 };

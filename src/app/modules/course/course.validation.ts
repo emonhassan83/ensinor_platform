@@ -72,8 +72,17 @@ const changedStatusValidationSchema = z.object({
   }),
 });
 
+const assignCourseValidationSchema = z.object({
+  body: z.object({
+     authorId: z
+      .string({ required_error: 'Author is required' })
+      .uuid('author must be a valid UUID'),
+  }),
+});
+
 export const CourseValidation = {
   createValidationSchema,
   updateValidationSchema,
   changedStatusValidationSchema,
+  assignCourseValidationSchema,
 };

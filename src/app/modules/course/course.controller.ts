@@ -161,6 +161,20 @@ const changeStatusIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const assignACourse = catchAsync(async (req, res) => {
+  const result = await CourseService.assignACourseIntoDB(
+    req.params.id,
+    req.body,
+    req.user!.userId
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course status data updated!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -183,5 +197,6 @@ export const CourseController = {
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,
+  assignACourse,
   deleteFromDB,
 };

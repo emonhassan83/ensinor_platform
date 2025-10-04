@@ -58,8 +58,7 @@ const getCombineInstructorFromDB = async (
         {
           user: {
             OR: [
-              { name: { contains: searchTerm, mode: 'insensitive' } },
-              { email: { contains: searchTerm, mode: 'insensitive' } },
+              { name: { contains: searchTerm, mode: 'insensitive' } }
             ],
           },
         },
@@ -73,8 +72,7 @@ const getCombineInstructorFromDB = async (
         {
           user: {
             OR: [
-              { name: { contains: searchTerm, mode: 'insensitive' } },
-              { email: { contains: searchTerm, mode: 'insensitive' } },
+              { name: { contains: searchTerm, mode: 'insensitive' } }
             ],
           },
         },

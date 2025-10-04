@@ -22,7 +22,7 @@ export const sendNotifYToAdmin = async (
 
 // Course Status Change Notification → User
 export const sendNotifYToUser = async (
-  status: 'pending' | 'approved' | 'denied' | 'deleted',
+  status: 'pending' | 'approved' | 'denied' | 'deleted' | 'assign',
   userId: string,
 ) => {
   // Determine the message and description based on the status
@@ -31,23 +31,27 @@ export const sendNotifYToUser = async (
 
   switch (status) {
     case 'pending':
-      message = messages.shop.changedStatus;
+      message = messages.course.changedStatus;
       description = `Your course has been submitted and is currently under review.`;
       break;
 
     case 'approved':
-      message = messages.shop.changedStatus;
+      message = messages.course.changedStatus;
       description = `Congratulations! Your course has been approved and published in the platform.`;
       break;
 
     case 'denied':
-      message = messages.shop.changedStatus;
+      message = messages.course.changedStatus;
       description = `Your course has been denied from the platform.`;
       break;
 
     case 'deleted':
-      message = messages.shop.deleted;
+      message = messages.course.deleted;
       description = `Your course has been removed from the platform.`;
+      break;
+    case 'assign':
+      message = messages.course.assign;
+      description = `You have been assigned as the instructor for the course`;
       break;
 
     default:

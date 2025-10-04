@@ -74,6 +74,13 @@ router.put(
 );
 
 router.patch(
+  '/course-assign/:id',
+  auth(UserRole.company_admin),
+  validateRequest(CourseValidation.updateValidationSchema),
+  CourseController.assignACourse,
+);
+
+router.patch(
   '/status/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(CourseValidation.updateValidationSchema),
