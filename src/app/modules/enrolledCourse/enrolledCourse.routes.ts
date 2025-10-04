@@ -44,6 +44,12 @@ router.get(
 );
 
 router.get(
+  '/my-enrolled-courses-quizzes',
+  auth(UserRole.student, UserRole.employee),
+  EnrolledCourseController.myEnrolledCoursesQuiz,
+);
+
+router.get(
   '/:id',
   auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.getByIdFromDB,

@@ -158,7 +158,7 @@ const addGrade = async (payload: IGrade) => {
 const getAllFromDB = async (
   params: IGradingSystemFilterRequest,
   options: IPaginationOptions,
-  filterBy: {
+  filterBy?: {
     authorId?: string;
     courseId?: string;
   },
@@ -170,10 +170,10 @@ const getAllFromDB = async (
     { isDeleted: false },
   ];
   // Filter either by authorId, courseId, bookId or eventId
-  if (filterBy.authorId) {
+  if (filterBy && filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
   }
-  if (filterBy.courseId) {
+  if (filterBy && filterBy.courseId) {
     andConditions.push({ courseId: filterBy.courseId });
   }
 
@@ -268,6 +268,26 @@ const getByIdFromDB = async (id: string): Promise<GradingSystem | null> => {
 
   if (!result || result?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Grading system not found!');
+  }
+
+  return result;
+};
+
+const getDefaultGradingSystemFromDB = async (): Promise<GradingSystem | null> => {
+  const result = await prisma.gradingSystem.findFirst({
+    where: { isDefault: true, isDeleted: false },
+    include: {
+      grades: {
+        orderBy: { minScore: 'desc' },
+      },
+      course: {
+        select: { title: true },
+      },
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No default grading system found!');
   }
 
   return result;
@@ -372,6 +392,7 @@ export const GradingSystemService = {
   addGrade,
   getAllFromDB,
   getGradesByGradingSystemId,
+  getDefaultGradingSystemFromDB,
   getByIdFromDB,
   updateIntoDB,
   updateGrade,

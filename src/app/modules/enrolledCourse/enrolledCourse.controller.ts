@@ -57,6 +57,19 @@ const myEnrolledCoursesGrade = catchAsync(async (req, res) => {
   });
 });
 
+const myEnrolledCoursesQuiz = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.myEnrolledCoursesQuiz(
+    req.user!.userId,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My enroll course grade data fetched!',
+    data: result,
+  });
+});
+
 const getStudentByAuthorCourse = catchAsync(async (req, res) => {
   const filters = pick(req.query, enrolledCourseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -134,6 +147,7 @@ export const EnrolledCourseController = {
   bulkInsertIntoDB,
   getMyFromDB,
   myEnrolledCoursesGrade,
+  myEnrolledCoursesQuiz,
   getStudentByAuthorCourse,
   getByIdFromDB,
   updateIntoDB,

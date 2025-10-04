@@ -30,6 +30,19 @@ router.post(
 );
 
 router.get(
+  '/default-grading-system',
+  auth(
+    UserRole.super_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.employee,
+    UserRole.student,
+  ),
+  GradingSystemController.getDefaultGradingSystem,
+);
+
+router.get(
   '/course/:courseId',
   auth(
     UserRole.super_admin,
@@ -41,7 +54,6 @@ router.get(
   ),
   GradingSystemController.getByCourseIdFromDB,
 );
-
 
 router.get(
   '/my-grading-system',

@@ -25,6 +25,17 @@ const addGrade = catchAsync(async (req, res) => {
   });
 });
 
+const getDefaultGradingSystem = catchAsync(async (req, res) => {
+  const result = await GradingSystemService.getDefaultGradingSystemFromDB();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Default Grading system data fetched!',
+    data: result,
+  });
+});
+
 const getByCourseIdFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, gradingSystemFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -118,6 +129,7 @@ const deleteGrade = catchAsync(async (req, res) => {
 export const GradingSystemController = {
   insertIntoDB,
   addGrade,
+  getDefaultGradingSystem,
   getByCourseIdFromDB,
   getByIdFromDB,
   getGradesByAuthorId,

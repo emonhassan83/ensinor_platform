@@ -601,13 +601,25 @@ const myEnrolledCoursesGrade = async (userId: string) => {
   // --- Quiz attempts ---
   const quizAttempts = await prisma.quizAttempt.findMany({
     where: { userId, isCompleted: true, isDeleted: false },
-    select: { id: true, quizId: true, marksObtained: true, totalMarks: true, grade: true },
+    select: {
+      id: true,
+      quizId: true,
+      marksObtained: true,
+      totalMarks: true,
+      grade: true,
+    },
   });
 
   // --- Assignment submissions ---
   const assignmentSubmissions = await prisma.assignmentSubmission.findMany({
     where: { userId, isDeleted: false },
-    select: { id: true, assignmentId: true, marksObtained: true, totalMarks: true, grade: true },
+    select: {
+      id: true,
+      assignmentId: true,
+      marksObtained: true,
+      totalMarks: true,
+      grade: true,
+    },
   });
 
   // --- Calculate total marks dynamically ---
@@ -703,6 +715,109 @@ const myEnrolledCoursesGrade = async (userId: string) => {
   };
 };
 
+const myEnrolledCoursesQuiz = async (userId: string) => {
+  // 1️⃣ Get all enrolled courses for this user
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: {
+      userId,
+      isDeleted: false,
+    },
+    select: {
+      courseId: true,
+      course: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail: true,
+          authorId: true,
+        },
+      },
+    },
+  });
+
+  if (!enrolledCourses.length) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'No enrolled courses found for this user',
+    );
+  }
+
+  // 2️⃣ Collect course IDs
+  const courseIds = enrolledCourses.map(c => c.courseId);
+
+  // 3️⃣ Get all quizzes from those courses
+  const quizzes = await prisma.quiz.findMany({
+    where: {
+      courseId: { in: courseIds },
+      isDeleted: false,
+    },
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail: true,
+        },
+      },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      questionsList: {
+        where: { isDeleted: false },
+        select: {
+          id: true,
+          name: true,
+          options: {
+            select: {
+              id: true,
+              optionLevel: true,
+              optionText: true,
+              isCorrect: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  // 4️⃣ Group quizzes under their courses
+  const courseQuizMap: Record<string, any> = {};
+
+  quizzes.forEach(quiz => {
+    if (!courseQuizMap[quiz.courseId]) {
+      courseQuizMap[quiz.courseId] = {
+        courseId: quiz.course.id,
+        courseTitle: quiz.course.title,
+        thumbnail: quiz.course.thumbnail,
+        quizzes: [],
+      };
+    }
+
+    courseQuizMap[quiz.courseId].quizzes.push({
+      quizId: quiz.id,
+      marks: quiz.marks,
+      totalQuestions: quiz.questions,
+      timeLimit: quiz.time,
+      deadline: quiz.deadline,
+      totalAttempt: quiz.totalAttempt,
+      author: quiz.author,
+    });
+  });
+
+  // 5️⃣ Return formatted data
+  return {
+    totalQuizzes: quizzes.length,
+    data: Object.values(courseQuizMap),
+  };
+};
 
 const getByIdFromDB = async (id: string) => {
   const enrolledCourse = await prisma.enrolledCourse.findUnique({
@@ -987,6 +1102,7 @@ export const EnrolledCourseService = {
   enrollBundleCourses,
   getAllFromDB,
   getStudentByAuthorCourse,
+  myEnrolledCoursesQuiz,
   myEnrolledCoursesGrade,
   getByIdFromDB,
   updateIntoDB,
