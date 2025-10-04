@@ -22,9 +22,25 @@ router.post(
 );
 
 router.get(
+  '/student-by-author-course/:authorId',
+  auth(
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  EnrolledCourseController.getStudentByAuthorCourse,
+);
+
+router.get(
   '/author/my-enrolled-courses',
   auth(UserRole.student, UserRole.employee),
   EnrolledCourseController.getMyFromDB,
+);
+
+router.get(
+  '/my-enrolled-courses-grade',
+  auth(UserRole.student, UserRole.employee),
+  EnrolledCourseController.myEnrolledCoursesGrade,
 );
 
 router.get(

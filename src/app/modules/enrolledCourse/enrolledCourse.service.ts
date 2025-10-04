@@ -1,6 +1,7 @@
 import {
   ChatRole,
   ChatType,
+  CourseGrade,
   CoursesStatus,
   EnrolledCourse,
   PlatformType,
@@ -19,6 +20,15 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import { sendCourseCompleteNotifYToAuthor } from './enrolledCourse.utils';
 import { sendCourseEnrollmentEmail } from '../../utils/email/courseEnrolledmentEmail';
+
+// Static fallback grading system
+const defaultGradingSystem = [
+  { gradeLabel: 'A', minScore: 90, maxScore: 100 },
+  { gradeLabel: 'B', minScore: 80, maxScore: 89 },
+  { gradeLabel: 'C', minScore: 70, maxScore: 79 },
+  { gradeLabel: 'D', minScore: 60, maxScore: 69 },
+  { gradeLabel: 'F', minScore: 0, maxScore: 59 },
+];
 
 const insertIntoDB = async (payload: IEnrolledCourse) => {
   const { userId, courseId } = payload;
@@ -427,6 +437,273 @@ const getAllFromDB = async (
   };
 };
 
+const getStudentByAuthorCourse = async (
+  params: IEnrolledCourseFilterRequest,
+  options: IPaginationOptions,
+  authorId?: string,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  // 🔹 Base filter conditions
+  const andConditions: Prisma.EnrolledCourseWhereInput[] = [
+    { authorId, isDeleted: false },
+  ];
+
+  // 🔹 Search filter (by user name or email)
+  if (searchTerm) {
+    andConditions.push({
+      OR: [
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { email: { contains: searchTerm, mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  // 🔹 Dynamic filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: { equals: (filterData as any)[key] },
+      })),
+    });
+  }
+
+  const whereConditions: Prisma.EnrolledCourseWhereInput = {
+    AND: andConditions,
+  };
+
+  // 🔹 Fetch all enrollments for this author
+  const enrolledCourses = await prisma.enrolledCourse.findMany({
+    where: whereConditions,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+          country: true,
+          city: true,
+          role: true,
+          student: {
+            select: {
+              courseEnrolled: true,
+              courseCompleted: true,
+            },
+          },
+          employee: {
+            select: {
+              courseEnrolled: true,
+              courseCompleted: true,
+            },
+          },
+        },
+      },
+      course: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  // 🔹 Group by unique user (student/employee)
+  const studentMap = new Map<string, any>();
+
+  for (const record of enrolledCourses) {
+    const { user, completedRate, course, isComplete } = record;
+
+    if (!studentMap.has(user.id)) {
+      // Determine user type stats (student or employee)
+      const userTypeData =
+        user.role === 'employee' ? user.employee : user.student;
+
+      studentMap.set(user.id, {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        photoUrl: user.photoUrl,
+        city: user.city,
+        country: user.country,
+        enrolledCourse: userTypeData?.courseEnrolled ?? 0,
+        completedCourse: userTypeData?.courseCompleted ?? 0,
+        totalCompletedRate: 0,
+        totalCourses: 0,
+        courses: [],
+      });
+    }
+
+    const student = studentMap.get(user.id);
+    student.totalCompletedRate += completedRate;
+    student.totalCourses += 1;
+    student.courses.push(course);
+
+    // Optional: update completedCourse if tracked by isComplete flag
+    if (isComplete) {
+      student.completedCourse += 1;
+    }
+  }
+
+  // 🔹 Format final response
+  const students = Array.from(studentMap.values()).map(student => {
+    const avgCompletedRate =
+      student.totalCourses > 0
+        ? Math.round(student.totalCompletedRate / student.totalCourses)
+        : 0;
+
+    return {
+      id: student.id,
+      name: student.name,
+      email: student.email,
+      photoUrl: student.photoUrl,
+      country: student.country,
+      city: student.city,
+      enrolledCourse: student.totalCourses,
+      completedCourse: student.completedCourse,
+      avgCompletedRate,
+      enrolledCourses: student.courses,
+    };
+  });
+
+  // 🔹 Manual pagination (since unique filtering is done in memory)
+  const total = students.length;
+  const paginated = students.slice(skip, skip + limit);
+
+  return {
+    meta: { page, limit, total },
+    data: paginated,
+  };
+};
+
+const getGradeLabel = (
+  percent: number,
+  grading: { gradeLabel: CourseGrade; minScore: number; maxScore: number }[],
+) => {
+  const grade = grading.find(
+    g => percent >= g.minScore && percent <= g.maxScore,
+  );
+  return grade ? grade.gradeLabel : 'NA';
+};
+
+const myEnrolledCoursesGrade = async (userId: string) => {
+  if (!userId) throw new Error('User ID is required');
+
+  // --- Completed Courses ---
+  const completedCourses = await prisma.enrolledCourse.findMany({
+    where: { userId, isComplete: true, isDeleted: false },
+    select: { courseId: true, courseMark: true, grade: true, authorId: true },
+  });
+
+  const completedCourseCount = completedCourses.length;
+
+  // --- Quiz attempts ---
+  const quizAttempts = await prisma.quizAttempt.findMany({
+    where: { userId, isCompleted: true, isDeleted: false },
+    select: { id: true, quizId: true, marksObtained: true, totalMarks: true, grade: true },
+  });
+
+  // --- Assignment submissions ---
+  const assignmentSubmissions = await prisma.assignmentSubmission.findMany({
+    where: { userId, isDeleted: false },
+    select: { id: true, assignmentId: true, marksObtained: true, totalMarks: true, grade: true },
+  });
+
+  // --- Calculate total marks dynamically ---
+  let totalObtained = 0;
+  let totalPossible = 0;
+
+  // ✅ Iterate through completed courses
+  for (const c of completedCourses) {
+    // Get all quizzes and assignments for this course
+    const courseQuizzes = await prisma.quiz.findMany({
+      where: { courseId: c.courseId, isDeleted: false },
+      select: { id: true, marks: true },
+    });
+
+    const courseAssignments = await prisma.assignment.findMany({
+      where: { courseId: c.courseId, isDeleted: false },
+      select: { id: true, marks: true },
+    });
+
+    // Calculate total possible marks for this course
+    const courseTotalMarks =
+      courseQuizzes.reduce((sum, q) => sum + (q.marks || 0), 0) +
+      courseAssignments.reduce((sum, a) => sum + (a.marks || 0), 0);
+
+    // Aggregate student’s obtained marks for this course
+    const courseQuizMarks = quizAttempts
+      .filter(q => courseQuizzes.some(cq => cq.id === q.quizId))
+      .reduce((sum, q) => sum + q.marksObtained, 0);
+
+    const courseAssignmentMarks = assignmentSubmissions
+      .filter(a => courseAssignments.some(ca => ca.id === a.assignmentId))
+      .reduce((sum, a) => sum + a.marksObtained, 0);
+
+    const courseObtained = courseQuizMarks + courseAssignmentMarks;
+
+    totalObtained += courseObtained;
+    totalPossible += courseTotalMarks;
+  }
+
+  // --- Handle edge cases (no data) ---
+  const avgPercent =
+    totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
+
+  // --- Fetch grading system dynamically ---
+  let gradingSystemRecords = await prisma.gradingSystem.findMany({
+    where: {
+      OR: [
+        { authorId: userId, isDeleted: false },
+        { isDefault: true, isDeleted: false },
+      ],
+    },
+    include: { grades: true },
+  });
+
+  let grading: {
+    gradeLabel: CourseGrade;
+    minScore: number;
+    maxScore: number;
+  }[] = [];
+
+  if (gradingSystemRecords.length > 0) {
+    const system =
+      gradingSystemRecords.find(g => !g.isDefault) ||
+      gradingSystemRecords.find(g => g.isDefault);
+    grading =
+      system?.grades.map(g => ({
+        gradeLabel: g.gradeLabel as CourseGrade,
+        minScore: g.minScore,
+        maxScore: g.maxScore,
+      })) || [];
+  } else {
+    grading = defaultGradingSystem as {
+      gradeLabel: CourseGrade;
+      minScore: number;
+      maxScore: number;
+    }[];
+  }
+
+  // --- Final computed results ---
+  const overallGPA = parseFloat((avgPercent / 20).toFixed(2)); // Convert 0-100 to 0-5 scale
+  const avgGrade = getGradeLabel(avgPercent, grading);
+  const avgMarks = `${avgPercent.toFixed(2)}%`;
+
+  return {
+    overallGPA,
+    avgGrade,
+    avgMarks,
+    completedCourse: completedCourseCount,
+    totalObtained,
+    totalPossible,
+    quizAttempt: quizAttempts,
+    myAssignment: assignmentSubmissions,
+  };
+};
+
+
 const getByIdFromDB = async (id: string) => {
   const enrolledCourse = await prisma.enrolledCourse.findUnique({
     where: { id, isDeleted: false },
@@ -709,6 +986,8 @@ export const EnrolledCourseService = {
   insertIntoDB,
   enrollBundleCourses,
   getAllFromDB,
+  getStudentByAuthorCourse,
+  myEnrolledCoursesGrade,
   getByIdFromDB,
   updateIntoDB,
   watchLectureIntoDB,

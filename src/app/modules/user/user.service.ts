@@ -485,6 +485,8 @@ const invitationInstructor = async (
       data: {
         name: payload.user.name,
         email: payload.user.email,
+        contactNo: payload.user.contactNo,
+        bio: payload.user.bio,
         password: hashPassword,
         role: UserRole.instructor,
         registerWith: RegisterWith.credentials,

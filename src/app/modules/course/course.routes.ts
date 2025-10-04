@@ -32,7 +32,7 @@ router.get(
   CourseController.getCombineCourses,
 );
 
-router.get('/author/:authorId', CourseController.getByAuthorId);
+router.get('/author-courses/:authorId', CourseController.getByAuthorId);
 
 router.get('/popular', CourseController.getPopularCourses);
 

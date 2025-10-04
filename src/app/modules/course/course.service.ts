@@ -184,11 +184,12 @@ const getPopularCoursesFromDB = async () => {
 const getCombineCoursesFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  filterBy?: { userId?: string; authorId?: string }, // authorId
+  filterBy?: { userId?: string; authorId?: string },
 ) => {
-  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { page, limit } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
+  // ====== WHERE CONDITIONS ======
   const andConditions: Prisma.CourseWhereInput[] = [
     {
       isDeleted: false,
@@ -200,23 +201,19 @@ const getCombineCoursesFromDB = async (
     { isDeleted: false },
   ];
 
-  // Filter by authorId
-  if (filterBy && filterBy.authorId) {
+  // --- Filter by authorId ---
+  if (filterBy?.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
     bundleConditions.push({ authorId: filterBy.authorId });
   }
 
-  // Search filter
+  // --- Search filter ---
   if (searchTerm) {
     andConditions.push({
       OR: courseSearchAbleFields.map(field => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
+        [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
     });
-
     bundleConditions.push({
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
@@ -225,34 +222,24 @@ const getCombineCoursesFromDB = async (
     });
   }
 
-  // Extra filters (dynamic)
+  // --- Dynamic filters ---
   if (Object.keys(filterData).length > 0) {
-    andConditions.push({
+    const extraFilters = {
       AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
+        [key]: { equals: (filterData as any)[key] },
       })),
-    });
-
-    bundleConditions.push({
-      AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
-      })),
-    });
+    };
+    andConditions.push(extraFilters);
+    bundleConditions.push(extraFilters);
   }
 
   const whereCourse: Prisma.CourseWhereInput = { AND: andConditions };
   const whereBundle: Prisma.CourseBundleWhereInput = { AND: bundleConditions };
 
-  // --- Queries ---
-  const [courses, courseTotal, bundles, bundleTotal] = await Promise.all([
+  // ====== FETCH DATA ======
+  const [courses, bundles] = await Promise.all([
     prisma.course.findMany({
       where: whereCourse,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -271,13 +258,11 @@ const getCombineCoursesFromDB = async (
         ratingCount: true,
         lectures: true,
         duration: true,
+        createdAt: true,
       },
     }),
-    prisma.course.count({ where: whereCourse }),
     prisma.courseBundle.findMany({
       where: whereBundle,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -296,12 +281,33 @@ const getCombineCoursesFromDB = async (
         ratingCount: true,
         lectures: true,
         duration: true,
+        createdAt: true,
       },
     }),
-    prisma.courseBundle.count({ where: whereBundle }),
   ]);
 
-  // --- Fetch wishlist only if user is logged in ---
+  // ====== MERGE + SORT ======
+  const combined = [
+    ...courses.map(c => ({ ...c, type: 'course' })),
+    ...bundles.map(b => ({ ...b, type: 'bundle' })),
+  ];
+
+  const sortKey = options.sortBy || 'createdAt';
+
+  combined.sort((a, b) => {
+    const order = options.sortOrder === 'asc' ? 1 : -1;
+    if ((a as any)[sortKey] > (b as any)[sortKey]) return order;
+    if ((a as any)[sortKey] < (b as any)[sortKey]) return -order;
+    return 0;
+  });
+
+  // ====== PAGINATE IN MEMORY ======
+  const total = combined.length;
+  const start = (page - 1) * limit;
+  const end = start + limit;
+  const paginated = combined.slice(start, end);
+
+  // ====== Wishlist Integration ======
   let wishlistIds: Set<string> = new Set();
   if (filterBy?.userId) {
     const wishlists = await prisma.wishlist.findMany({
@@ -314,28 +320,17 @@ const getCombineCoursesFromDB = async (
       },
       select: { courseId: true, courseBundleId: true },
     });
-
     wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
   }
 
-  // --- Normalize data and add isWishlist ---
-  const normalizedCourses = courses.map(c => ({
-    ...c,
-    type: 'course',
-    isWishlist: wishlistIds.has(c.id), // true if logged in and in wishlist
+  const finalData = paginated.map(item => ({
+    ...item,
+    isWishlist: wishlistIds.has(item.id),
   }));
-
-  const normalizedBundles = bundles.map(b => ({
-    ...b,
-    type: 'bundle',
-    isWishlist: wishlistIds.has(b.id),
-  }));
-
-  const combined = [...normalizedCourses, ...normalizedBundles];
 
   return {
-    meta: { page, limit, total: courseTotal + bundleTotal },
-    data: combined,
+    meta: { page, limit, total, totalPage: Math.ceil(total / limit) },
+    data: finalData,
   };
 };
 
