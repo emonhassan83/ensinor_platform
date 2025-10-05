@@ -1,4 +1,4 @@
-import { PackageAudience, PackageBillingCycle } from "@prisma/client";
+import { PackageAudience, PackageBillingCycle, SubscriptionType } from "@prisma/client";
 
 export type IPackageFilterRequest = {
   searchTerm?: string | undefined;
@@ -9,8 +9,7 @@ export type IPackageFilterRequest = {
 
 export type IPackage = {
   title: string;
-  type: string;
-  logo: string;
+  type: SubscriptionType;
   audience: PackageAudience
   features: string[];
   billingCycle: PackageBillingCycle;

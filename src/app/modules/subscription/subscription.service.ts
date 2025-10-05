@@ -3,6 +3,7 @@ import ApiError from '../../errors/ApiError';
 import cron from 'node-cron';
 import prisma from '../../utils/prisma';
 import {
+  PackageAudience,
   PaymentStatus,
   Prisma,
   SubscriptionStatus,
@@ -15,6 +16,7 @@ import {
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { subscriptionSearchAbleFields } from './subscription.constants';
+import { subscriptionNotifyToUser } from './subscription.utils';
 
 export const startSubscriptionCron = () => {
   // run at every 12th hour: '0 */12 * * *'
@@ -41,12 +43,11 @@ export const startSubscriptionCron = () => {
         },
       });
 
-      for (const subscription of expiringToday) {
-        // implement notification function: subscriptionNotifyToUser('WARNING', package, subscription, user)
+      for (const sub of expiringToday) {
+        await subscriptionNotifyToUser('WARNING', sub.package, sub.user);
         console.log(
-          `⚠️ Subscription expiring soon for user ${subscription.userId} package ${subscription.packageId}`,
+          `⚠️ Warning sent to user ${sub.userId} for package ${sub.packageId}`,
         );
-        // TODO: call your notification util here
       }
 
       // 2) Mark as expired (expiredAt < today)
@@ -56,43 +57,58 @@ export const startSubscriptionCron = () => {
           isExpired: false,
           paymentStatus: PaymentStatus.paid,
         },
-        include: { user: true },
+        include: { user: true, package: true },
       });
 
       if (alreadyExpired.length > 0) {
         // update in a transaction
-        const tx = await prisma.$transaction(
+        await prisma.$transaction(
           alreadyExpired.map(s =>
             prisma.subscription.update({
               where: { id: s.id },
-              data: { isExpired: true, isDeleted: true, status: 'expired' },
+              data: {
+                isExpired: true,
+                isDeleted: true,
+                status: SubscriptionStatus.expired,
+              },
             }),
           ),
         );
 
-        // Optionally clear user.packageExpiry if it equals the expired date
-        for (const s of alreadyExpired) {
-          try {
-            const user = await prisma.user.findUnique({
-              where: { id: s.userId },
+        // --- Handle expired users & companies ---
+        for (const sub of alreadyExpired) {
+          const user = sub.user;
+
+          // Send notification
+          await subscriptionNotifyToUser('EXPIRED', sub.package, sub.user);
+
+          // Clear package expiry if applicable
+          if (user?.packageExpiry && user.packageExpiry <= new Date()) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { packageExpiry: null },
             });
-            if (
-              user &&
-              user.packageExpiry &&
-              user.packageExpiry <= new Date()
-            ) {
-              await prisma.user.update({
-                where: { id: user.id },
-                data: { packageExpiry: null },
-              });
-            }
-          } catch (err) {
-            console.warn(
-              'Failed to clear user.packageExpiry for',
-              s.userId,
-              err,
-            );
           }
+
+          // --- 🏢 If audience is company_admin, deactivate company ---
+          if (sub.package.audience === PackageAudience.company_admin) {
+            const companyAdmin = await prisma.companyAdmin.findUnique({
+              where: { userId: user.id },
+              include: { company: true },
+            });
+
+            if (companyAdmin?.company) {
+              await prisma.company.update({
+                where: { id: companyAdmin.company.id },
+                data: { isActive: false },
+              });
+              console.log(
+                `🏢 Company "${companyAdmin.company.name}" deactivated due to expired subscription for admin ${user.id}`,
+              );
+            }
+          }
+
+          console.log(`❌ Expired notification sent to user ${sub.userId}`);
         }
       }
 
@@ -180,7 +196,6 @@ const createSubscription = async (payload: ISubscription) => {
     return created;
   });
 
-  // optionally notify admin or user here
   return result;
 };
 

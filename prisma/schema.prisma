@@ -1094,7 +1094,7 @@ model AffiliateSale {
 model Package {
   id           String              @id @default(uuid())
   title        String
-  type         String
+  type         SubscriptionType   @default(basic)
   audience     PackageAudience
   features     String[]
   billingCycle PackageBillingCycle
@@ -1720,6 +1720,7 @@ enum NotificationModeType {
   certificate
   batch
   withdraw_request
+  subscription
 }
 
 enum UserStatus {
@@ -1808,9 +1809,9 @@ enum SubscriptionType {
   basic
   standard
   premium
-  non_profits
-  most_popular
-  full_power
+  ngo
+  sme
+  enterprise
 }
 
 enum SubscriptionStatus {

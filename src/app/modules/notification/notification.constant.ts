@@ -61,7 +61,7 @@ export const messages = {
   },
 
   subscription: {
-    newPlan: 'New subscription plan added.',
+    expired: 'Your subscription plan expired',
     warningForPlan: 'Alert for add new plan',
   },
 

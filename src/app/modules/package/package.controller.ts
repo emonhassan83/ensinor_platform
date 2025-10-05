@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { packageFilterableFields } from './package.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await PackageService.insertIntoDB(req.body, req.file);
+  const result = await PackageService.insertIntoDB(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -43,8 +43,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await PackageService.updateIntoDB(
     req.params.id,
-    req.body,
-    req.file,
+    req.body
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

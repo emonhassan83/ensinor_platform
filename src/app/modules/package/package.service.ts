@@ -1,34 +1,36 @@
-import {
-  Package,
-  Prisma,
-} from '@prisma/client';
+import { Package, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IPackage, IPackageFilterRequest } from './package.interface';
 import { packageSearchAbleFields } from './package.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
-import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 
-const insertIntoDB = async (payload: IPackage, file: any) => {
-  // upload to image
-    if (file) {
-      payload.logo = (await uploadToS3({
-        file,
-        fileName: `images/package_logo/${Math.floor(100000 + Math.random() * 900000)}`,
-      })) as string;
-    }
+const insertIntoDB = async (payload: IPackage) => {
+  // --Prevent duplicate subscription type + billing cycle for same audience ---
+  const existingPackage = await prisma.package.findFirst({
+    where: {
+      audience: payload.audience,
+      type: payload.type,
+      billingCycle: payload.billingCycle,
+      isDeleted: false,
+    },
+  });
+
+  if (existingPackage) {
+    throw new ApiError(
+      httpStatus.CONFLICT,
+      `Package with subscription type '${payload.type}' and billing cycle '${payload.billingCycle}' for audience '${payload.audience}' already exists!`,
+    );
+  }
 
   const result = await prisma.package.create({
-    data: payload
+    data: payload,
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Package creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Package creation failed!');
   }
   return result;
 };
@@ -44,15 +46,15 @@ const getAllFromDB = async (
 
   // Search across Package and nested User fields
   if (searchTerm) {
-      andConditions.push({
-        OR: packageSearchAbleFields.map(field => ({
-          [field]: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
-        })),
-      });
-    }
+    andConditions.push({
+      OR: packageSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
 
   // Filters
   if (Object.keys(filterData).length > 0) {
@@ -112,7 +114,6 @@ const getByIdFromDB = async (id: string): Promise<Package | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<Package>,
-  file: any,
 ): Promise<Package> => {
   const pkg = await prisma.package.findUnique({
     where: { id },
@@ -121,17 +122,9 @@ const updateIntoDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not found!');
   }
 
-  // upload to image
-  if (file) {
-    payload.logo = (await uploadToS3({
-      file,
-      fileName: `images/package_logo/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
-  }
-
   const result = await prisma.package.update({
     where: { id },
-    data: payload
+    data: payload,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Package not updated!');
