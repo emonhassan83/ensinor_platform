@@ -6,17 +6,24 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import {
   OrderStatus,
+  PackageAudience,
   Payment,
   PaymentModelType,
   PaymentStatus,
+  PaymentType,
   Prisma,
   SubscriptionStatus,
+  UserRole,
   UserStatus,
 } from '@prisma/client';
 import { paymentSearchAbleFields } from './payment.constants';
 import prisma from '../../utils/prisma';
 import config from '../../config';
-import { createCheckoutSession } from './payment.utils';
+import {
+  createCheckoutSession,
+  paymentNotifyToAdmin,
+  paymentNotifyToUser,
+} from './payment.utils';
 import { findAdmin } from '../../utils/findAdmin';
 import { generateTransactionId } from '../../utils/generateTransctionId';
 
@@ -28,24 +35,29 @@ const stripe = new Stripe(config.stripe?.stripe_api_secret as string, {
 const initiatePayment = async (payload: IPayment) => {
   const admin = await findAdmin();
   const transactionId = generateTransactionId();
-  const { modelType, userId } = payload;
+  const { modelType, subscriptionId, orderId, userId } = payload;
 
-  // 1) user validation
+  // 1. user validation
   const user = await prisma.user.findUnique({
     where: { id: userId, status: UserStatus.active, isDeleted: false },
   });
   if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
 
-  // 2) load referenced model depending on modelType
+  // 2. load referenced model depending on modelType
   let model: any = null;
   let modelName = '';
 
   if (modelType === PaymentModelType.order) {
-    modelName = 'order';
-    model = await prisma.order.findUnique({ where: { id: payload.orderId } });
+    modelName = PaymentModelType.order;
+    model = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItem: true,
+      },
+    });
     if (!model) throw new ApiError(httpStatus.NOT_FOUND, 'Order not found!');
 
-    const orderAmount = Number(model.amount ?? 0);
+    const orderAmount = Number(model.finalAmount ?? 0);
     if (orderAmount === 0) {
       return {
         message:
@@ -55,66 +67,39 @@ const initiatePayment = async (payload: IPayment) => {
     }
 
     payload.amount = orderAmount;
-    if (model.authorId) payload.authorId = model.authorId;
-
-    // try to compute commission based on subscription (best-effort)
-    try {
-      // NOTE: replace subscription with your Prisma model name & fields
-      const subscription = await prisma.subscription.findFirst({
-        where: {
-          userId,
-          isDeleted: false,
-          isExpired: false,
-          paymentStatus: PaymentStatus.paid,
-        },
-        orderBy: { createdAt: 'desc' },
-        include: { package: true },
-      });
-
-      if (subscription?.type) {
-        let adminCommissionPercentage = 0;
-        const adminCommission = Math.round(
-          (orderAmount * adminCommissionPercentage) / 100,
-        );
-        const instructorEarning = orderAmount - adminCommission;
-        payload.adminCommission = adminCommission;
-        payload.instructorEarning = instructorEarning;
-      }
-    } catch (err) {
-      // swallow - not fatal
-      console.warn(
-        'Vendor subscription lookup failed:',
-        (err as Error).message,
-      );
-    }
+    payload.authorId = model.authorId;
+    payload.companyId = model.companyId;
+    payload.type = model.orderItem[0].modelType;
+    payload.platformShare = model.platformShare;
+    payload.instructorShare = model.instructorShare;
+    payload.coInstructorsShare = model.coInstructorsShare;
   } else if (modelType === PaymentModelType.subscription) {
-    modelName = 'subscription';
-    // NOTE: ensure vendorSubscription exists in your Prisma schema
+    modelName = PaymentModelType.subscription;
+
     model = await prisma.subscription.findUnique({
-      where: { id: payload.subscriptionId },
+      where: { id: subscriptionId },
       include: { package: true },
     });
     if (!model)
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        'Vendor Subscription not found!',
-      );
+      throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found!');
 
-    const vendorAmount = Number(model.amount ?? 0);
-    if (vendorAmount === 0) {
-      return {
-        message: 'No payment required. Free access granted',
-        order: model,
-      };
+    // Determine payment type based on package audience
+    if (model.package.audience === PackageAudience.instructor) {
+      payload.type = PaymentType.instructor_subscription;
+    } else if (model.package.audience === PackageAudience.company_admin) {
+      payload.type = PaymentType.company_subscription;
     }
-    payload.amount = vendorAmount;
+
     if (!admin?.id) {
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
         'Admin ID not found',
       );
     }
+    //  Platform gets 100% of subscription payments
     payload.authorId = admin.id;
+    payload.amount = model.amount;
+    payload.platformShare = model.amount;
   } else {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid modelType');
   }
@@ -122,9 +107,15 @@ const initiatePayment = async (payload: IPayment) => {
   if (!model)
     throw new ApiError(httpStatus.NOT_FOUND, `${modelName} Not Found!`);
 
-  // 3) Check existing unpaid payment for same reference + account
+  // 3. Check existing unpaid payment for same reference + account
   let paymentData = await prisma.payment.findFirst({
-    where: { modelType, userId, isPaid: false }, // adapt field names: accountId / isPaid
+    where: {
+      modelType,
+      userId,
+      isPaid: false,
+      ...(orderId ? { orderId } : {}),
+      ...(subscriptionId ? { subscriptionId } : {}),
+    },
   });
 
   if (paymentData) {
@@ -135,17 +126,14 @@ const initiatePayment = async (payload: IPayment) => {
     });
   } else {
     // create new payment
-    const amount = Number(model.amount ?? payload.amount ?? 0);
+    const amount = Number(payload.amount ?? 0);
     const createPayload: any = {
       ...payload,
       transactionId,
       amount,
-      currency: 'usd',
       status: PaymentStatus.unpaid,
       isPaid: false,
       authorId: payload.authorId ?? null,
-      adminCommission: payload.adminCommission ?? null,
-      instructorEarning: payload.instructorEarning ?? null,
     };
 
     paymentData = await prisma.payment.create({ data: createPayload });
@@ -195,10 +183,10 @@ const confirmPayment = async (query: Record<string, any>) => {
     );
   }
 
-  // use prisma transaction
+  // Prisma transaction
   try {
     const result = await prisma.$transaction(async tx => {
-      // update payment
+      // 1. Update payment record
       const payment = await tx.payment.update({
         where: { id: paymentId },
         data: {
@@ -213,20 +201,77 @@ const confirmPayment = async (query: Record<string, any>) => {
 
       // handle each modelType
       if (payment.modelType === PaymentModelType.order) {
-        // update order
-        const order = await tx.order.update({
+        // 2️. Handle Order Payment Logic
+        const order = await tx.order.findUnique({
           where: { id: payment.orderId ?? undefined },
+        });
+        if (!order)
+          throw new ApiError(httpStatus.NOT_FOUND, 'Order not found!');
+
+        // --- (1a) Platform owner (Super Admin) balance update ---
+        const superAdmin = await tx.user.findFirst({
+          where: { role: UserRole.super_admin, isDeleted: false },
+        });
+        if (superAdmin) {
+          await tx.user.update({
+            where: { id: superAdmin.id },
+            data: {
+              balance: {
+                increment: Math.round(payment.platformShare * 10) / 10 || 0,
+              },
+            },
+          });
+        }
+
+        // --- (1b) Author balance update ---
+        if (payment.authorId) {
+          await tx.user.update({
+            where: { id: payment.authorId },
+            data: {
+              balance: {
+                increment: Math.round((payment.instructorShare || 0) * 10) / 10,
+              },
+            },
+          });
+        }
+
+        // --- (1c) Co-instructors balance update (if any) ---
+        if (order.coInstructorIds && order.coInstructorIds.length > 0) {
+          const coInstructors = order.coInstructorIds;
+          const totalCoShare = payment.coInstructorsShare || 0;
+          const individualShare =
+            coInstructors.length > 0
+              ? Math.round((totalCoShare / coInstructors.length) * 10) / 10
+              : 0;
+
+          // Update each co-instructor balance
+          for (const coId of coInstructors) {
+            await tx.user.update({
+              where: { id: coId },
+              data: { balance: { increment: individualShare } },
+            });
+
+            // (2️⃣) Insert CoInstructorEarning record
+            await tx.coInstructorEarning.create({
+              data: {
+                coInstructorId: coId,
+                paymentId: payment.id,
+                amount: individualShare,
+              },
+            });
+          }
+        }
+
+        // 3. Update Order Payment Status ---
+        await tx.order.update({
+          where: { id: order.id },
           data: {
             transactionId: payment.transactionId,
             paymentStatus: PaymentStatus.paid,
             status: OrderStatus.completed,
+            isDeleted: false,
           },
         });
-
-        if (!order)
-          throw new ApiError(httpStatus.NOT_FOUND, 'Order not found!');
-
-        // send order confirmation docs to user
       } else if (payment.modelType === PaymentModelType.subscription) {
         const sub = await tx.subscription.update({
           where: { id: payment.subscriptionId ?? undefined },
@@ -250,8 +295,7 @@ const confirmPayment = async (query: Record<string, any>) => {
           now.getTime() + billingCycleDays * 24 * 60 * 60 * 1000,
         );
 
-        // mark subscription expiry and maybe merge with previous
-        // find previous active subscription for vendor
+        // mark subscription expiry and maybe merge with previous, find previous active subscription for vendor
         const previous = await tx.subscription.findFirst({
           where: {
             id: { not: sub.id },
@@ -327,8 +371,8 @@ const confirmPayment = async (query: Record<string, any>) => {
       }
 
       // notify users & admin
-      // await paymentNotifyToUser('SUCCESS', payment);
-      // await paymentNotifyToAdmin('SUCCESS', payment);
+      await paymentNotifyToUser('SUCCESS', payment);
+      await paymentNotifyToAdmin('SUCCESS', payment);
 
       return payment;
     });

@@ -7,7 +7,7 @@ export const generateTransactionId = (): string => {
 
   const randomPart = Math.floor(10000 + Math.random() * 90000); // Generates 5-digit number
 
-  const transactionId = `Ensinor--${year}${month}${day}-${randomPart}`;
+  const transactionId = `Ensinor-${year}${month}${day}-${randomPart}`;
 
   return transactionId;
 };

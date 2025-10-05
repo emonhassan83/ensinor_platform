@@ -123,6 +123,7 @@ model User {
   bankDetail                 BankDetail?
   affiliateSale              AffiliateSale[]
   cart                       Cart[]
+  coInstructorEarning        CoInstructorEarning[]
 
   @@map("users")
 }
@@ -340,10 +341,9 @@ model CoInstructor {
   updatedAt      DateTime     @updatedAt
 
   // Relations
-  course              Course                @relation(fields: [courseId], references: [id])
-  invitedBy           User                  @relation("InvitedByRelation", fields: [invitedById], references: [id])
-  coInstructorUser    User                  @relation("CoInstructorRelation", fields: [coInstructorId], references: [id])
-  coInstructorEarning CoInstructorEarning[]
+  course           Course @relation(fields: [courseId], references: [id])
+  invitedBy        User   @relation("InvitedByRelation", fields: [invitedById], references: [id])
+  coInstructorUser User   @relation("CoInstructorRelation", fields: [coInstructorId], references: [id])
 
   @@map("co_instructors")
 }
@@ -608,18 +608,18 @@ model Cart {
 }
 
 model Order {
-  id              String  @id @default(uuid())
-  userId          String
-  authorId        String?
-  companyId       String?
-  amount          Float
-  discount        Float?
-  finalAmount     Float // after discount
-  instructorShare Float
-  platformShare   Float
-  affiliateShare  Float?  @default(0)
-  coInstructorsShare Float? @default(0)
-  coInstructorIds   String[]        @default([])
+  id                 String   @id @default(uuid())
+  userId             String
+  authorId           String?
+  companyId          String?
+  amount             Float
+  discount           Float?
+  finalAmount        Float // after discount
+  instructorShare    Float
+  platformShare      Float
+  affiliateShare     Float?   @default(0)
+  coInstructorsShare Float?   @default(0)
+  coInstructorIds    String[] @default([])
 
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
@@ -1095,7 +1095,6 @@ model Package {
   id           String              @id @default(uuid())
   title        String
   type         String
-  logo         String
   audience     PackageAudience
   features     String[]
   billingCycle PackageBillingCycle
@@ -1141,14 +1140,12 @@ model Payment {
   subscriptionId     String?
   modelType          PaymentModelType
   type               PaymentType
-  platform           PlatformType
   transactionId      String           @unique
   amount             Float            @default(0.00)
   platformShare      Float            @default(0.00)
   instructorShare    Float            @default(0.00)
   coInstructorsShare Float            @default(0.00)
   status             PaymentStatus    @default(unpaid)
-  paymentMethod      PaymentMethod
   paymentIntentId    String?
   isPaid             Boolean          @default(false)
   isDeleted          Boolean          @default(false)
@@ -1166,18 +1163,16 @@ model Payment {
 }
 
 model CoInstructorEarning {
-  id             String    @id @default(uuid())
+  id             String   @id @default(uuid())
   coInstructorId String
   paymentId      String
-  amount         Float     @default(0.00)
-  isWithdrawn    Boolean   @default(false)
-  withdrawnAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  amount         Float    @default(0.00)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  coInstructor CoInstructor @relation(fields: [coInstructorId], references: [id])
-  payment      Payment      @relation(fields: [paymentId], references: [id])
+  coInstructor User    @relation(fields: [coInstructorId], references: [id])
+  payment      Payment @relation(fields: [paymentId], references: [id])
 
   @@map("co_instructor_earnings")
 }

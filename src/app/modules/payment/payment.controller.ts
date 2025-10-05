@@ -4,6 +4,7 @@ import sendResponse from '../../utils/sendResponse';
 import { PaymentService } from './payment.service';
 import pick from '../../utils/pick';
 import { paymentFilterableFields } from './payment.constants';
+import httpStatus from 'http-status';
 import config from '../../config';
 
 const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
@@ -19,15 +20,15 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
 const confirmPayment = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentService.confirmPayment(req.query)
 
-   res.redirect(
-    `${config.payment_success_url}`,
-  )
+  //  res.redirect(
+  //   `${config.payment_success_url}`,
+  // )
   
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     data: result,
-    message: 'payment initiate successfully',
+    message: 'payment confirmed successfully',
   })
 })
 

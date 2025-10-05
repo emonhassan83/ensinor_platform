@@ -83,9 +83,9 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       include: { author: { include: { user: true } } },
     });
     if (!company)
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+      throw new ApiError(httpStatus.NOT_FOUND, 'Your company not found!');
     if (!company.isActive)
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Company is not active!');
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
   }
 
   // 🔹 Upload thumbnail (if file provided)

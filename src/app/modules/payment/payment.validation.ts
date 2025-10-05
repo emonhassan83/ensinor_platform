@@ -1,4 +1,4 @@
-import { OrderModelType, OrderStatus } from '@prisma/client';
+import { OrderStatus, PaymentModelType } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation
@@ -7,22 +7,15 @@ const createValidationSchema = z.object({
     userId: z
       .string({ required_error: 'User id is required' })
       .uuid('user id must be a valid UUID'),
-    modelType: z.nativeEnum(OrderModelType),
-    referenceId: z
-      .string({ required_error: 'Book id is required' })
-      .uuid('book id must be a valid UUID')
+    modelType: z.nativeEnum(PaymentModelType),
+    orderId: z
+      .string({ required_error: 'Order id is required' })
+      .uuid('Order id must be a valid UUID')
       .optional(),
-    courseId: z
-      .string({ required_error: 'Course id is required' })
-      .uuid('course id must be a valid UUID')
-      .optional(),
-    courseBundleId: z
-      .string({ required_error: 'Course bundle id is required' })
-      .uuid('course bundle id must be a valid UUID')
-      .optional(),
-    paymentMethod: z
-      .string({ required_error: 'Oder paymentMethod is required!' })
-      .optional(),
+    subscriptionId: z
+      .string({ required_error: 'Subscription id is required' })
+      .uuid('Subscription id must be a valid UUID')
+      .optional()
   }),
 });
 

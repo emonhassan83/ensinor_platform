@@ -1,4 +1,4 @@
-import { PaymentMethod, PaymentModelType } from "@prisma/client";
+import { PaymentMethod, PaymentModelType, PaymentType } from "@prisma/client";
 
 export type IPaymentFilterRequest = {
   searchTerm?: string | undefined;
@@ -11,12 +11,15 @@ export type IPaymentFilterRequest = {
 export interface IPayment {
   userId: string
   authorId: string
+  companyId?: string
   modelType: PaymentModelType
+  type: PaymentType
   orderId?: string
   subscriptionId?: string
   amount: number
-  adminCommission: number
-  instructorEarning: number
+  platformShare?: number
+  instructorShare?: number
+  coInstructorsShare?: number
   paymentMethod: PaymentMethod
   transactionId?: string
 }
