@@ -4,6 +4,7 @@ import config from './app/config';
 import initializeSocketIO from './socket';
 import { seeder } from './app/seeder/seed';
 import { scheduleExpiredUserCleanup } from './app/utils/cleanupExpiredUsers';
+import { newsletterScheduleCorn } from './app/modules/newsletter/newsletter.utils';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
 
@@ -13,6 +14,7 @@ const main = async () => {
     seeder.seedAdmin();
     seeder.seedContents();
     scheduleExpiredUserCleanup();
+    newsletterScheduleCorn();
 
     server = app.listen(Number(config.port), config.ip as string, () => {
       console.log(
