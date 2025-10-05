@@ -1,4 +1,4 @@
-import { NewsletterCategory } from '@prisma/client';
+import { NewsletterCategory, RecurrenceType } from '@prisma/client';
 import { z } from 'zod';
 
 const subscribeValidationSchema = z.object({
@@ -9,9 +9,7 @@ const subscribeValidationSchema = z.object({
         required_error: 'Newsletter category is required',
       })
       .nonempty({ message: 'At least one category must be selected' }),
-    recurrence: z.string({
-      required_error: 'Newsletter recurrence is required',
-    }),
+    recurrence: z.nativeEnum(RecurrenceType),
   }),
 });
 
@@ -30,9 +28,7 @@ const changeSubscriberValidationSchema = z.object({
       })
       .nonempty({ message: 'At least one category must be selected' })
       .optional(),
-    recurrence: z
-      .string({ required_error: 'Newsletter recurrence is required' })
-      .optional(),
+    recurrence: z.nativeEnum(RecurrenceType).optional(),
   }),
 });
 

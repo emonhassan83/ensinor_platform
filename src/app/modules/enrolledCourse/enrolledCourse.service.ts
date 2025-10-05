@@ -358,6 +358,103 @@ const enrollBundleCourses = async (payload: {
   return filteredCourses;
 };
 
+const getEnrolledStudent = async (
+  params: IEnrolledCourseFilterRequest,
+  options: IPaginationOptions,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  const andConditions: Prisma.EnrolledCourseWhereInput[] = [{ isDeleted: false }];
+
+  // 🔍 Optional search (by student name or email)
+  if (searchTerm) {
+    andConditions.push({
+      user: {
+        OR: [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      },
+    });
+  }
+
+  // 🧭 Filter conditions (like platform, etc.)
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: { equals: (filterData as any)[key] },
+      })),
+    });
+  }
+
+  const whereConditions: Prisma.EnrolledCourseWhereInput = {
+    AND: andConditions,
+  };
+
+  // 🧩 Step 1: Find all distinct userIds from enrolled courses
+  const enrolledUsers = await prisma.enrolledCourse.findMany({
+    where: whereConditions,
+    distinct: ['userId'],
+    select: {
+      userId: true,
+    },
+    skip,
+    take: limit,
+  });
+
+  const userIds = enrolledUsers.map(u => u.userId);
+
+  if (userIds.length === 0) {
+    return {
+      meta: {
+        page,
+        limit,
+        total: 0,
+      },
+      data: [],
+    };
+  }
+
+  // 🧩 Step 2: Fetch user details for these enrolled users
+  const users = await prisma.user.findMany({
+    where: {
+      id: { in: userIds },
+      isDeleted: false,
+    },
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      photoUrl: true,
+      country: true,
+      role: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+
+  // 🧩 Step 3: Count total enrolled users for pagination
+  const total = await prisma.enrolledCourse.groupBy({
+    by: ['userId'],
+    where: whereConditions,
+    _count: { userId: true },
+  });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total: total.length,
+    },
+    data: users,
+  };
+};
+
 const getAllFromDB = async (
   params: IEnrolledCourseFilterRequest,
   options: IPaginationOptions,
@@ -1100,6 +1197,7 @@ const deleteFromDB = async (id: string): Promise<EnrolledCourse> => {
 export const EnrolledCourseService = {
   insertIntoDB,
   enrollBundleCourses,
+  getEnrolledStudent,
   getAllFromDB,
   getStudentByAuthorCourse,
   myEnrolledCoursesQuiz,

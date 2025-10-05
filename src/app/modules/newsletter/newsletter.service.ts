@@ -2,7 +2,7 @@ import httpStatus from 'http-status';
 import ApiError from '../../errors/ApiError';
 import prisma from '../../utils/prisma';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { NewsletterStatus, Prisma, RecurrenceType } from '@prisma/client';
+import { NewsletterStatus, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { newsletterSearchableFields } from './newsletter.constant';
 import {
@@ -10,6 +10,7 @@ import {
   INewsletterFilterRequest,
   ISubscriber,
 } from './newsletter.interface';
+import emailSender from '../../utils/emailSender';
 
 const subscribeUser = async (payload: ISubscriber) => {
   const { email } = payload;
@@ -34,6 +35,22 @@ const subscribeUser = async (payload: ISubscriber) => {
     );
   }
 
+  // ✉️ Send congratulation email
+  await emailSender(
+    email,
+    '🎉 Welcome to Our Newsletter!',
+    `
+      <div style="font-family:sans-serif; line-height:1.6;">
+        <h2 style="color:#2b6cb0;">Welcome to the Family!</h2>
+        <p>Hi there,</p>
+        <p>Thank you for subscribing to our newsletter. You’ll now receive the latest updates, tips, and offers directly in your inbox.</p>
+        <p>We’re thrilled to have you with us! 🎊</p>
+        <br/>
+        <p>Warm regards,<br/>The Team</p>
+      </div>
+    `,
+  );
+
   return result;
 };
 
@@ -47,9 +64,8 @@ const unsubscribeUser = async (payload: { email: string }) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Subscriber not found!');
   }
 
-  const result = await prisma.newsletterSubscriber.update({
+  const result = await prisma.newsletterSubscriber.delete({
     where: { id: existing.id },
-    data: { status: NewsletterStatus.unsubscribed },
   });
   if (!result) {
     throw new ApiError(
@@ -57,6 +73,23 @@ const unsubscribeUser = async (payload: { email: string }) => {
       'Newsletter subscription created failed!',
     );
   }
+
+  // ✉️ Send goodbye email
+  await emailSender(
+    email,
+    'We’re sad to see you go 💔',
+    `
+      <div style="font-family:sans-serif; line-height:1.6;">
+        <h2 style="color:#e53e3e;">Goodbye for now!</h2>
+        <p>Hi there,</p>
+        <p>You’ve successfully unsubscribed from our newsletter.</p>
+        <p>We’re sorry to see you go, but you’re always welcome back anytime.</p>
+        <p>If this was a mistake, you can resubscribe again.</p>
+        <br/>
+        <p>Take care,<br/>The Team</p>
+      </div>
+    `,
+  );
 
   return result;
 };

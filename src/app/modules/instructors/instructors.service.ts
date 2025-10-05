@@ -36,51 +36,33 @@ const getCombineInstructorFromDB = async (
   params: IInstructorFilterRequest,
   options: IPaginationOptions,
 ) => {
-  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { page, limit } = paginationHelpers.calculatePagination(options);
   const { searchTerm, status, ...filterData } = params;
 
   // === Instructor Conditions ===
   const instructorConditions: Prisma.InstructorWhereInput[] = [];
-  // === BusinessInstructor Conditions ===
-  const businessInstructorConditions: Prisma.BusinessInstructorWhereInput[] =
-    [];
+  const businessInstructorConditions: Prisma.BusinessInstructorWhereInput[] = [];
 
-  // 🔍 Search filter
   if (searchTerm) {
     const fieldConditions = (instructorsSearchAbleFields || []).map(field => ({
       [field]: { contains: searchTerm, mode: 'insensitive' },
     }));
 
-    // instructor
     instructorConditions.push({
       OR: [
         ...fieldConditions,
-        {
-          user: {
-            OR: [
-              { name: { contains: searchTerm, mode: 'insensitive' } }
-            ],
-          },
-        },
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
       ],
     });
 
-    // business_instructor
     businessInstructorConditions.push({
       OR: [
         ...fieldConditions,
-        {
-          user: {
-            OR: [
-              { name: { contains: searchTerm, mode: 'insensitive' } }
-            ],
-          },
-        },
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
       ],
     });
   }
 
-  // 🎛 Dynamic filters
   if (Object.keys(filterData).length > 0) {
     instructorConditions.push({
       AND: Object.keys(filterData).map(key => ({
@@ -95,7 +77,6 @@ const getCombineInstructorFromDB = async (
     });
   }
 
-  // 🔎 Filter by user status
   if (status) {
     instructorConditions.push({ user: { status: status as UserStatus } });
     businessInstructorConditions.push({
@@ -110,60 +91,36 @@ const getCombineInstructorFromDB = async (
     AND: businessInstructorConditions,
   };
 
-  // === Queries parallel ===
-  const [
-    instructors,
-    businessInstructors,
-    instructorTotal,
-    businessInstructorTotal,
-  ] = await Promise.all([
+  // === Fetch all data (without skip/take) ===
+  const [instructors, businessInstructors] = await Promise.all([
     prisma.instructor.findMany({
       where: whereInstructor,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
           : { createdAt: 'desc' },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            photoUrl: true,
-            bio: true,
-            status: true,
-          },
+          select: { id: true, name: true, email: true, photoUrl: true, bio: true, status: true },
         },
       },
     }),
     prisma.businessInstructor.findMany({
       where: whereBusinessInstructor,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
           : { createdAt: 'desc' },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            photoUrl: true,
-            status: true,
-          },
+          select: { id: true, name: true, email: true, photoUrl: true, status: true },
         },
         company: { select: { id: true, name: true } },
       },
     }),
-    prisma.instructor.count({ where: whereInstructor }),
-    prisma.businessInstructor.count({ where: whereBusinessInstructor }),
   ]);
 
-  // === Normalize result with type flag ===
+  // === Normalize + combine ===
   const normalizedInstructors = instructors.map(i => ({
     ...i,
     type: 'instructor',
@@ -176,13 +133,26 @@ const getCombineInstructorFromDB = async (
 
   const combined = [...normalizedInstructors, ...normalizedBusinessInstructors];
 
+  // === Sort again after merge ===
+  combined.sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return dateB - dateA; // newest first
+  });
+
+  // === Manual Pagination ===
+  const total = combined.length;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedData = combined.slice(startIndex, endIndex);
+
   return {
     meta: {
       page,
       limit,
-      total: instructorTotal + businessInstructorTotal,
+      total,
     },
-    data: combined,
+    data: paginatedData,
   };
 };
 
@@ -212,9 +182,7 @@ const getAllFromDB = async (
     // Nested user search
     orConditions.push({
       user: {
-        OR: [
-          { name: { contains: searchTerm, mode: 'insensitive' } }
-        ],
+        OR: [{ name: { contains: searchTerm, mode: 'insensitive' } }],
       },
     });
 

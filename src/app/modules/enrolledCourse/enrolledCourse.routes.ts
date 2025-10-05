@@ -22,6 +22,11 @@ router.post(
 );
 
 router.get(
+  '/total-enrolled-user',
+  EnrolledCourseController.getEnrolledStudent,
+);
+
+router.get(
   '/student-by-author-course/:authorId',
   auth(
     UserRole.company_admin,

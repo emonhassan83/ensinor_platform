@@ -1094,7 +1094,7 @@ model AffiliateSale {
 model Package {
   id           String              @id @default(uuid())
   title        String
-  type         SubscriptionType   @default(basic)
+  type         SubscriptionType    @default(basic)
   audience     PackageAudience
   features     String[]
   billingCycle PackageBillingCycle
@@ -1111,8 +1111,8 @@ model Package {
 
 model Subscription {
   id            String             @id @default(uuid())
-  packageId     String            
-  userId        String         
+  packageId     String
+  userId        String
   type          SubscriptionType
   transactionId String?
   amount        Float
@@ -1547,31 +1547,46 @@ model Support {
 }
 
 model Newsletter {
-  id           String             @id @default(uuid())
-  title        String
-  content      String
-  category     NewsletterCategory
-  scheduleDate DateTime           @default(now())
-  status       NewsletterStatus   @default(active)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id            String             @id @default(uuid())
+  title         String
+  content       String
+  category      NewsletterCategory
+  scheduleDate  DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  newsletterLog NewsletterLog[]
 
   @@map("newsletters")
 }
 
 model NewsletterSubscriber {
-  id         String               @id @default(uuid())
-  email      String
-  name       String?
-  category   NewsletterCategory[] // multiple preferences
-  recurrence RecurrenceType       @default(once)
-  status     NewsletterStatus     @default(active)
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
+  id            String               @id @default(uuid())
+  email         String
+  name          String?
+  category      NewsletterCategory[] // multiple preferences
+  recurrence    RecurrenceType       @default(once)
+  scheduleDate  DateTime             @default(now())
+  lastSentAt    DateTime?
+  status        NewsletterStatus     @default(active)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
-  // to prevent duplicate subscriptions
-  @@unique([email, category], name: "unique_subscriber_email_category")
+  newsletterLog NewsletterLog[]
+
   @@map("newsletter_subscribers")
+}
+
+model NewsletterLog {
+  id           String   @id @default(uuid())
+  subscriberId String
+  newsletterId String
+  sentAt       DateTime @default(now())
+
+  subscriber NewsletterSubscriber @relation(fields: [subscriberId], references: [id])
+  newsletter Newsletter           @relation(fields: [newsletterId], references: [id])
+
+  @@map("newsletter_logs")
 }
 
 enum RegisterWith {
@@ -1648,6 +1663,7 @@ enum RecurrenceType {
 
 enum NewsletterStatus {
   active
+  paused
   unsubscribed
 }
 
