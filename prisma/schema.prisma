@@ -67,7 +67,7 @@ model User {
   employee                   Employee?
   instructor                 Instructor?
   student                    Student?
-  subscription               Subscription?
+  subscription               Subscription[]
   paymentUserAccount         Payment[]              @relation("PaymentUserAccount")
   PaymentAuthorAccount       Payment[]              @relation("PaymentAuthorAccount")
   reviewRef                  ReviewRef[]
@@ -1104,15 +1104,15 @@ model Package {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
-  subscription Subscription?
+  subscription Subscription[]
 
   @@map("packages")
 }
 
 model Subscription {
   id            String             @id @default(uuid())
-  packageId     String             @unique
-  userId        String             @unique
+  packageId     String            
+  userId        String         
   type          SubscriptionType
   transactionId String?
   amount        Float

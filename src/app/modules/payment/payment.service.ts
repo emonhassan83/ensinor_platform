@@ -281,7 +281,7 @@ const confirmPayment = async (query: Record<string, any>) => {
             status: SubscriptionStatus.active,
             isExpired: false,
           },
-          include: { package: true },
+          include: { package: true, user: true },
         });
 
         if (!sub)
@@ -290,84 +290,93 @@ const confirmPayment = async (query: Record<string, any>) => {
         // compute expiry based on package.billingCycle
         const now = new Date();
         const billingCycleDays =
-          sub.package?.billingCycle === 'annually' ? 365 : 30;
-        let calculatedExpiry = new Date(
+          sub.package?.billingCycle === 'annually'
+            ? 365
+            : sub.package?.billingCycle === 'halfYearly'
+              ? 180
+              : 30;
+
+        let newExpiry = new Date(
           now.getTime() + billingCycleDays * 24 * 60 * 60 * 1000,
         );
 
-        // mark subscription expiry and maybe merge with previous, find previous active subscription for vendor
-        const previous = await tx.subscription.findFirst({
+        // --- Find if user already has active subscription ---
+        const existingSub = await tx.subscription.findFirst({
           where: {
+            userId: sub.userId,
             id: { not: sub.id },
-            paymentStatus: PaymentStatus.paid,
-            status: SubscriptionStatus.active,
-            isDeleted: false,
             isExpired: false,
+            isDeleted: false,
+            paymentStatus: PaymentStatus.paid,
           },
         });
 
-        if (previous) {
-          const isDifferentType = previous.type !== sub.type;
-          if (isDifferentType) {
-            await tx.subscription.update({
-              where: { id: previous.id },
-              data: { isExpired: true, expiredAt: undefined },
-            });
+        if (existingSub) {
+          const remainingDays =
+            existingSub.expiredAt && existingSub.expiredAt > now
+              ? Math.ceil(
+                  (existingSub.expiredAt.getTime() - now.getTime()) /
+                    (1000 * 60 * 60 * 24),
+                )
+              : 0;
 
-            const baseDate =
-              previous.expiredAt && previous.expiredAt > now
-                ? previous.expiredAt
-                : now;
-            const extendedExpiry = new Date(
-              baseDate.getTime() + billingCycleDays * 24 * 60 * 60 * 1000,
-            );
-            await tx.subscription.update({
-              where: { id: sub.id },
-              data: { expiredAt: extendedExpiry },
-            });
-          } else {
-            // same vendorType -> merge extension into previous
-            const extendedExpiry =
-              previous.expiredAt && previous.expiredAt > now
-                ? new Date(
-                    previous.expiredAt.getTime() +
-                      (sub.expiredAt!.getTime() - now.getTime()),
-                  )
-                : sub.expiredAt;
+          const totalDays = billingCycleDays + remainingDays;
+          const extendedExpiry = new Date(
+            now.getTime() + totalDays * 24 * 60 * 60 * 1000,
+          );
 
-            await tx.subscription.update({
-              where: { id: previous.id },
-              data: { expiredAt: extendedExpiry, isExpired: false },
-            });
+          // Mark previous as expired but preserve for record
+          await tx.subscription.update({
+            where: { id: existingSub.id },
+            data: {
+              isExpired: true,
+              isDeleted: true,
+              status: SubscriptionStatus.expired,
+            },
+          });
 
-            // reassign payment to previous and delete new vendorSub
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: { subscriptionId: previous.id },
+          // Update new subscription expiry
+          newExpiry = extendedExpiry;
+          await tx.subscription.update({
+            where: { id: sub.id },
+            data: { expiredAt: newExpiry },
+          });
+        } else {
+          // Set expiry for first-time subscription
+          await tx.subscription.update({
+            where: { id: sub.id },
+            data: { expiredAt: newExpiry },
+          });
+        }
+
+        // --- 1️⃣ Company activation logic ---
+        if (sub.package.audience === PackageAudience.company_admin) {
+          const companyAdmin = await tx.companyAdmin.findUnique({
+            where: { userId: sub.userId },
+            include: { company: true },
+          });
+
+          if (companyAdmin?.company) {
+            await tx.company.update({
+              where: { id: companyAdmin.company.id },
+              data: { isActive: true },
             });
-            await tx.subscription.delete({ where: { id: sub.id } });
           }
         }
 
-        // update user's packageExpiry
-        const finalExpiry = previous?.expiredAt || sub.expiredAt || new Date();
+        // --- Update user's package expiry ---
         await tx.user.update({
           where: { id: sub.userId },
-          data: { packageExpiry: finalExpiry },
+          data: { packageExpiry: newExpiry },
         });
 
-        // update package popularity if you have package model
+        // --- Increment package popularity ---
         if (sub.packageId) {
           await tx.package.update({
             where: { id: sub.packageId },
             data: { popularity: { increment: 1 } },
           });
         }
-      } else {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Invalid model type for payment processing!',
-        );
       }
 
       // notify users & admin

@@ -4,6 +4,7 @@ import cron from 'node-cron';
 import prisma from '../../utils/prisma';
 import {
   PackageAudience,
+  PackageBillingCycle,
   PaymentStatus,
   Prisma,
   SubscriptionStatus,
@@ -164,13 +165,13 @@ const createSubscription = async (payload: ISubscription) => {
   const now = new Date();
   let expiredAt: Date;
 
-  if (pkg.billingCycle === 'annually') {
+  if (pkg.billingCycle === PackageBillingCycle.annually) {
     expiredAt = new Date(now);
     expiredAt.setFullYear(expiredAt.getFullYear() + 1);
-  } else if (pkg.billingCycle === 'halfYearly') {
+  } else if (pkg.billingCycle === PackageBillingCycle.halfYearly) {
     expiredAt = new Date(now);
     expiredAt.setMonth(expiredAt.getMonth() + 6);
-  } else if (pkg.billingCycle === 'monthly') {
+  } else if (pkg.billingCycle === PackageBillingCycle.monthly) {
     expiredAt = new Date(now);
     expiredAt.setMonth(expiredAt.getMonth() + 1);
   } else {
@@ -187,8 +188,8 @@ const createSubscription = async (payload: ISubscription) => {
         packageId: pkg.id,
         type: finalType as any,
         amount: amount,
-        paymentStatus: payload.paymentStatus ?? 'unpaid',
-        status: payload.status ?? 'pending',
+        paymentStatus: payload.paymentStatus ?? PaymentStatus.unpaid,
+        status: payload.status ?? SubscriptionStatus.pending,
         expiredAt: expiredAt,
       },
     });
