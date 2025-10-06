@@ -7,6 +7,7 @@ import { CourseValidation } from './course.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
 import { optionalAuth } from '../../middlewares/optionalAuth';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -20,6 +21,7 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   upload.single('image'),
   parseData(),
   validateRequest(CourseValidation.createValidationSchema),
@@ -43,6 +45,7 @@ router.get('/filter-data', CourseController.getAllFilterDataFromDB);
 router.get(
   '/company/:companyId',
   auth(UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   CourseController.getByCompanyFromDB,
 );
 
@@ -54,6 +57,7 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   CourseController.getMyCourseFromDB,
 );
 
@@ -67,6 +71,7 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   upload.single('image'),
   parseData(),
   validateRequest(CourseValidation.updateValidationSchema),
@@ -76,6 +81,7 @@ router.put(
 router.patch(
   '/course-assign/:id',
   auth(UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   validateRequest(CourseValidation.updateValidationSchema),
   CourseController.assignACourse,
 );
@@ -83,6 +89,7 @@ router.patch(
 router.patch(
   '/status/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   validateRequest(CourseValidation.updateValidationSchema),
   CourseController.changeStatusIntoDB,
 );
@@ -95,6 +102,7 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   CourseController.deleteFromDB,
 );
 

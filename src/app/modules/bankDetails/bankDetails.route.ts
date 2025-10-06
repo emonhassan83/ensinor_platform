@@ -4,6 +4,7 @@ import { BankDetailsValidation } from './bankDetails.validations';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { BankDetailsController } from './bankDetails.controller';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   validateRequest(BankDetailsValidation.createValidationSchema),
   BankDetailsController.insertIntoDB,
 );
@@ -27,6 +29,7 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   validateRequest(BankDetailsValidation.updateValidationSchema),
   BankDetailsController.updateIntoDB,
 );
@@ -39,6 +42,7 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   BankDetailsController.getAllMyFromDB,
 );
 
@@ -58,6 +62,7 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   BankDetailsController.deleteFromDB,
 );
 

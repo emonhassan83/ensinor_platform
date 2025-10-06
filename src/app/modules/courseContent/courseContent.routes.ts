@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client';
 import { CourseContentValidation } from './courseContent.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -19,6 +20,7 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   upload.single('content'),
   parseData(),
   validateRequest(CourseContentValidation.createValidationSchema),
@@ -37,6 +39,7 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   upload.single('content'),
   parseData(),
   validateRequest(CourseContentValidation.updateValidationSchema),
@@ -51,6 +54,7 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   CourseContentController.deleteFromDB,
 );
 

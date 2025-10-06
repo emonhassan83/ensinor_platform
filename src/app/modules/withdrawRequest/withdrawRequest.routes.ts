@@ -4,12 +4,18 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { WithdrawRequestValidation } from './withdrawRequest.validation';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.company_admin,
+    UserRole.instructor,
+    UserRole.business_instructors,
+  ),
+  checkCompanyAdminSubscription(),
   validateRequest(WithdrawRequestValidation.createValidationSchema),
   WithdrawRequestController.insertIntoDB,
 );
@@ -21,6 +27,7 @@ router.get(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
+  checkCompanyAdminSubscription(),
   WithdrawRequestController.getAuthorPayout,
 );
 
@@ -36,7 +43,17 @@ router.get(
   WithdrawRequestController.getAllFromDB,
 );
 
-router.get('/:id', WithdrawRequestController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.instructor,
+    UserRole.business_instructors,
+  ),
+  checkCompanyAdminSubscription(),
+  WithdrawRequestController.getByIdFromDB,
+);
 
 router.patch(
   '/status/:id',
@@ -47,7 +64,13 @@ router.patch(
 
 router.delete(
   '/:id',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.instructor,
+    UserRole.business_instructors,
+  ),
+  checkCompanyAdminSubscription(),
   WithdrawRequestController.deleteFromDB,
 );
 

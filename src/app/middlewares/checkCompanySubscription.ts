@@ -12,7 +12,7 @@ import ApiError from '../errors/ApiError';
 
 const checkCompanyAdminSubscription = () => {
   return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const userId = req.user?._id;
+    const userId = req.user?.userId;
     const userRole = req.user?.role;
 
     // 1️⃣ If not company admin, allow

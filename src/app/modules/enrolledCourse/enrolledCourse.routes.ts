@@ -4,6 +4,7 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { EnrolledCourseValidation } from './enrolledCourse.validation';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   EnrolledCourseController.getStudentByAuthorCourse,
 );
 
@@ -80,6 +82,7 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
+  checkCompanyAdminSubscription(),
   validateRequest(EnrolledCourseValidation.updateValidationSchema),
   EnrolledCourseController.updateIntoDB,
 );

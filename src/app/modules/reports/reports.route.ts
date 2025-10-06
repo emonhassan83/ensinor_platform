@@ -2,6 +2,7 @@ import express from 'express';
 import { ReportsController } from './reports.controller';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
+import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -37,19 +38,22 @@ router.get(
 
 router.get(
   '/course-completion-reports/:companyId',
-  auth(UserRole.super_admin),
+  auth(UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   ReportsController.courseCompletionReports,
 );
 
 router.get(
   '/quiz-reports/:companyId',
-  auth(UserRole.super_admin),
+  auth(UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   ReportsController.quizReports,
 );
 
 router.get(
   '/attendance-reports/:companyId',
-  auth(UserRole.super_admin),
+  auth(UserRole.company_admin),
+  checkCompanyAdminSubscription(),
   ReportsController.attendanceReports,
 );
 
