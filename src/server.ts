@@ -5,6 +5,7 @@ import initializeSocketIO from './socket';
 import { seeder } from './app/seeder/seed';
 import { scheduleExpiredUserCleanup } from './app/utils/cleanupExpiredUsers';
 import { newsletterScheduleCorn } from './app/modules/newsletter/newsletter.utils';
+import { cleanupCouponsAndPromos } from './app/modules/orders/orders.utils';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
 
@@ -15,6 +16,7 @@ const main = async () => {
     seeder.seedContents();
     scheduleExpiredUserCleanup();
     newsletterScheduleCorn();
+    cleanupCouponsAndPromos();
 
     server = app.listen(Number(config.port), config.ip as string, () => {
       console.log(

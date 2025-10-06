@@ -2,6 +2,7 @@ import { CouponModel, OrderModelType, PromoCodeModel } from '@prisma/client';
 import httpStatus from 'http-status';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import cron from 'node-cron';
 
 // 🔹 Config for model mapping
 const modelConfig: Record<OrderModelType, { model: any; priceField: string }> =
@@ -58,7 +59,6 @@ export const validateCoupon = async (
     where: {
       code: couponCode,
       isActive: true,
-      expireAt: { gte: new Date() },
       modelType,
       OR: [
         { bookId: modelType === 'book' ? referenceId : null },
@@ -70,6 +70,15 @@ export const validateCoupon = async (
 
   if (!coupon)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon invalid for this item!');
+
+  // Check expiration
+  if (new Date() > coupon.expireAt) {
+    await prisma.coupon.update({
+      where: { id: coupon.id },
+      data: { isActive: false },
+    });
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon has expired!');
+  }
 
   if (coupon.maxUsage && coupon.usedCount >= coupon.maxUsage) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon usage limit reached!');
@@ -105,7 +114,6 @@ export const validatePromo = async (
     where: {
       code: promoCode,
       isActive: true,
-      expireAt: { gte: new Date() },
       modelType,
       OR: [
         { bookId: modelType === 'book' ? referenceId : null },
@@ -121,17 +129,29 @@ export const validatePromo = async (
       'Promo code invalid for this item!',
     );
 
+  // Check expiration
+  if (new Date() > promo.expireAt) {
+    await prisma.promoCode.update({
+      where: { id: promo.id },
+      data: { isActive: false },
+    });
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Promo code has expired!');
+  }
+
   if (promo.maxUsage && promo.usedCount >= promo.maxUsage) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Promo usage limit reached!');
   }
 
-   const updatedPromo = await prisma.promoCode.update({
+  const updatedPromo = await prisma.promoCode.update({
     where: { id: promo.id },
     data: { usedCount: { increment: 1 } },
   });
 
-   // if maxUsage reached, set isActive to false
-  if (updatedPromo.maxUsage && updatedPromo.usedCount >= updatedPromo.maxUsage) {
+  // if maxUsage reached, set isActive to false
+  if (
+    updatedPromo.maxUsage &&
+    updatedPromo.usedCount >= updatedPromo.maxUsage
+  ) {
     await prisma.promoCode.update({
       where: { id: promo.id },
       data: { isActive: false },
@@ -176,3 +196,38 @@ export function calculateRevenue(finalAmount: number, orderData: any) {
 
   return { instructorShare, platformShare, affiliateShare };
 }
+
+
+// ✅ Cleanup expired or inactive coupons & promo codes Runs every day at 2:00 AM
+export const cleanupCouponsAndPromos = () => {
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      const now = new Date();
+
+      // Delete expired or inactive coupons
+      const deletedCoupons = await prisma.coupon.deleteMany({
+        where: {
+          OR: [
+            { isActive: false },
+            { expireAt: { lt: now } },
+          ],
+        },
+      });
+      console.log(`Deleted ${deletedCoupons.count} expired/inactive coupons.`);
+
+      // Delete expired or inactive promo codes
+      const deletedPromos = await prisma.promoCode.deleteMany({
+        where: {
+          OR: [
+            { isActive: false },
+            { expireAt: { lt: now } },
+          ],
+        },
+      });
+      console.log(`Deleted ${deletedPromos.count} expired/inactive promo codes.`);
+
+    } catch (error: any) {
+      console.error('Error cleaning up coupons and promo codes:', error.message);
+    }
+  });
+};
