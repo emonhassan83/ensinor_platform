@@ -2,6 +2,7 @@ import {
   CoInstructor,
   CoursesStatus,
   Prisma,
+  SubscriptionStatus,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -27,7 +28,10 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
       id: invitedById,
       status: UserStatus.active,
       isDeleted: false,
-      role: { in: [UserRole.instructor, UserRole.business_instructors] }, // adjust your roles enum
+      role: { in: [UserRole.instructor, UserRole.business_instructors] },
+    },
+    include: {
+      subscription: true,
     },
   });
   if (!inviter) {
@@ -36,6 +40,25 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
       'Inviter not found or not eligible',
     );
   }
+
+    // 🧭 1.1 Validate instructor’s active subscription
+  if (inviter.role === UserRole.instructor) {
+    const activeSubscription = inviter.subscription.find(
+      (sub) =>
+        sub.status === SubscriptionStatus.active &&
+        sub.isExpired === false &&
+        sub.isDeleted === false &&
+        new Date(sub.expiredAt) > new Date()
+    );
+
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'You need an active subscription to invite a co-instructor.'
+      );
+    }
+  }
+
 
   // 2️⃣ Validate course
   const course = await prisma.course.findFirst({

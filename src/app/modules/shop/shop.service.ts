@@ -3,6 +3,7 @@ import {
   BookStatus,
   PlatformType,
   Prisma,
+  SubscriptionStatus,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -21,16 +22,7 @@ import { findAdmin } from '../../utils/findAdmin';
 const insertIntoDB = async (payload: IShop, files: any) => {
   const { authorId, platform } = payload;
 
-  // // 🔹 1. If platform = admin → auto assign super admin
-  // if (platform === PlatformType.admin) {
-  //   const admin = await findAdmin();
-  //   if (!admin) {
-  //     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
-  //   }
-  //   payload.authorId = admin.id;
-  // }
-
-  // 🔹 2. Validate author user
+  // 🔹 1. Validate author user
   const author = await prisma.user.findFirst({
     where: {
       id: authorId,
@@ -40,6 +32,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     include: {
       companyAdmin: { select: { company: { select: { id: true } } } },
       businessInstructor: { select: { company: { select: { id: true } } } },
+      subscription: true,
     },
   });
   if (!author) {
@@ -48,6 +41,23 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 
   let company: any = null;
   let companyAuthor: any = null;
+
+  // 2️. If author is an instructor → check subscription
+  if (author.role === UserRole.instructor) {
+    const activeSubscription = author.subscription.find(
+      sub =>
+        sub.status === SubscriptionStatus.active &&
+        sub.isExpired === false &&
+        sub.isDeleted === false &&
+        new Date(sub.expiredAt) > new Date(),
+    );
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'You need an active subscription to add shop/book items.',
+      );
+    }
+  }
 
   // 🔹 3. If platform = company → validate company & company admin
   if (platform === PlatformType.company) {
@@ -68,7 +78,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
       payload.companyId = author.businessInstructor?.company!.id;
     }
 
-    // Validate company
+    // 4. Validate company
     company = await prisma.company.findFirst({
       where: { id: payload.companyId, isDeleted: false },
       include: {
@@ -107,7 +117,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     }
   }
 
-  // 4. upload thumbnail and file
+  // 5. upload thumbnail and file
   if (files) {
     const { thumbnail, file } = files as UploadedFiles;
 
@@ -128,7 +138,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     }
   }
 
-  //🔹 5. Create record
+  //🔹 6. Create record
   const result = await prisma.book.create({
     data: payload,
   });
@@ -136,7 +146,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
   }
 
-  // 🔹 6. Send notification
+  // 🔹 7. Send notification
   if (platform === PlatformType.admin) {
     const admin = await findAdmin();
     if (!admin) throw new Error('Super admin not found!');

@@ -1,4 +1,10 @@
-import { Course, CourseBundle, Prisma, UserStatus } from '@prisma/client';
+import {
+  CourseBundle,
+  Prisma,
+  SubscriptionStatus,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -21,9 +27,29 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       status: UserStatus.active,
       isDeleted: false,
     },
+    include: {
+      subscription: true,
+    },
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found or inactive!');
+  }
+
+  // If author is an instructor → check subscription
+  if (author.role === UserRole.instructor) {
+    const activeSubscription = author.subscription.find(
+      sub =>
+        sub.status === SubscriptionStatus.active &&
+        sub.isExpired === false &&
+        sub.isDeleted === false &&
+        new Date(sub.expiredAt) > new Date(),
+    );
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'You need an active subscription to add bundle course items.',
+      );
+    }
   }
 
   // Validate Courses belong to this author
@@ -94,7 +120,7 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     })) as string;
   }
 
-   // 🔹 Set free flag if price = 0
+  // 🔹 Set free flag if price = 0
   if (typeof payload.price === 'number' && payload.price === 0) {
     payload.isFreeCourse = true;
   }
