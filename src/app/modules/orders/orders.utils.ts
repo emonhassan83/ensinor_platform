@@ -1,40 +1,37 @@
-
-import { CouponModel, OrderModelType, PromoCodeModel } from "@prisma/client";
-import httpStatus from "http-status";
-import prisma from "../../utils/prisma";
-import ApiError from "../../errors/ApiError";
+import { CouponModel, OrderModelType, PromoCodeModel } from '@prisma/client';
+import httpStatus from 'http-status';
+import prisma from '../../utils/prisma';
+import ApiError from '../../errors/ApiError';
 
 // 🔹 Config for model mapping
-const modelConfig: Record<
-  OrderModelType,
-  { model: any; priceField: string }
-> = {
-  [OrderModelType.book]: {
-    model: prisma.book,
-    priceField: "price",
-  },
-  [OrderModelType.course]: {
-    model: prisma.course,
-    priceField: "price",
-  },
-  [OrderModelType.courseBundle]: {
-    model: prisma.courseBundle,
-    priceField: "price",
-  },
-  [OrderModelType.event]: {
-    model: prisma.event,
-    priceField: "price",
-  },
-};
+const modelConfig: Record<OrderModelType, { model: any; priceField: string }> =
+  {
+    [OrderModelType.book]: {
+      model: prisma.book,
+      priceField: 'price',
+    },
+    [OrderModelType.course]: {
+      model: prisma.course,
+      priceField: 'price',
+    },
+    [OrderModelType.courseBundle]: {
+      model: prisma.courseBundle,
+      priceField: 'price',
+    },
+    [OrderModelType.event]: {
+      model: prisma.event,
+      priceField: 'price',
+    },
+  };
 
 // 🔹 Fetch Entity by Type
 export const fetchEntity = async (
   modelType: OrderModelType,
-  referenceId: string
+  referenceId: string,
 ) => {
   const config = modelConfig[modelType];
   if (!config) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid model type!");
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid model type!');
   }
 
   const entity = await config.model.findFirst({
@@ -44,7 +41,7 @@ export const fetchEntity = async (
   if (!entity) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
-      `${modelType} with id ${referenceId} not found!`
+      `${modelType} with id ${referenceId} not found!`,
     );
   }
 
@@ -52,7 +49,11 @@ export const fetchEntity = async (
 };
 
 // 🔹 Validate Coupon
-export const validateCoupon = async (couponCode: string, modelType: CouponModel, referenceId: string) => {
+export const validateCoupon = async (
+  couponCode: string,
+  modelType: CouponModel,
+  referenceId: string,
+) => {
   const coupon = await prisma.coupon.findFirst({
     where: {
       code: couponCode,
@@ -67,24 +68,39 @@ export const validateCoupon = async (couponCode: string, modelType: CouponModel,
     },
   });
 
-  if (!coupon) throw new ApiError(httpStatus.BAD_REQUEST, "Coupon invalid for this item!");
+  if (!coupon)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon invalid for this item!');
 
   if (coupon.maxUsage && coupon.usedCount >= coupon.maxUsage) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Coupon usage limit reached!");
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon usage limit reached!');
   }
 
   // increment usage
-  await prisma.coupon.update({
+  const updatedCoupon = await prisma.coupon.update({
     where: { id: coupon.id },
     data: { usedCount: { increment: 1 } },
   });
 
+  // if maxUsage reached, set isActive to false
+  if (
+    updatedCoupon.maxUsage &&
+    updatedCoupon.usedCount >= updatedCoupon.maxUsage
+  ) {
+    await prisma.coupon.update({
+      where: { id: coupon.id },
+      data: { isActive: false },
+    });
+  }
+
   return coupon;
 };
 
-
 // 🔹 Validate Promo
-export const validatePromo = async (promoCode: string, modelType: PromoCodeModel, referenceId: string) => {
+export const validatePromo = async (
+  promoCode: string,
+  modelType: PromoCodeModel,
+  referenceId: string,
+) => {
   const promo = await prisma.promoCode.findFirst({
     where: {
       code: promoCode,
@@ -99,16 +115,28 @@ export const validatePromo = async (promoCode: string, modelType: PromoCodeModel
     },
   });
 
-  if (!promo) throw new ApiError(httpStatus.BAD_REQUEST, "Promo code invalid for this item!");
+  if (!promo)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Promo code invalid for this item!',
+    );
 
   if (promo.maxUsage && promo.usedCount >= promo.maxUsage) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "Promo usage limit reached!");
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Promo usage limit reached!');
   }
 
-  await prisma.promoCode.update({
+   const updatedPromo = await prisma.promoCode.update({
     where: { id: promo.id },
     data: { usedCount: { increment: 1 } },
   });
+
+   // if maxUsage reached, set isActive to false
+  if (updatedPromo.maxUsage && updatedPromo.usedCount >= updatedPromo.maxUsage) {
+    await prisma.promoCode.update({
+      where: { id: promo.id },
+      data: { isActive: false },
+    });
+  }
 
   return promo;
 };
@@ -120,7 +148,7 @@ export const validateAffiliate = async (affiliateId: string) => {
   });
 
   if (!affiliate) {
-    throw new ApiError(httpStatus.NOT_FOUND, "Affiliate not found!");
+    throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate not found!');
   }
   return affiliate;
 };

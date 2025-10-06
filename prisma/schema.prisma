@@ -997,6 +997,7 @@ model Coupon {
   maxUsage  Int?
   usedCount Int      @default(0)
   expireAt  DateTime
+  isGlobal  Boolean  @default(false)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1025,6 +1026,7 @@ model PromoCode {
   maxUsage  Int?
   usedCount Int            @default(0)
   expireAt  DateTime
+  isGlobal  Boolean        @default(false)
   isActive  Boolean        @default(true)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -1794,12 +1796,14 @@ enum CourseLevel {
 }
 
 enum CouponModel {
+  global
   course
   event
   book
 }
 
 enum PromoCodeModel {
+  global
   course
   event
   book

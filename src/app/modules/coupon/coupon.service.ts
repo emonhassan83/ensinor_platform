@@ -1,4 +1,10 @@
-import { Coupon, CouponModel, Prisma, UserStatus } from '@prisma/client';
+import {
+  Coupon,
+  CouponModel,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { ICoupon, ICouponFilterRequest } from './coupon.interface';
@@ -26,6 +32,19 @@ const insertIntoDB = async (payload: ICoupon) => {
   });
   if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
 
+  // set global coupon if author super admin
+  payload.isGlobal = author.role === UserRole.super_admin;
+  if (payload.isGlobal) {
+    if (bookId || courseId || eventId) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Global coupon cannot be linked to a specific book, course, or event!',
+      );
+    }
+
+    payload.modelType = CouponModel.global;
+  }
+
   // 2️⃣ Validate discount
   if (discount <= 0)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Discount must be positive!');
@@ -42,90 +61,92 @@ const insertIntoDB = async (payload: ICoupon) => {
   if (existing)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists!');
 
-  // 5️⃣ Validate model-specific reference + active coupon check
-  let referenceWhere: any = { authorId, isActive: true };
+  if (!payload.isGlobal) {
+    // 5️⃣ Validate model-specific reference + active coupon check
+    let referenceWhere: any = { authorId, isActive: true };
 
-  switch (modelType) {
-    case CouponModel.book:
-      if (!bookId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Book ID is required for BOOK coupon!',
-        );
-      const book = await prisma.book.findFirst({
-        where: { id: bookId, authorId, isDeleted: false },
-      });
-      if (!book)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Book not found or does not belong to author!',
-        );
+    switch (modelType) {
+      case CouponModel.book:
+        if (!bookId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Book ID is required for BOOK coupon!',
+          );
+        const book = await prisma.book.findFirst({
+          where: { id: bookId, authorId, isDeleted: false },
+        });
+        if (!book)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Book not found or does not belong to author!',
+          );
 
-      // Check active coupon for this book
-      const existingBookCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.book, bookId },
-      });
-      if (existingBookCoupon)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An active coupon already exists for this book!',
-        );
-      break;
+        // Check active coupon for this book
+        const existingBookCoupon = await prisma.coupon.findFirst({
+          where: { ...referenceWhere, modelType: CouponModel.book, bookId },
+        });
+        if (existingBookCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active coupon already exists for this book!',
+          );
+        break;
 
-    case CouponModel.course:
-      if (!courseId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Course ID is required for COURSE coupon!',
-        );
-      const course = await prisma.course.findFirst({
-        where: { id: courseId, isDeleted: false },
-      });
-      if (!course)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Course not found !',
-        );
+      case CouponModel.course:
+        if (!courseId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Course ID is required for COURSE coupon!',
+          );
+        const course = await prisma.course.findFirst({
+          where: { id: courseId, isDeleted: false },
+        });
+        if (!course)
+          throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found !');
 
-      // Check active coupon for this course
-      const existingCourseCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.course, courseId },
-      });
-      if (existingCourseCoupon)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An active coupon already exists for this course!',
-        );
-      break;
+        // Check active coupon for this course
+        const existingCourseCoupon = await prisma.coupon.findFirst({
+          where: { ...referenceWhere, modelType: CouponModel.course, courseId },
+        });
+        if (existingCourseCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active coupon already exists for this course!',
+          );
+        break;
 
-    case CouponModel.event:
-      if (!eventId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Event ID is required for EVENT coupon!',
-        );
-      const event = await prisma.event.findFirst({
-        where: { id: eventId, authorId, isDeleted: false },
-      });
-      if (!event)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Event not found or does not belong to author!',
-        );
+      case CouponModel.event:
+        if (!eventId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Event ID is required for EVENT coupon!',
+          );
+        const event = await prisma.event.findFirst({
+          where: { id: eventId, authorId, isDeleted: false },
+        });
+        if (!event)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Event not found or does not belong to author!',
+          );
 
-      // Check active coupon for this event
-      const existingEventCoupon = await prisma.coupon.findFirst({
-        where: { ...referenceWhere, modelType: CouponModel.event, eventId },
-      });
-      if (existingEventCoupon)
+        // Check active coupon for this event
+        const existingEventCoupon = await prisma.coupon.findFirst({
+          where: { ...referenceWhere, modelType: CouponModel.event, eventId },
+        });
+        if (existingEventCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active coupon already exists for this event!',
+          );
+        break;
+
+      default:
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          'An active coupon already exists for this event!',
+          'Invalid coupon model type!',
         );
-      break;
-
-    default:
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid coupon model type!');
+    }
   }
 
   // 6️⃣ Validate maxUsage
@@ -152,7 +173,7 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CouponWhereInput[] = [];
+  const andConditions: Prisma.CouponWhereInput[] = [{ isActive: true }];
   if (authorId) {
     andConditions.push({ authorId });
   }
@@ -208,21 +229,21 @@ const getAllFromDB = async (
         select: {
           id: true,
           title: true,
-          thumbnail: true
+          thumbnail: true,
         },
       },
       book: {
         select: {
           id: true,
           title: true,
-          thumbnail: true
+          thumbnail: true,
         },
       },
       event: {
         select: {
           id: true,
           title: true,
-          thumbnail: true
+          thumbnail: true,
         },
       },
     },
@@ -289,6 +310,27 @@ const updateIntoDB = async (
   return result;
 };
 
+const changedActiveStatusIntoDB = async (id: string): Promise<Coupon> => {
+  const coupon = await prisma.coupon.findFirst({
+    where: { id },
+  });
+  if (!coupon) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Coupon not found!');
+  }
+
+  // Toggle the isActive field
+  const result = await prisma.coupon.update({
+    where: { id },
+    data: { isActive: !coupon.isActive },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Coupon not updated!');
+  }
+
+  return result;
+};
+
 const deleteFromDB = async (id: string): Promise<Coupon> => {
   const coupon = await prisma.coupon.findFirst({
     where: { id },
@@ -312,5 +354,6 @@ export const CouponService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedActiveStatusIntoDB,
   deleteFromDB,
 };

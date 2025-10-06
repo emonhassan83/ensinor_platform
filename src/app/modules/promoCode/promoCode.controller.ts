@@ -83,6 +83,18 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const changedActiveStatus = catchAsync(async (req, res) => {
+  const result = await PromoCodeService.changedActiveStatusIntoDB(
+    req.params.id
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Promo code active status updated!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await PromoCodeService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -100,5 +112,6 @@ export const PromoCodeController = {
   getMyPromoCodesFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedActiveStatus,
   deleteFromDB,
 };

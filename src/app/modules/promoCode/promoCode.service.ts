@@ -1,4 +1,10 @@
-import { Prisma, PromoCode, PromoCodeModel, UserStatus } from '@prisma/client';
+import {
+  Prisma,
+  PromoCode,
+  PromoCodeModel,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IPromoCode, IPromoCodeFilterRequest } from './promoCode.interface';
@@ -26,6 +32,19 @@ const insertIntoDB = async (payload: IPromoCode) => {
   });
   if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
 
+  // set global promo if author super admin
+  payload.isGlobal = author.role === UserRole.super_admin;
+  if (payload.isGlobal) {
+    if (bookId || courseId || eventId) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Global promo cannot be linked to a specific book, course, or event!',
+      );
+    }
+
+    payload.modelType = PromoCodeModel.global;
+  }
+
   // 2️⃣ Validate discount
   if (discount <= 0)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Discount must be positive!');
@@ -45,94 +64,97 @@ const insertIntoDB = async (payload: IPromoCode) => {
       'PromoCode code already exists!',
     );
 
-  // 5️⃣ Validate model-specific reference + active coupon check
-  let referenceWhere: any = { authorId, isActive: true };
+  if (!payload.isGlobal) {
+    // 5️⃣ Validate model-specific reference + active coupon check
+    let referenceWhere: any = { authorId, isActive: true };
 
-  switch (modelType) {
-    case PromoCodeModel.book:
-      if (!bookId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Book ID is required for BOOK promo!',
-        );
-      const book = await prisma.book.findFirst({
-        where: { id: bookId, authorId, isDeleted: false },
-      });
-      if (!book)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Book not found or does not belong to author!',
-        );
+    switch (modelType) {
+      case PromoCodeModel.book:
+        if (!bookId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Book ID is required for BOOK promo!',
+          );
+        const book = await prisma.book.findFirst({
+          where: { id: bookId, authorId, isDeleted: false },
+        });
+        if (!book)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Book not found or does not belong to author!',
+          );
 
-      // Check active promo for this book
-      const existingBookPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: PromoCodeModel.book, bookId },
-      });
-      if (existingBookPromo)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An active promo already exists for this book!',
-        );
-      break;
+        // Check active promo for this book
+        const existingBookPromo = await prisma.promoCode.findFirst({
+          where: { ...referenceWhere, modelType: PromoCodeModel.book, bookId },
+        });
+        if (existingBookPromo)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active promo already exists for this book!',
+          );
+        break;
 
-    case PromoCodeModel.course:
-      if (!courseId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Course ID is required for COURSE promo!',
-        );
-      const course = await prisma.course.findFirst({
-        where: { id: courseId, isDeleted: false },
-      });
-      if (!course)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Course not found !',
-        );
+      case PromoCodeModel.course:
+        if (!courseId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Course ID is required for COURSE promo!',
+          );
+        const course = await prisma.course.findFirst({
+          where: { id: courseId, isDeleted: false },
+        });
+        if (!course)
+          throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found !');
 
-      // Check active promo for this course
-      const existingCoursePromo = await prisma.promoCode.findFirst({
-        where: {
-          ...referenceWhere,
-          modelType: PromoCodeModel.course,
-          courseId,
-        },
-      });
-      if (existingCoursePromo)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An active promo already exists for this course!',
-        );
-      break;
+        // Check active promo for this course
+        const existingCoursePromo = await prisma.promoCode.findFirst({
+          where: {
+            ...referenceWhere,
+            modelType: PromoCodeModel.course,
+            courseId,
+          },
+        });
+        if (existingCoursePromo)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active promo already exists for this course!',
+          );
+        break;
 
-    case PromoCodeModel.event:
-      if (!eventId)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Event ID is required for EVENT promo!',
-        );
-      const event = await prisma.event.findFirst({
-        where: { id: eventId, authorId, isDeleted: false },
-      });
-      if (!event)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Event not found or does not belong to author!',
-        );
+      case PromoCodeModel.event:
+        if (!eventId)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Event ID is required for EVENT promo!',
+          );
+        const event = await prisma.event.findFirst({
+          where: { id: eventId, authorId, isDeleted: false },
+        });
+        if (!event)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'Event not found or does not belong to author!',
+          );
 
-      // Check active promo for this event
-      const existingEventPromo = await prisma.promoCode.findFirst({
-        where: { ...referenceWhere, modelType: PromoCodeModel.event, eventId },
-      });
-      if (existingEventPromo)
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An active promo already exists for this event!',
-        );
-      break;
+        // Check active promo for this event
+        const existingEventPromo = await prisma.promoCode.findFirst({
+          where: {
+            ...referenceWhere,
+            modelType: PromoCodeModel.event,
+            eventId,
+          },
+        });
+        if (existingEventPromo)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'An active promo already exists for this event!',
+          );
+        break;
 
-    default:
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid promo model type!');
+      default:
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid promo model type!');
+    }
   }
 
   // 6️⃣ Validate maxUsage
@@ -296,6 +318,25 @@ const updateIntoDB = async (
   return result;
 };
 
+const changedActiveStatusIntoDB = async (id: string): Promise<PromoCode> => {
+  const promoCode = await prisma.promoCode.findFirst({
+    where: { id },
+  });
+  if (!promoCode) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Promo code not found!');
+  }
+
+  const result = await prisma.promoCode.update({
+    where: { id },
+    data: { isActive: !promoCode.isActive },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Promo code not updated!');
+  }
+
+  return result;
+};
+
 const deleteFromDB = async (id: string): Promise<PromoCode> => {
   const promoCode = await prisma.promoCode.findFirst({
     where: { id },
@@ -319,5 +360,6 @@ export const PromoCodeService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedActiveStatusIntoDB,
   deleteFromDB,
 };

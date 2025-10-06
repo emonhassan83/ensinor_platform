@@ -21,16 +21,16 @@ router.post(
 
 router.get('/', PromoCodeController.getAllFromDB);
 
-// router.get(
-//   '/reference/:referenceId',
-//   auth(
-//     UserRole.super_admin,
-//     UserRole.company_admin,
-//     UserRole.business_instructors,
-//     UserRole.instructor,
-//   ),
-//   PromoCodeController.getAllByReferenceFromDB,
-// );
+router.get(
+  '/status/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  PromoCodeController.changedActiveStatus,
+);
 
 router.get(
   '/my-promo-code',

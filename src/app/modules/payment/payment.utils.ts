@@ -4,6 +4,7 @@ import { findAdmin } from '../../utils/findAdmin';
 import { messages } from '../notification/notification.constant';
 import { NotificationModeType, Payment } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
+import emailSender from '../../utils/emailSender';
 
 const stripe: Stripe = new Stripe(config.stripe?.stripe_api_secret as string, {
   apiVersion: '2025-08-27.basil',
@@ -94,4 +95,39 @@ export const paymentNotifyToUser = async (
     description,
     modeType: NotificationModeType.payment,
   });
+};
+
+export const sendOrderConfirmationAndDocumentsEmail = async (
+  user: any,
+  order: any,
+) => {
+  if (!user?.email) return;
+
+  const pdfFiles = order.files?.filter((file: string) => file) || [];
+  if (pdfFiles.length === 0) return;
+
+  const zipDownloadLink = `
+    <div style="margin: 20px 0;">
+      <a href="${config.server_url}/download/order/${order.id}"
+         style="background-color: #28a745; color: white; padding: 12px 20px;
+         border-radius: 5px; text-decoration: none;" target="_blank">
+        📥 Download Your eBooks (ZIP)
+      </a>
+    </div>
+  `;
+
+  const subject = `🎉 Congratulations ${user.name || ''}! Your Book Purchase is Confirmed`;
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;
+    padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+      <h2 style="color: #333;">Thank You for Your Purchase!</h2>
+      <p>Hi ${user.name || 'there'},</p>
+      <p>Congratulations on your successful purchase! Your books are ready to download.</p>
+      ${zipDownloadLink}
+      <p>If you have any questions, feel free to contact our support team anytime.</p>
+      <p style="margin-top: 10px;">— The Team</p>
+    </div>
+  `;
+
+  await emailSender(user.email, subject, htmlContent);
 };

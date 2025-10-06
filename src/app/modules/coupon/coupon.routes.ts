@@ -21,24 +21,25 @@ router.post(
 
 router.get('/', CouponController.getAllFromDB);
 
-// router.get(
-//   '/reference/:referenceId',
-//   auth(UserRole.super_admin),
-//   CouponController.getAllByReferenceFromDB,
-// );
-
 router.get(
-  '/my-coupon',
+  '/reference/:referenceId',
+  auth(UserRole.super_admin),
+  CouponController.getAllByReferenceFromDB,
+);
+
+
+router.get('/:id', CouponController.getByIdFromDB);
+
+router.patch(
+  '/status/:id',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  CouponController.getMyCouponsFromDB,
+  CouponController.changedActiveStatus,
 );
-
-router.get('/:id', CouponController.getByIdFromDB);
 
 router.put(
   '/:id',

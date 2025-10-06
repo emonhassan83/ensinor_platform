@@ -23,6 +23,7 @@ import {
   createCheckoutSession,
   paymentNotifyToAdmin,
   paymentNotifyToUser,
+  sendOrderConfirmationAndDocumentsEmail,
 } from './payment.utils';
 import { findAdmin } from '../../utils/findAdmin';
 import { generateTransactionId } from '../../utils/generateTransctionId';
@@ -262,8 +263,8 @@ const confirmPayment = async (query: Record<string, any>) => {
           }
         }
 
-        // 3. Update Order Payment Status ---
-        await tx.order.update({
+        // --- 3️. Update order status ---
+        const updatedOrder = await tx.order.update({
           where: { id: order.id },
           data: {
             transactionId: payment.transactionId,
@@ -271,7 +272,25 @@ const confirmPayment = async (query: Record<string, any>) => {
             status: OrderStatus.completed,
             isDeleted: false,
           },
+          include: {
+            orderItem: { include: { book: true } },
+            user: true,
+          },
         });
+        console.log(JSON.stringify(updatedOrder, null, 2));
+
+        // --- 4️. Send email with book PDFs (if any) ---
+        const bookFiles =
+          updatedOrder.orderItem
+            ?.filter(item => item.modelType === 'book' && item.book?.file)
+            ?.map(item => item.book!.file) || [];
+            
+        if (bookFiles.length > 0) {
+          await sendOrderConfirmationAndDocumentsEmail(updatedOrder.user, {
+            ...updatedOrder,
+            documents: bookFiles,
+          });
+        }
       } else if (payment.modelType === PaymentModelType.subscription) {
         const sub = await tx.subscription.update({
           where: { id: payment.subscriptionId ?? undefined },

@@ -83,6 +83,18 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const changedActiveStatus = catchAsync(async (req, res) => {
+  const result = await CouponService.changedActiveStatusIntoDB(
+    req.params.id
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Coupon active status updated!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CouponService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -100,5 +112,6 @@ export const CouponController = {
   getMyCouponsFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedActiveStatus,
   deleteFromDB,
 };

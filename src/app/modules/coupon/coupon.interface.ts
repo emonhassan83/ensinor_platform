@@ -17,4 +17,5 @@ export type ICoupon = {
   code: string;
   discount: number;
   maxUsage: number;
+  isGlobal?: boolean
 };

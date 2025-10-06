@@ -18,4 +18,5 @@ export type IPromoCode = {
   code: string;
   discount: number;
   maxUsage: number;
+  isGlobal?: boolean;
 };
