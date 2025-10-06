@@ -19,4 +19,5 @@ export type IShop = {
   thumbnail: string;
   file: string;
   publishedDate: string;
+  language: string
 };

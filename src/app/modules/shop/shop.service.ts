@@ -259,31 +259,37 @@ const getAllFromDB = async (
 };
 
 const getAllCategoryFromDB = async () => {
-  const andConditions: Prisma.BookWhereInput[] = [
-    { status: BookStatus.published, isDeleted: false },
-  ];
-
   const whereConditions: Prisma.BookWhereInput = {
-    AND: andConditions,
+    status: BookStatus.published,
+    isDeleted: false,
   };
 
-  const result = await prisma.book.groupBy({
+  // 📚 1️⃣ Get unique categories + count
+  const categoryResult = await prisma.book.groupBy({
     by: ['category'],
     where: whereConditions,
     _count: { category: true },
-    orderBy: {
-      category: 'asc', // alphabetically
-    },
+    orderBy: { category: 'asc' },
   });
 
-  // Format result: unique categories + their counts
-  const categories = result.map(item => ({
+  const categories = categoryResult.map(item => ({
     name: item.category,
     count: item._count.category,
   }));
 
+  // 🌐 2️⃣ Get unique languages
+  const languageResult = await prisma.book.findMany({
+    where: whereConditions,
+    distinct: ['language'], // ✅ ensures unique languages
+    select: { language: true },
+    orderBy: { language: 'asc' },
+  });
+
+  const languages = languageResult.map(item => item.language);
+
   return {
-    data: categories,
+    categories,
+    languages,
   };
 };
 

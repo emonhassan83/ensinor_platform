@@ -443,6 +443,7 @@ model Book {
   price         Float
   thumbnail     String?
   file          String
+  language      String
   sales         Int          @default(0)
   publishedDate String?
   status        BookStatus   @default(inReview)
@@ -620,6 +621,7 @@ model Order {
   affiliateShare     Float?   @default(0)
   coInstructorsShare Float?   @default(0)
   coInstructorIds    String[] @default([])
+  files              String[] @default([])
 
   status        OrderStatus   @default(pending)
   paymentStatus PaymentStatus @default(unpaid)
@@ -1547,13 +1549,13 @@ model Support {
 }
 
 model Newsletter {
-  id            String             @id @default(uuid())
-  title         String
-  content       String
-  category      NewsletterCategory
-  scheduleDate  DateTime           @default(now())
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id           String             @id @default(uuid())
+  title        String
+  content      String
+  category     NewsletterCategory
+  scheduleDate DateTime           @default(now())
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   newsletterLog NewsletterLog[]
 
@@ -1561,16 +1563,16 @@ model Newsletter {
 }
 
 model NewsletterSubscriber {
-  id            String               @id @default(uuid())
-  email         String
-  name          String?
-  category      NewsletterCategory[] // multiple preferences
-  recurrence    RecurrenceType       @default(once)
-  scheduleDate  DateTime             @default(now())
-  lastSentAt    DateTime?
-  status        NewsletterStatus     @default(active)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id           String               @id @default(uuid())
+  email        String
+  name         String?
+  category     NewsletterCategory[] // multiple preferences
+  recurrence   RecurrenceType       @default(once)
+  scheduleDate DateTime             @default(now())
+  lastSentAt   DateTime?
+  status       NewsletterStatus     @default(active)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   newsletterLog NewsletterLog[]
 

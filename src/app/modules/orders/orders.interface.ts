@@ -26,6 +26,7 @@ export interface IOrder {
     amount?: number; 
     paymentMethod: PaymentMethod;
     transactionId?: string;
+    files?: string[]
   };
   items: IOrderItem[];
 }

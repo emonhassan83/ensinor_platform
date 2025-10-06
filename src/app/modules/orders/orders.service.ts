@@ -33,6 +33,7 @@ const createOrders = async (payload: IOrder) => {
   const authorSet = new Set<string>();
   const companySet = new Set<string>();
   const coInstructorIdsSet = new Set<string>();
+  const orderFiles: string[] = [];
 
   // 2️. Process Each Item
   for (const item of items) {
@@ -105,6 +106,12 @@ const createOrders = async (payload: IOrder) => {
       });
     }
 
+    // 6. If book, collect its file (if available)
+    if (item.modelType === 'book' && entity.file) {
+      orderFiles.push(entity.file);
+    }
+
+    // 7. Push order item
     orderItems.push({
       modelType: item.modelType,
       bookId: item.modelType === 'book' ? item.referenceId : undefined,
@@ -121,24 +128,23 @@ const createOrders = async (payload: IOrder) => {
 
   const finalAmount = totalAmount - totalDiscount;
 
-  // 6. Determine order-level authorId & companyId
+  // 8. Determine order-level authorId & companyId
   const orderAuthorId = authorSet.size === 1 ? Array.from(authorSet)[0] : null;
   const orderCompanyId =
     companySet.size === 1 ? Array.from(companySet)[0] : null;
 
-  // 7.1: Revenue split
+  // 9: Revenue split
   let { instructorShare, platformShare, affiliateShare } = calculateRevenue(
     finalAmount,
     orderData,
   );
 
-  // 7.2: Adjust split if any co-instructor was found
   if (hasCoInstructors) {
     instructorShare = finalAmount * 0.35;
     platformShare = finalAmount * 0.3;
   }
 
-  // 8. Create Order
+  // 10. Create Order
   const order = await prisma.order.create({
     data: {
       userId: orderData.userId,
@@ -152,6 +158,7 @@ const createOrders = async (payload: IOrder) => {
       affiliateShare,
       coInstructorsShare: coInstructorShare,
       coInstructorIds: Array.from(coInstructorIdsSet),
+      files: orderFiles,
       orderItem: { createMany: { data: orderItems } },
     },
     include: { orderItem: true },

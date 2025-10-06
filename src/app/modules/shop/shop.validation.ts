@@ -21,6 +21,7 @@ const createValidationSchema = z.object({
       .nonnegative('Price must be a positive number'),
     file: z.string({ required_error: 'File is required!' }).optional(),
     publishedDate: z.string({ required_error: 'Published Date is required!' }),
+    language: z.string({ required_error: 'language is required!' }),
   }),
 });
 
@@ -39,6 +40,7 @@ const updateValidationSchema = z.object({
       .nonnegative('Price must be a positive number')
       .optional(),
     file: z.string({ required_error: 'File is required!' }).optional(),
+    language: z.string({ required_error: 'Language is required!' }).optional(),
   }),
 });
 

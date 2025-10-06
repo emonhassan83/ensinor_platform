@@ -2,7 +2,6 @@ import cron from 'node-cron';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import prisma from '../../utils/prisma';
 import emailSender from '../../utils/emailSender';
-import { NewsletterStatus } from '@prisma/client';
 
 // 🧭 Helper: Next schedule date
 const getNextScheduleDate = (
@@ -23,12 +22,14 @@ const getNextScheduleDate = (
   }
 };
 
+// ⏰ Run every hour, at the start of the hours
 let isRunning = false;
-
 export const newsletterScheduleCorn = () => {
-  cron.schedule('*/10 * * * * *', async () => {
+  cron.schedule('0 * * * *', async () => {
     if (isRunning) {
-      console.log('⚠️ Newsletter job skipped — previous run still in progress.');
+      console.log(
+        '⚠️ Newsletter job skipped — previous run still in progress.',
+      );
       return;
     }
 
@@ -69,7 +70,7 @@ export const newsletterScheduleCorn = () => {
           select: { newsletterId: true },
         });
 
-        const alreadySentIds = sentNewsletterIds.map((n) => n.newsletterId);
+        const alreadySentIds = sentNewsletterIds.map(n => n.newsletterId);
 
         // ✅ Fetch only newsletters NOT already sent to this subscriber
         const newsletters = await prisma.newsletter.findMany({
@@ -96,7 +97,7 @@ export const newsletterScheduleCorn = () => {
                 <p>${newsletter.content}</p>
                 <p style="color:gray;">Category: ${newsletter.category}</p>
               </div>
-            `
+            `,
           );
 
           // Log each send
