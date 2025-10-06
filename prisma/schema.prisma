@@ -1237,14 +1237,15 @@ model ReviewRef {
 }
 
 model WithdrawRequest {
-  id               String         @id @default(uuid())
+  id               String             @id @default(uuid())
   userId           String
   amount           Float
+  payoutType       WithdrawPayoutType @default(author_payout)
   stripeTransferId String?
   paymentMethod    PaymentMethod
-  status           WithdrawStatus @default(pending)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  status           WithdrawStatus     @default(pending)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
@@ -1618,6 +1619,11 @@ enum OrderModelType {
   event
 }
 
+enum WithdrawPayoutType {
+  author_payout
+  coInstructor_payout
+}
+
 enum EventType {
   virtual
   in_person
@@ -1845,7 +1851,6 @@ enum SubscriptionStatus {
 
 enum PaymentMethod {
   Stripe
-  PayPal
   BankTransfer
 }
 

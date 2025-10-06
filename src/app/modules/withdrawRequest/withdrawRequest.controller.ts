@@ -4,18 +4,19 @@ import catchAsync from '../../utils/catchAsync';
 import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 import { withdrawRequestFilterableFields } from './withdrawRequest.constant';
+import { WithdrawPayoutType } from '@prisma/client';
 
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await WithdrawRequestService.insertIntoDB(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Review ref insert successfully!',
+    message: 'Withdraw insert successfully!',
     data: result,
   });
 });
 
-const getAllByUserFromDB = catchAsync(async (req, res) => {
+const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, withdrawRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
@@ -24,7 +25,37 @@ const getAllByUserFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Reviews ref data fetched!',
+    message: 'All withdraw request data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getAuthorPayout = catchAsync(async (req, res) => {
+  const filters = pick(req.query, withdrawRequestFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await WithdrawRequestService.getAuthorPayout(filters, options, req.user!.userId, WithdrawPayoutType.author_payout);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My withdraw record data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getCoInstructorPayout = catchAsync(async (req, res) => {
+  const filters = pick(req.query, withdrawRequestFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await WithdrawRequestService.getAuthorPayout(filters, options, req.user!.userId, WithdrawPayoutType.coInstructor_payout);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My withdraw record data fetched!',
     meta: result.meta,
     data: result.data,
   });
@@ -35,7 +66,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Review ref data fetched by id!',
+    message: 'Withdraw data fetched by id!',
     data: result,
   });
 });
@@ -48,7 +79,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Review ref data updated!',
+    message: 'Withdraw data updated!',
     data: result,
   });
 });
@@ -58,14 +89,16 @@ const deleteFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Review ref data deleted!',
+    message: 'Withdraw data deleted!',
     data: result,
   });
 });
 
 export const WithdrawRequestController = {
   insertIntoDB,
-  getAllByUserFromDB,
+  getAllFromDB,
+  getAuthorPayout,
+  getCoInstructorPayout,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

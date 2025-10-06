@@ -496,42 +496,28 @@ const getCoInstructorEarningOverview = async (coInstructorId: string, year: numb
   const currentYear = now.getFullYear();
   const isCurrentYear = year === currentYear;
 
-  const yearStart = startOfYear(new Date(year, 0, 1));
-  const yearEnd = endOfYear(new Date(year, 11, 31));
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
 
   const filteredMonths = isCurrentYear
     ? months.slice(0, now.getMonth() + 1)
     : months;
 
-  // Find co instructor invitee course
-  const coInstructorCourses = await prisma.coInstructor.findMany({
-    where: { coInstructorId, isDeleted: false, isActive: true },
-    select: { courseId: true },
-  });
-  const courseIds = coInstructorCourses.map(c => c.courseId);
-
-  // earning data group by month
-  const earnings = await prisma.payment.groupBy({
+  // Aggregate earnings by month from CoInstructorEarning
+  const earnings = await prisma.coInstructorEarning.groupBy({
     by: ['createdAt'],
     where: {
-      isPaid: true,
-      isDeleted: false,
-      coInstructorsShare: { gt: 0 },
+      coInstructorId,
       createdAt: { gte: yearStart, lte: yearEnd },
-      order: {
-        orderItem: {
-
-        }
-      },
     },
-    _sum: { coInstructorsShare: true },
+    _sum: { amount: true },
   });
 
   const earningOverview = filteredMonths.map((month, index) => {
     const row = earnings.find(e => new Date(e.createdAt).getMonth() === index);
     return {
       month,
-      amount: row?._sum.coInstructorsShare ?? 0,
+      amount: row?._sum.amount ?? 0,
     };
   });
 
@@ -1223,7 +1209,7 @@ const coInstructorMetaData = async (
   query: Record<string, unknown>,
 ) => {
   if (
-    user?.role !== UserRole.instructor ||
+    user?.role !== UserRole.instructor &&
     user.role !== UserRole.business_instructors
   ) {
     throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
@@ -1232,7 +1218,7 @@ const coInstructorMetaData = async (
 
   const totalCourseCount = await prisma.coInstructor.count({
     where: {
-      coInstructorId: user.id,
+      coInstructorId: user.userId,
       isDeleted: false,
       isActive: true,
       course: {
@@ -1242,30 +1228,14 @@ const coInstructorMetaData = async (
     },
   });
 
-  // --- Revenue ---
-  const totalRevenue = await prisma.payment.aggregate({
-    _sum: { coInstructorsShare: true },
+  // --- Total Revenue from CoInstructorEarning ---
+  const totalRevenueAgg = await prisma.coInstructorEarning.aggregate({
+    _sum: { amount: true },
     where: {
-      isPaid: true,
-      isDeleted: false,
-      coInstructorsShare: { gt: 0 },
-      order: {
-        orderItem: {
-          some: {
-            courseId: {
-              in: (
-                await prisma.coInstructor.findMany({
-                  where: { coInstructorId: user.id, isDeleted: false },
-                  select: { courseId: true },
-                })
-              ).map(c => c.courseId),
-            },
-          },
-        },
-      },
+      coInstructorId: user.userId,
     },
   });
-  const revenue = Math.round(totalRevenue._sum?.coInstructorsShare ?? 0);
+  const totalRevenue = Number((totalRevenueAgg._sum?.amount ?? 0).toFixed(1));
 
   // --- Selected Year for Chart ---
   const selectedEarningYear = year
@@ -1283,7 +1253,7 @@ const coInstructorMetaData = async (
       id: {
         in: (
           await prisma.coInstructor.findMany({
-            where: { coInstructorId: user.id, isDeleted: false },
+            where: { coInstructorId: user.userId, isDeleted: false },
             select: { courseId: true },
           })
         ).map(c => c.courseId),
@@ -1315,7 +1285,7 @@ const coInstructorMetaData = async (
 
   return {
     totalCourseCount,
-    totalRevenue: revenue,
+    totalRevenue,
     earningOverview,
     mostEnrolledCourses,
   };

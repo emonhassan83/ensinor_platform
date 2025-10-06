@@ -59,11 +59,22 @@ export const validateCoupon = async (
     where: {
       code: couponCode,
       isActive: true,
-      modelType,
-      OR: [
-        { bookId: modelType === 'book' ? referenceId : null },
-        { courseId: modelType === 'course' ? referenceId : null },
-        { eventId: modelType === 'event' ? referenceId : null },
+      AND: [
+        {
+          OR: [
+            // 1️⃣ Global coupon
+            { isGlobal: true, modelType: 'global' },
+            // 2️⃣ Specific coupon for this modelType
+            {
+              modelType,
+              OR: [
+                { bookId: modelType === 'book' ? referenceId : null },
+                { courseId: modelType === 'course' ? referenceId : null },
+                { eventId: modelType === 'event' ? referenceId : null },
+              ],
+            },
+          ],
+        },
       ],
     },
   });
@@ -114,11 +125,20 @@ export const validatePromo = async (
     where: {
       code: promoCode,
       isActive: true,
-      modelType,
-      OR: [
-        { bookId: modelType === 'book' ? referenceId : null },
-        { courseId: modelType === 'course' ? referenceId : null },
-        { eventId: modelType === 'event' ? referenceId : null },
+      AND: [
+        {
+          OR: [
+            { isGlobal: true, modelType: 'global' },
+            {
+              modelType,
+              OR: [
+                { bookId: modelType === 'book' ? referenceId : null },
+                { courseId: modelType === 'course' ? referenceId : null },
+                { eventId: modelType === 'event' ? referenceId : null },
+              ],
+            },
+          ],
+        },
       ],
     },
   });
@@ -197,7 +217,6 @@ export function calculateRevenue(finalAmount: number, orderData: any) {
   return { instructorShare, platformShare, affiliateShare };
 }
 
-
 // ✅ Cleanup expired or inactive coupons & promo codes Runs every day at 2:00 AM
 export const cleanupCouponsAndPromos = () => {
   cron.schedule('0 2 * * *', async () => {
@@ -207,10 +226,7 @@ export const cleanupCouponsAndPromos = () => {
       // Delete expired or inactive coupons
       const deletedCoupons = await prisma.coupon.deleteMany({
         where: {
-          OR: [
-            { isActive: false },
-            { expireAt: { lt: now } },
-          ],
+          OR: [{ isActive: false }, { expireAt: { lt: now } }],
         },
       });
       console.log(`Deleted ${deletedCoupons.count} expired/inactive coupons.`);
@@ -218,16 +234,17 @@ export const cleanupCouponsAndPromos = () => {
       // Delete expired or inactive promo codes
       const deletedPromos = await prisma.promoCode.deleteMany({
         where: {
-          OR: [
-            { isActive: false },
-            { expireAt: { lt: now } },
-          ],
+          OR: [{ isActive: false }, { expireAt: { lt: now } }],
         },
       });
-      console.log(`Deleted ${deletedPromos.count} expired/inactive promo codes.`);
-
+      console.log(
+        `Deleted ${deletedPromos.count} expired/inactive promo codes.`,
+      );
     } catch (error: any) {
-      console.error('Error cleaning up coupons and promo codes:', error.message);
+      console.error(
+        'Error cleaning up coupons and promo codes:',
+        error.message,
+      );
     }
   });
 };

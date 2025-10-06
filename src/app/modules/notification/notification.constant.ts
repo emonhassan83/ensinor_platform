@@ -69,4 +69,9 @@ export const messages = {
     paymentSuccess: 'Payment was successful!',
     paymentRefunded: 'Payment refunded successfully.',
   },
+
+  withdrawRequest: {
+    completed: 'Withdraw request approved !',
+    cancelled: 'Withdraw request cancelled !',
+  },
 };

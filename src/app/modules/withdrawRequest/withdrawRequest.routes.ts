@@ -15,20 +15,40 @@ router.post(
 );
 
 router.get(
-  '/user/:userId',
+  '/author/my-payout',
+  auth(
+    UserRole.company_admin,
+    UserRole.instructor,
+    UserRole.business_instructors,
+  ),
+  WithdrawRequestController.getAuthorPayout,
+);
+
+router.get(
+  '/co-instructor/my-payout',
+  auth(UserRole.instructor, UserRole.business_instructors),
+  WithdrawRequestController.getCoInstructorPayout,
+);
+
+router.get(
+  '/',
   auth(UserRole.super_admin),
-  WithdrawRequestController.getAllByUserFromDB,
+  WithdrawRequestController.getAllFromDB,
 );
 
 router.get('/:id', WithdrawRequestController.getByIdFromDB);
 
 router.patch(
-  '/:id',
+  '/status/:id',
   auth(UserRole.super_admin),
   validateRequest(WithdrawRequestValidation.updateValidationSchema),
   WithdrawRequestController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), WithdrawRequestController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.super_admin),
+  WithdrawRequestController.deleteFromDB,
+);
 
 export const WithdrawRequestRoutes = router;
