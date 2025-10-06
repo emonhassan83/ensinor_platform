@@ -2,6 +2,8 @@ import {
   Invitation,
   Prisma,
   RegisterWith,
+  SubscriptionStatus,
+  SubscriptionType,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -36,21 +38,51 @@ const insertIntoDB = async (payload: IInvitation) => {
               id: true,
               name: true,
               isActive: true,
+              size: true,
             },
           },
         },
       },
+      subscription: {
+        where: { isExpired: false, status: SubscriptionStatus.active },
+        select: { type: true },
+      },
     },
   });
 
-  if (!inviter) {
+  if (!inviter)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
-  }
-  if (inviter.companyAdmin?.company?.isActive === false) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company active!');
+
+  if (!inviter.companyAdmin?.company)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Inviter is not linked to any company!',
+    );
+  if (!inviter.companyAdmin.company.isActive)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company is inactive!');
+
+  // 2️. Determine subscription type & enforce invite limit
+  const activeSubscription = inviter.subscription[0];
+  if (!activeSubscription) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No active subscription found!');
   }
 
-  // 2. Check department validity
+  const companySize = inviter.companyAdmin.company.size;
+  const subscriptionType = activeSubscription.type;
+
+  if (
+    (subscriptionType === SubscriptionType.ngo && companySize >= 50) ||
+    (subscriptionType === SubscriptionType.sme && companySize >= 200)
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Your subscription (${subscriptionType}) allows a maximum of ${
+        subscriptionType === SubscriptionType.ngo ? 50 : 200
+      } members. Upgrade to invite more.`,
+    );
+  }
+
+  // 3. Check department validity
   const department = await prisma.department.findFirst({
     where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
   });
@@ -58,7 +90,7 @@ const insertIntoDB = async (payload: IInvitation) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
   }
 
-  // 3. Check if email already registered
+  // 4. Check if email already registered
   const existingUser = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true },
@@ -70,11 +102,11 @@ const insertIntoDB = async (payload: IInvitation) => {
     );
   }
 
-  // 4. Default password for invited employees (can be reset later)
+  // 5. Default password for invited employees (can be reset later)
   const defaultPassword = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(defaultPassword);
 
-  // 5. Create user + employee in a transaction
+  // 6. Create user + employee in a transaction
   const result = await prisma.$transaction(async tx => {
     const newUser = await tx.user.create({
       data: {
@@ -110,7 +142,7 @@ const insertIntoDB = async (payload: IInvitation) => {
       },
     });
 
-    // 6. Send congratulation email
+    // 7. Send congratulation email
     await sendEmployeeInvitationEmail(
       newUser.email,
       newUser.name,
@@ -122,15 +154,13 @@ const insertIntoDB = async (payload: IInvitation) => {
     return { user: newUser, employee: newEmployee };
   });
 
-  // after invitation here increment the department size by one
+  // 8. Increment company + department size
   await prisma.department.update({
     where: { id: department.id },
     data: {
       joined: { increment: 1 },
     },
   });
-
-  // here updated company info
   await prisma.company.update({
     where: { id: inviter.companyAdmin!.company!.id },
     data: {
@@ -153,17 +183,52 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       name: true,
       companyAdmin: {
         select: {
-          company: { select: { id: true, name: true, isActive: true } },
+          company: {
+            select: { id: true, name: true, isActive: true, size: true },
+          },
         },
+      },
+      subscription: {
+        where: { isExpired: false, status: SubscriptionStatus.active },
+        select: { type: true },
       },
     },
   });
-  
-  if (!inviter) {
+
+  if (!inviter)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+  if (!inviter.companyAdmin?.company)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Inviter is not linked to any company!',
+    );
+  if (!inviter.companyAdmin.company.isActive)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company is inactive!');
+
+  // 2️⃣ Check active subscription and enforce limits
+  const activeSubscription = inviter.subscription[0];
+  if (!activeSubscription) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No active subscription found!');
   }
-  if (inviter.companyAdmin?.company?.isActive === false) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company active!');
+
+  const companySize = inviter.companyAdmin.company.size;
+  const subscriptionType = activeSubscription.type;
+  const newInvites = emails.length;
+
+  if (
+    (subscriptionType === SubscriptionType.ngo &&
+      companySize + newInvites > 50) ||
+    (subscriptionType === SubscriptionType.sme &&
+      companySize + newInvites > 200)
+  ) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `Your subscription (${subscriptionType}) allows only ${
+        subscriptionType === SubscriptionType.ngo ? 50 : 200
+      } total members. You already have ${companySize}, so you can invite ${
+        (subscriptionType === SubscriptionType.ngo ? 50 : 200) - companySize
+      } more.`,
+    );
   }
 
   // 2. Validate department

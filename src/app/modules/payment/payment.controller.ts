@@ -18,19 +18,17 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
 });
 
 const confirmPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.confirmPayment(req.query)
+  const result = await PaymentService.confirmPayment(req.query);
 
-  //  res.redirect(
-  //   `${config.payment_success_url}`,
-  // )
-  
+  res.redirect(`${config.payment_success_url}`);
+
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     data: result,
     message: 'payment confirmed successfully',
-  })
-})
+  });
+});
 
 const getAllIntoDB = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, paymentFilterableFields);
@@ -117,15 +115,15 @@ const deleteIntoDB = catchAsync(async (req: Request, res: Response) => {
 });
 
 const refundPayment = catchAsync(async (req, res) => {
-  const result = await PaymentService.refundPayment(req.body)
+  const result = await PaymentService.refundPayment(req.body);
 
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     message: 'Payment refund successfully!',
     data: result,
-  })
-})
+  });
+});
 
 export const PaymentController = {
   insertIntoDB,
@@ -136,5 +134,5 @@ export const PaymentController = {
   getByIdIntoDB,
   updateIntoDB,
   deleteIntoDB,
-  refundPayment
+  refundPayment,
 };

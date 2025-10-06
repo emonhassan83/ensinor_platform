@@ -239,10 +239,8 @@ const eventFilterData = async () => {
   }));
 
   return {
-    data: {
-      categories,
-      languages: formattedLanguages,
-    },
+    categories,
+    languages: formattedLanguages,
   };
 };
 

@@ -7,6 +7,8 @@ import {
   CourseType,
   PlatformType,
   Prisma,
+  SubscriptionStatus,
+  SubscriptionType,
   User,
   UserRole,
   UserStatus,
@@ -44,6 +46,10 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
           include: {
             company: { include: { author: { include: { user: true } } } },
           },
+        },
+        subscription: {
+          where: { isExpired: false, status: SubscriptionStatus.active },
+          select: { type: true },
         },
       },
     });
@@ -86,6 +92,31 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Your company not found!');
     if (!company.isActive)
       throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
+
+    // 🔹 Check company subscription
+    const activeSubscription = actor.subscription[0];
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'No active subscription found for this company!',
+      );
+    }
+
+    const { type: subscriptionType } = activeSubscription;
+
+    // 🔹 Course upload limits by subscription type
+    const currentCourses = company.courses;
+    if (
+      (subscriptionType === SubscriptionType.ngo && currentCourses >= 5) ||
+      (subscriptionType === SubscriptionType.sme && currentCourses >= 15)
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Your current subscription (${subscriptionType}) allows only ${
+          subscriptionType === SubscriptionType.ngo ? 5 : 15
+        } total courses. You’ve already uploaded ${currentCourses}. Upgrade to upload more.`,
+      );
+    }
   }
 
   // 🔹 Upload thumbnail (if file provided)
@@ -726,7 +757,7 @@ const assignACourseIntoDB = async (
   });
 
   // sent notification
-  await sendNotifYToUser('assign', instructor.id)
+  await sendNotifYToUser('assign', instructor.id);
 
   return updatedCourse;
 };
