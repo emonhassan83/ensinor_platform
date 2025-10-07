@@ -129,19 +129,19 @@ model User {
 }
 
 model Achievement {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  paidCoursePoints    Int      @default(0)
-  freeCoursePoints    Int      @default(0)
-  monthlyStreakPoints Int      @default(0)
-  totalPoints         Int      @default(0)
-  level               Int      @default(0)
-  badges              String[] @default([])
+  id                  String @id @default(uuid())
+  userId              String @unique
+  paidCoursePoints    Int    @default(0)
+  freeCoursePoints    Int    @default(0)
+  monthlyStreakPoints Int    @default(0)
+  totalPoints         Int    @default(0)
+  level               Int    @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  badges Batch[] @relation("AchievementBadges")
 
   @@map("achievements")
 }
@@ -157,7 +157,7 @@ model AchievementLogs {
 
   user   User    @relation(fields: [userId], references: [id])
   course Course? @relation(fields: [courseId], references: [id])
-  badge  Batch?   @relation(fields: [badgeId], references: [id])
+  badge  Batch?  @relation(fields: [badgeId], references: [id])
 
   @@map("achievement_logs")
 }
@@ -1252,6 +1252,7 @@ model Batch {
   // Relations
   author          User              @relation(fields: [authorId], references: [id])
   achievementLogs AchievementLogs[]
+  achievements    Achievement[]     @relation("AchievementBadges")
 
   @@map("batches")
 }

@@ -63,6 +63,7 @@ import { QuizAnswerRoutes } from '../modules/quizAnswer/quizAnswer.routes';
 import { MetaRoutes } from '../modules/meta/meta.route';
 import { ReportsRoutes } from '../modules/reports/reports.route';
 import { CartRoutes } from '../modules/cart/cart.route';
+import { AchievementsRoutes } from '../modules/achievements/achievements.route';
 
 const router = express.Router();
 
@@ -323,6 +324,10 @@ const moduleRoutes = [
     path: '/reports',
     route: ReportsRoutes,
   },
+  {
+    path: '/achievements',
+    route: AchievementsRoutes,
+  }
 ];
 
 moduleRoutes.forEach(route => router.use(route.path, route.route));

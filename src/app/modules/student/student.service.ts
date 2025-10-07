@@ -6,6 +6,7 @@ import { studentSearchAbleFields } from './student.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
+import httpStatus from 'http-status';
 
 const getAllFromDB = async (
   params: IStudentFilterRequest,
