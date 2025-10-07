@@ -1790,6 +1790,7 @@ enum OrderStatus {
 
 enum WithdrawStatus {
   pending
+  approved
   completed
   cancelled
 }

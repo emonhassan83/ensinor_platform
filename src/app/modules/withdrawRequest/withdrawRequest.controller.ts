@@ -35,7 +35,12 @@ const getAuthorPayout = catchAsync(async (req, res) => {
   const filters = pick(req.query, withdrawRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await WithdrawRequestService.getAuthorPayout(filters, options, req.user!.userId, WithdrawPayoutType.author_payout);
+  const result = await WithdrawRequestService.getAuthorPayout(
+    filters,
+    options,
+    WithdrawPayoutType.author_payout,
+    req.user!.userId,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -50,7 +55,12 @@ const getCoInstructorPayout = catchAsync(async (req, res) => {
   const filters = pick(req.query, withdrawRequestFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await WithdrawRequestService.getAuthorPayout(filters, options, req.user!.userId, WithdrawPayoutType.coInstructor_payout);
+  const result = await WithdrawRequestService.getAuthorPayout(
+    filters,
+    options,
+    WithdrawPayoutType.coInstructor_payout,
+    req.user!.userId,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -74,7 +84,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await WithdrawRequestService.updateIntoDB(
     req.params.id,
-    req.body
+    req.body,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

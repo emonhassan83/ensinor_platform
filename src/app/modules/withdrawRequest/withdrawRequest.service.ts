@@ -16,8 +16,13 @@ import { withdrawRequestSearchAbleFields } from './withdrawRequest.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
-import { sendWithdrawStatusNotifYToUser } from './withdrawRequest.utils';
-import emailSender from '../../utils/emailSender';
+import {
+  sendWithdrawApprovedEmail,
+  sendWithdrawCancelledEmail,
+  sendWithdrawCompletedEmail,
+  sendWithdrawStatusNotifYToUser,
+} from './withdrawRequest.utils';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IWithdrawRequest) => {
   const { userId, paymentMethod, amount } = payload;
@@ -316,9 +321,8 @@ const updateIntoDB = async (
   // 1️⃣ Find the withdraw request
   const withdrawRequest = await prisma.withdrawRequest.findUnique({
     where: { id },
-    include: { user: true }, // include user info for email + notify
+    include: { user: true },
   });
-
   if (!withdrawRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Withdraw request not found!');
   }
@@ -332,57 +336,101 @@ const updateIntoDB = async (
   }
 
   // 3️⃣ Handle status transitions
-  if (withdrawRequest.status === 'pending' && status === 'completed') {
-    // --- Deduct balance ---
-    const userBalance = withdrawRequest.user?.balance ?? 0;
-    if (userBalance < withdrawRequest.amount) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Insufficient balance!');
-    }
+  switch (status) {
+    // ✅ Super Admin approves the withdraw request
+    case 'approved':
+      if (withdrawRequest.status !== 'pending') {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Only pending requests can be approved!',
+        );
+      }
 
-    await prisma.user.update({
-      where: { id: withdrawRequest.userId },
-      data: {
-        balance: { decrement: withdrawRequest.amount },
-      },
-    });
+      await prisma.withdrawRequest.update({
+        where: { id },
+        data: { status },
+      });
 
-    // --- Update status ---
-    const result = await prisma.withdrawRequest.update({
-      where: { id },
-      data: { status },
-    });
+      // sent notification and email
+      await sendWithdrawApprovedEmail(
+        withdrawRequest.user,
+        withdrawRequest.amount,
+      );
+      await sendWithdrawStatusNotifYToUser(
+        'approved',
+        withdrawRequest.user,
+        withdrawRequest.amount,
+      );
+      break;
 
-    // --- Send email ---
-    await emailSender(
-      withdrawRequest.user.email,
-      'Withdrawal Approved ✅',
-      `Your withdrawal of $${withdrawRequest.amount.toFixed(2)} has been approved and processed.`,
-    );
+    // ✅ Payout completed
+    case 'completed':
+      if (withdrawRequest.status !== 'approved') {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Only approved requests can be completed!',
+        );
+      }
 
-    // --- Send notification ---
-    await sendWithdrawStatusNotifYToUser('completed', withdrawRequest.user);
+      const userBalance = withdrawRequest.user?.balance ?? 0;
+      if (userBalance < withdrawRequest.amount) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Insufficient balance!');
+      }
 
-    return result;
+      await prisma.user.update({
+        where: { id: withdrawRequest.userId },
+        data: { balance: { decrement: withdrawRequest.amount } },
+      });
+
+      const completedResult = await prisma.withdrawRequest.update({
+        where: { id },
+        data: { status },
+      });
+
+      // sent email and notification
+      await sendWithdrawCompletedEmail(
+        withdrawRequest.user,
+        withdrawRequest.amount,
+        userBalance - withdrawRequest.amount,
+      );
+      await sendWithdrawStatusNotifYToUser(
+        'completed',
+        withdrawRequest.user,
+        withdrawRequest.amount,
+      );
+      return completedResult;
+
+    // ✅ Cancelled by user or admin
+    case 'cancelled':
+      if (withdrawRequest.status === 'completed') {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Completed withdrawals cannot be cancelled!',
+        );
+      }
+
+      const cancelledResult = await prisma.withdrawRequest.update({
+        where: { id },
+        data: { status },
+      });
+
+      // sent email and notification
+      await sendWithdrawCancelledEmail(
+        withdrawRequest.user,
+        withdrawRequest.amount,
+      );
+      await sendWithdrawStatusNotifYToUser(
+        'cancelled',
+        withdrawRequest.user,
+        withdrawRequest.amount,
+      );
+      return cancelledResult;
+
+    default:
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid status update!');
   }
 
-  if (withdrawRequest.status === 'pending' && status === 'cancelled') {
-    // --- Update status ---
-    const result = await prisma.withdrawRequest.update({
-      where: { id },
-      data: { status },
-    });
-
-    // --- Send notification ---
-    await sendWithdrawStatusNotifYToUser('cancelled', withdrawRequest.user);
-
-    return result;
-  }
-
-  // 4️⃣ Block other invalid transitions
-  throw new ApiError(
-    httpStatus.BAD_REQUEST,
-    'Invalid status transition! You can only update from pending to completed or cancelled.',
-  );
+  return withdrawRequest;
 };
 
 const deleteFromDB = async (id: string): Promise<WithdrawRequest> => {

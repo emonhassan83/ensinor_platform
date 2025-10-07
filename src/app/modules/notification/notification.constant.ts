@@ -71,7 +71,8 @@ export const messages = {
   },
 
   withdrawRequest: {
-    completed: 'Withdraw request approved !',
+    approved: 'Withdraw request approved !',
+    completed: 'Withdraw request completed !',
     cancelled: 'Withdraw request cancelled !',
   },
 };

@@ -1,24 +1,32 @@
-import { NotificationModeType, User } from "@prisma/client";
-import { messages } from "../notification/notification.constant";
-import { NotificationService } from "../notification/notification.service";
+import { NotificationModeType, User } from '@prisma/client';
+import { messages } from '../notification/notification.constant';
+import { NotificationService } from '../notification/notification.service';
+import emailSender from '../../utils/emailSender';
 
 // User Status Change Notification → User
 export const sendWithdrawStatusNotifYToUser = async (
-  status: 'completed' | 'cancelled' ,
+  status: 'approved' | 'completed' | 'cancelled',
   user: Partial<User>,
+  amount?: number,
 ) => {
   // Determine the message and description based on the status
-  let message;
-  let description;
+  let message: string;
+  let description: string;
 
-  if (status === 'completed') {
-    message = messages.withdrawRequest.completed;
-    description = ``;
-  } else {
-    message = messages.withdrawRequest.cancelled;
-    description = ``;
+  switch (status) {
+    case 'approved':
+      message = `Withdrawal request approved`;
+      description = `Your withdrawal request of $${amount?.toFixed(2)} has been approved. Funds will be processed soon.`;
+      break;
+    case 'completed':
+      message = `Withdrawal completed`;
+      description = `Your withdrawal of $${amount?.toFixed(2)} has been successfully completed and deducted from your balance.`;
+      break;
+    case 'cancelled':
+      message = `Withdrawal cancelled`;
+      description = `Your withdrawal request of $${amount?.toFixed(2)} has been cancelled. Contact support if you need assistance.`;
+      break;
   }
-
   // Create a notification entry
   await NotificationService.createNotificationIntoDB({
     receiverId: user?.id,
@@ -26,4 +34,57 @@ export const sendWithdrawStatusNotifYToUser = async (
     description,
     modeType: NotificationModeType.withdraw_request,
   });
+};
+
+export const sendWithdrawApprovedEmail = async (user: Partial<User>, amount: number) => {
+  if (!user?.email) return;
+
+  const subject = 'Withdrawal Approved ✅';
+  const body = `
+  Hello ${user.name},
+
+  Your withdrawal request of $${amount.toFixed(2)} has been approved by the admin.
+  The payout will be processed shortly.
+
+  Thank you for using our platform!
+  `;
+
+  await emailSender(user.email, subject, body);
+};
+
+export const sendWithdrawCompletedEmail = async (
+  user: Partial<User>,
+  amount: number,
+  remainingBalance: number,
+) => {
+  if (!user?.email) return;
+
+  const subject = 'Withdrawal Completed 💸';
+  const body = `
+  Hello ${user.name},
+
+  Your withdrawal of $${amount.toFixed(2)} has been successfully processed and deducted from your balance.
+
+  Remaining balance: $${remainingBalance.toFixed(2)}
+
+  Thank you for using our platform!
+  `;
+
+  await emailSender(user.email, subject, body);
+};
+
+export const sendWithdrawCancelledEmail = async (user: Partial<User>, amount: number) => {
+  if (!user?.email) return;
+
+  const subject = 'Withdrawal Cancelled ❌';
+  const body = `
+  Hello ${user.name},
+
+  Your withdrawal request of $${amount.toFixed(2)} has been cancelled.
+  Please contact support for further details.
+
+  Thank you for using our platform!
+  `;
+
+  await emailSender(user.email, subject, body);
 };
