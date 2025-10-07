@@ -120,15 +120,53 @@ const getTrendingEventsFromDB = async () => {
     AND: andConditions,
   };
 
-  const result = await prisma.event.findMany({
+  const events = await prisma.event.findMany({
     where: whereConditions,
-    take: 5,
+    take: 4,
     orderBy: {
       registered: 'desc',
     },
+    include: {
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+    },
   });
 
-  return result;
+  return events.map(event => {
+    const coupon = event.coupon?.[0];
+    const promo = event.promoCode?.[0];
+
+    let discount = 0;
+    let couponCode = null;
+    let promoCode = null;
+    let expiry = null;
+
+    if (coupon) {
+      discount = coupon.discount;
+      couponCode = coupon.code;
+      expiry = coupon.expireAt;
+    } else if (promo) {
+      discount = promo.discount;
+      promoCode = promo.code;
+      expiry = promo.expireAt;
+    }
+
+    const discountPrice =
+      discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
+
+    const { coupon: _c, promoCode: _p, ...rest } = event;
+    return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
+  });
 };
 
 const getAllFromDB = async (
@@ -175,7 +213,7 @@ const getAllFromDB = async (
     AND: andConditions,
   };
 
-  const result = await prisma.event.findMany({
+  const events = await prisma.event.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -187,19 +225,53 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+    },
   });
 
-  const total = await prisma.event.count({
-    where: whereConditions,
+  const formattedEvents = events.map(event => {
+    const coupon = event.coupon?.[0];
+    const promo = event.promoCode?.[0];
+
+    let discount = 0;
+    let couponCode = null;
+    let promoCode = null;
+    let expiry = null;
+
+    if (coupon) {
+      discount = coupon.discount;
+      couponCode = coupon.code;
+      expiry = coupon.expireAt;
+    } else if (promo) {
+      discount = promo.discount;
+      promoCode = promo.code;
+      expiry = promo.expireAt;
+    }
+
+    const discountPrice =
+      discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
+
+    const { coupon: _c, promoCode: _p, ...rest } = event;
+    return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
   });
+
+  const total = await prisma.event.count({ where: whereConditions });
 
   return {
-    meta: {
-      page,
-      limit,
-      total,
-    },
-    data: result,
+    meta: { page, limit, total },
+    data: formattedEvents,
   };
 };
 
@@ -244,8 +316,8 @@ const eventFilterData = async () => {
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<Event | null> => {
-  const result = await prisma.event.findUnique({
+const getByIdFromDB = async (id: string) => {
+  const event = await prisma.event.findUnique({
     where: { id, isDeleted: false },
     include: {
       author: {
@@ -258,13 +330,48 @@ const getByIdFromDB = async (id: string): Promise<Event | null> => {
       },
       eventSchedule: true,
       eventSpeaker: true,
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
     },
   });
 
-  if (!result) {
+  if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Event not found!');
   }
-  return result;
+
+  const coupon = event.coupon?.[0];
+  const promo = event.promoCode?.[0];
+
+  let discount = 0;
+  let couponCode = null;
+  let promoCode = null;
+  let expiry = null;
+
+  if (coupon) {
+    discount = coupon.discount;
+    couponCode = coupon.code;
+    expiry = coupon.expireAt;
+  } else if (promo) {
+    discount = promo.discount;
+    promoCode = promo.code;
+    expiry = promo.expireAt;
+  }
+
+  const discountPrice =
+    discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
+
+  const { coupon: _c, promoCode: _p, ...rest } = event;
+  return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
 };
 
 const updateIntoDB = async (

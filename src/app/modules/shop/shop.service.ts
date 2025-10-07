@@ -164,19 +164,53 @@ const getTrendingBooks = async () => {
     AND: andConditions,
   };
 
-  const result = await prisma.book.findMany({
+  const books = await prisma.book.findMany({
     where: whereConditions,
-    take: 5,
+    take: 4,
     orderBy: {
       sales: 'desc',
     },
     include: {
-      author: {
-        select: {
-          name: true,
-        },
+      author: { select: { name: true } },
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
       },
     },
+  });
+
+  const result = books.map(book => {
+    const coupon = book.coupon?.[0];
+    const promo = book.promoCode?.[0];
+
+    let discount = 0;
+    let couponCode = null;
+    let promoCode = null;
+    let expiry = null;
+
+    if (coupon) {
+      discount = coupon.discount;
+      couponCode = coupon.code;
+      expiry = coupon.expireAt;
+    } else if (promo) {
+      discount = promo.discount;
+      promoCode = promo.code;
+      expiry = promo.expireAt;
+    }
+
+    const discountPrice =
+      discount > 0 ? book.price - (book.price * discount) / 100 : book.price;
+
+    const { coupon: _c, promoCode: _p, ...rest } = book;
+    return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
   });
 
   return result;
@@ -227,7 +261,7 @@ const getAllFromDB = async (
     AND: andConditions,
   };
 
-  const result = await prisma.book.findMany({
+  const books = await prisma.book.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -240,19 +274,55 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
     include: {
-      author: {
-        select: {
-          name: true,
-        },
+      author: { select: { name: true } },
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
       },
     },
   });
 
-  // 🔹 Add computed `salesAmount`
-  const booksWithSalesAmount = result.map(book => ({
-    ...book,
-    salesAmount: book.sales * book.price,
-  }));
+  const formattedBooks = books.map(book => {
+    const coupon = book.coupon?.[0];
+    const promo = book.promoCode?.[0];
+
+    let discount = 0;
+    let couponCode = null;
+    let promoCode = null;
+    let expiry = null;
+
+    if (coupon) {
+      discount = coupon.discount;
+      couponCode = coupon.code;
+      expiry = coupon.expireAt;
+    } else if (promo) {
+      discount = promo.discount;
+      promoCode = promo.code;
+      expiry = promo.expireAt;
+    }
+
+    const discountPrice =
+      discount > 0 ? book.price - (book.price * discount) / 100 : book.price;
+
+    const { coupon: _c, promoCode: _p, ...rest } = book;
+    return {
+      ...rest,
+      salesAmount: book.sales * book.price,
+      couponCode,
+      promoCode,
+      expiry,
+      discount,
+      discountPrice,
+    };
+  });
 
   const total = await prisma.book.count({
     where: whereConditions,
@@ -264,7 +334,7 @@ const getAllFromDB = async (
       limit,
       total,
     },
-    data: booksWithSalesAmount,
+    data: formattedBooks,
   };
 };
 
@@ -303,25 +373,54 @@ const getAllCategoryFromDB = async () => {
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<Book | null> => {
-  const result = await prisma.book.findUnique({
+const getByIdFromDB = async (id: string) => {
+  const book = await prisma.book.findUnique({
     where: { id, isDeleted: false },
     include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
+      author: { select: { id: true, name: true, email: true, photoUrl: true } },
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
       },
     },
   });
 
-  if (!result) {
+  if (!book) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Book not found!');
   }
-  return result;
+
+  const coupon = book.coupon?.[0];
+  const promo = book.promoCode?.[0];
+
+  let discount = 0;
+  let couponCode = null;
+  let promoCode = null;
+  let expiry = null;
+
+  if (coupon) {
+    discount = coupon.discount;
+    couponCode = coupon.code;
+    expiry = coupon.expireAt;
+  } else if (promo) {
+    discount = promo.discount;
+    promoCode = promo.code;
+    expiry = promo.expireAt;
+  }
+
+  const discountPrice =
+    discount > 0 ? book.price - (book.price * discount) / 100 : book.price;
+
+  const { coupon: _c, promoCode: _p, ...rest } = book;
+
+  return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
 };
 
 const updateIntoDB = async (
