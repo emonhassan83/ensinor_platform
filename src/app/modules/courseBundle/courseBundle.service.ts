@@ -195,7 +195,7 @@ const getAllFromDB = async (
     AND: andConditions,
   };
 
-  const result = await prisma.courseBundle.findMany({
+  const bundles = await prisma.courseBundle.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -208,6 +208,16 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
   });
+
+  // Format bundles to include default coupon/promo fields
+  const result = bundles.map(b => ({
+    ...b,
+    couponCode: null,
+    promoCode: null,
+    expiry: null,
+    discount: 0,
+    discountPrice: b.price,
+  }));
 
   const total = await prisma.courseBundle.count({
     where: whereConditions,
@@ -223,7 +233,7 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<CourseBundle | null> => {
+const getByIdFromDB = async (id: string) => {
   const result = await prisma.courseBundle.findUnique({
     where: { id, isDeleted: false },
     include: {
@@ -235,7 +245,15 @@ const getByIdFromDB = async (id: string): Promise<CourseBundle | null> => {
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course bundle not found!');
   }
-  return result;
+
+  return {
+    ...result,
+    couponCode: null,
+    promoCode: null,
+    expiry: null,
+    discount: 0,
+    discountPrice: result.price,
+  };
 };
 
 const updateIntoDB = async (

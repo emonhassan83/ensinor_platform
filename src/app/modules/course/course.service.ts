@@ -201,12 +201,63 @@ const getPopularCoursesFromDB = async () => {
     AND: andConditions,
   };
 
-  const result = await prisma.course.findMany({
+  const courses = await prisma.course.findMany({
     where: whereConditions,
-    take: 5,
+    take: 4,
     orderBy: {
       enrollments: 'desc',
     },
+    include: {
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+    },
+  });
+
+  // Map to include coupon/promo fields
+  const result = courses.map(course => {
+    const coupon = course.coupon?.[0];
+    const promo = course.promoCode?.[0];
+
+    let discount = 0;
+    let couponCode = null;
+    let promoCode = null;
+    let expiry = null;
+
+    if (coupon) {
+      discount = coupon.discount;
+      couponCode = coupon.code;
+      expiry = coupon.expireAt;
+    } else if (promo) {
+      discount = promo.discount;
+      promoCode = promo.code;
+      expiry = promo.expireAt;
+    }
+
+    const discountPrice =
+      discount > 0
+        ? course.price - (course.price * discount) / 100
+        : course.price;
+
+    const { coupon: _c, promoCode: _p, ...rest } = course;
+
+    return {
+      ...rest,
+      couponCode,
+      promoCode,
+      expiry,
+      discount,
+      discountPrice,
+    };
   });
 
   return result;
@@ -290,6 +341,18 @@ const getCombineCoursesFromDB = async (
         lectures: true,
         duration: true,
         createdAt: true,
+        coupon: {
+          where: { isActive: true, expireAt: { gt: new Date() } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { code: true, discount: true, expireAt: true },
+        },
+        promoCode: {
+          where: { isActive: true, expireAt: { gt: new Date() } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { code: true, discount: true, expireAt: true },
+        },
       },
     }),
     prisma.courseBundle.findMany({
@@ -317,14 +380,66 @@ const getCombineCoursesFromDB = async (
     }),
   ]);
 
-  // ====== MERGE + SORT ======
+  // ====== MERGE + ADD COUPON/PROMO ======
   const combined = [
-    ...courses.map(c => ({ ...c, type: 'course' })),
-    ...bundles.map(b => ({ ...b, type: 'bundle' })),
+    ...courses.map(c => {
+      const coupon = c.coupon?.[0];
+      const promo = c.promoCode?.[0];
+
+      let couponCode = null;
+      let promoCode = null;
+      let discount = 0;
+      let expiry = null;
+
+      if (coupon) {
+        couponCode = coupon.code;
+        discount = coupon.discount;
+        expiry = coupon.expireAt;
+      } else if (promo) {
+        promoCode = promo.code;
+        discount = promo.discount;
+        expiry = promo.expireAt;
+      }
+
+      const discountPrice =
+        discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
+
+      return {
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        description: c.description,
+        thumbnail: c.thumbnail,
+        price: c.price,
+        isFreeCourse: c.isFreeCourse,
+        level: c.level,
+        language: c.language,
+        avgRating: c.avgRating,
+        ratingCount: c.ratingCount,
+        lectures: c.lectures,
+        duration: c.duration,
+        createdAt: c.createdAt,
+        type: 'course',
+        couponCode,
+        promoCode,
+        expiry,
+        discount,
+        discountPrice,
+      };
+    }),
+    ...bundles.map(b => ({
+      ...b,
+      type: 'bundle',
+      couponCode: null,
+      promoCode: null,
+      expiry: null,
+      discount: 0,
+      discountPrice: b.price,
+    })),
   ];
 
+  // ====== SORT ======
   const sortKey = options.sortBy || 'createdAt';
-
   combined.sort((a, b) => {
     const order = options.sortOrder === 'asc' ? 1 : -1;
     if ((a as any)[sortKey] > (b as any)[sortKey]) return order;
@@ -332,7 +447,7 @@ const getCombineCoursesFromDB = async (
     return 0;
   });
 
-  // ====== PAGINATE IN MEMORY ======
+  // ====== PAGINATION ======
   const total = combined.length;
   const start = (page - 1) * limit;
   const end = start + limit;
@@ -368,74 +483,124 @@ const getCombineCoursesFromDB = async (
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  filterBy: {
-    authorId?: string;
-    companyId?: string;
-  },
+  filterBy: { authorId?: string; companyId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
+  // ====== WHERE CONDITIONS ======
   const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
-  // Filter either by authorId, instructorId
-  if (filterBy.authorId) {
-    andConditions.push({ authorId: filterBy.authorId });
-  }
-  if (filterBy.companyId) {
-    andConditions.push({ companyId: filterBy.companyId });
-  }
 
-  // Search across Package and nested User fields
+  // Filter by authorId or companyId
+  if (filterBy.authorId) andConditions.push({ authorId: filterBy.authorId });
+  if (filterBy.companyId) andConditions.push({ companyId: filterBy.companyId });
+
+  // Search filter
   if (searchTerm) {
     andConditions.push({
       OR: courseSearchAbleFields.map(field => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
+        [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
     });
   }
 
-  // Filters
+  // Additional filters
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
+        [key]: { equals: (filterData as any)[key] },
       })),
     });
   }
 
-  const whereConditions: Prisma.CourseWhereInput = {
-    AND: andConditions,
-  };
+  const whereConditions: Prisma.CourseWhereInput = { AND: andConditions };
 
-  const result = await prisma.course.findMany({
+  // ====== FETCH COURSES WITH FIRST ACTIVE COUPON/PROMO ======
+  const courses = await prisma.course.findMany({
     where: whereConditions,
     skip,
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            avgRating: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { avgRating: 'desc' },
+    select: {
+      id: true,
+      authorId: true,
+      companyId: true,
+      title: true,
+      shortDescription: true,
+      platform: true,
+      type: true,
+      category: true,
+      level: true,
+      language: true,
+      deadline: true,
+      price: true,
+      description: true,
+      thumbnail: true,
+      lectures: true,
+      duration: true,
+      hasCertificate: true,
+      isFreeCourse: true,
+      enrollments: true,
+      totalCompleted: true,
+      status: true,
+      avgRating: true,
+      ratingCount: true,
+      isDeleted: true,
+      createdAt: true,
+      updatedAt: true,
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+    },
   });
 
-  const total = await prisma.course.count({
-    where: whereConditions,
+  // ====== FORMAT RESULTS ======
+  const result = courses.map(course => {
+    const coupon = course.coupon?.[0];
+    const promo = course.promoCode?.[0];
+
+    // Choose coupon first; if no coupon, use promo
+    const discountData = coupon || promo;
+    const discount = discountData?.discount ?? 0;
+    const couponCode = coupon ? coupon.code : null;
+    const promoCode = !coupon && promo ? promo.code : null;
+    const expiry = discountData?.expireAt ?? null;
+
+    const discountPrice =
+      discount > 0
+        ? course.price - (course.price * discount) / 100
+        : course.price;
+
+    // Exclude original arrays
+    const { coupon: _, promoCode: __, ...rest } = course;
+
+    return {
+      ...rest,
+      couponCode,
+      promoCode,
+      expiry,
+      discount,
+      discountPrice,
+    };
   });
+
+  // ====== TOTAL COUNT ======
+  const total = await prisma.course.count({ where: whereConditions });
 
   return {
-    meta: {
-      page,
-      limit,
-      total,
-    },
+    meta: { page, limit, total, totalPage: Math.ceil(total / limit) },
     data: result,
   };
 };
@@ -576,6 +741,18 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
       },
       resource: true,
       assignment: true,
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
     },
   });
 
@@ -583,7 +760,33 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
   }
 
-  return result;
+  // ====== Flatten coupon/promo ======
+  const coupon = result.coupon?.[0];
+  const promo = result.promoCode?.[0];
+
+  const discountData = coupon || promo;
+  const discount = discountData?.discount ?? 0;
+  const couponCode = coupon ? coupon.code : null;
+  const promoCode = !coupon && promo ? promo.code : null;
+  const expiry = discountData?.expireAt ?? null;
+
+  const discountPrice =
+    discount > 0
+      ? result.price - (result.price * discount) / 100
+      : result.price;
+
+  // Remove original arrays
+  const { coupon: _, promoCode: __, ...rest } = result;
+
+  return {
+    ...rest,
+    // @ts-ignore
+    couponCode,
+    promoCode,
+    expiry,
+    discount,
+    discountPrice,
+  };
 };
 
 const updateIntoDB = async (

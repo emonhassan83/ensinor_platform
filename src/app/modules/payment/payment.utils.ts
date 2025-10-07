@@ -109,7 +109,7 @@ export const sendOrderConfirmationAndDocumentsEmail = async (
   const zipDownloadLink = `
     <div style="margin: 20px 0;">
       <a href="${config.server_url}/download/order/${order.id}"
-         style="background-color: #28a745; color: white; padding: 12px 20px;
+         style="background-color: #eebc19ff; color: black; padding: 12px 20px;
          border-radius: 5px; text-decoration: none;" target="_blank">
         📥 Download Your eBooks (ZIP)
       </a>
