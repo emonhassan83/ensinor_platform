@@ -23,4 +23,14 @@ router.get(
   AchievementsController.availableBadges,
 );
 
+router.patch(
+  '/assign-badges/:badgeId',
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+  ),
+  AchievementsController.assignBadges,
+);
+
 export const AchievementsRoutes = router;

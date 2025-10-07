@@ -21,6 +21,7 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import { sendCourseCompleteNotifYToAuthor } from './enrolledCourse.utils';
 import { sendCourseEnrollmentEmail } from '../../utils/email/courseEnrolledmentEmail';
+import { calculateAchievementLevel } from '../../utils/achievementLevel';
 
 // Static fallback grading system
 const defaultGradingSystem = [
@@ -174,7 +175,7 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     });
 
     if (monthlyPurchases > 1) {
-      await prisma.achievement.update({
+      const achievement = await prisma.achievement.update({
         where: { userId },
         data: {
           totalPoints: { increment: 50 },
@@ -189,6 +190,10 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
           modelType: AchievementModelType.monthly_streak,
         },
       });
+
+      // Update level
+      const { level } = calculateAchievementLevel(achievement.totalPoints);
+      await prisma.achievement.update({ where: { userId }, data: { level } });
     }
   }
 
@@ -360,7 +365,7 @@ const enrollBundleCourses = async (payload: {
 
     if (monthlyPurchases > paidCourses.length) {
       // of have one paid course here
-      await prisma.achievement.update({
+      const achievement = await prisma.achievement.update({
         where: { userId },
         data: {
           totalPoints: { increment: 50 },
@@ -377,6 +382,10 @@ const enrollBundleCourses = async (payload: {
           },
         });
       }
+
+      // upgrade level
+      const { level } = calculateAchievementLevel(achievement.totalPoints);
+      await prisma.achievement.update({ where: { userId }, data: { level } });
     }
   }
 
@@ -1097,32 +1106,21 @@ const watchLectureIntoDB = async (payload: {
   return finalUpdate;
 };
 
-const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
+const completeCourseIntoDB = async (id: string) => {
   const enrollCourse = await prisma.enrolledCourse.findUnique({
     where: { id, isDeleted: false },
-    include: {
-      user: true,
-      course: true,
-    },
+    include: { user: true, course: true },
   });
 
-  if (!enrollCourse) {
+  if (!enrollCourse)
     throw new ApiError(httpStatus.NOT_FOUND, 'Enrolled course not found!');
-  }
 
   const result = await prisma.enrolledCourse.update({
     where: { id },
     data: { isComplete: true, courseFinishTime: new Date() },
-    include: {
-      user: true,
-      course: true,
-    },
+    include: { user: true, course: true },
   });
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Enrolled course not updated!');
-  }
 
-  // If course completed, notify the author
   if (result.isComplete && result.course?.authorId) {
     await sendCourseCompleteNotifYToAuthor(
       result.user,
@@ -1131,77 +1129,57 @@ const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
     );
   }
 
-  // --- POINTS ALLOCATION ---
-  let awardedPoints = 0;
-  const durationMins = result.learningTime ?? 0; // course duration in minutes
-  const price = result.course?.price ?? 0; // course price
+  const durationMins = result.learningTime ?? 0;
+  const price = result.course?.price ?? 0;
+  const userId = result.user.id;
 
-  // Find current user info (to check freePoints cap)
-  const currentUser = await prisma.user.findUnique({
-    where: { id: enrollCourse.user.id },
-    include: { achievement: true },
+  const achievement = await prisma.achievement.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
   });
 
-  if (!currentUser) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'User not found for awarding points',
-    );
-  }
+  let awardedPoints = 0;
 
-  // Case 1: Paid course
   if (price > 0) {
     awardedPoints = durationMins >= 600 || price >= 30 ? 200 : 100;
 
     await prisma.achievement.update({
-      where: { id: currentUser.achievement!.id },
+      where: { id: achievement.id },
       data: {
         totalPoints: { increment: awardedPoints },
         paidCoursePoints: { increment: awardedPoints },
       },
     });
+  } else {
+    const remainingCap = 250 - achievement.freeCoursePoints;
+    const pointsToAdd = Math.min(50, remainingCap > 0 ? remainingCap : 0);
+    awardedPoints = pointsToAdd;
 
-    await prisma.achievementLogs.create({
-      data: {
-        userId: currentUser.id,
-        courseId: enrollCourse.course.id,
-        modelType: AchievementModelType.course
-      }
-    })
-  }
-
-  // Case 2: Free course
-  else {
-    // Award 50 points per free course, cap at 250
-    if (currentUser.achievement!.freeCoursePoints < 250) {
-      // Ensure we don’t cross the 250 cap
-      const remainingCap = 250 - currentUser.achievement!.freeCoursePoints;
-      const pointsToAdd = Math.min(50, remainingCap);
-
+    if (pointsToAdd > 0) {
       await prisma.achievement.update({
-        where: { id: currentUser.achievement!.id },
+        where: { id: achievement.id },
         data: {
           totalPoints: { increment: pointsToAdd },
           freeCoursePoints: { increment: pointsToAdd },
         },
       });
-
-      await prisma.achievementLogs.create({
-        data: {
-          userId: currentUser.id,
-          courseId: enrollCourse.course.id,
-          modelType: AchievementModelType.course
-        }
-      })
-
-      awardedPoints = pointsToAdd;
-    } else {
-      // Cap already reached, no points awarded
-      awardedPoints = 0;
     }
   }
 
-  //  update the completed all table
+  await prisma.achievementLogs.create({
+    data: {
+      userId,
+      courseId: result.course.id,
+      modelType: AchievementModelType.course,
+    },
+  });
+
+  const { level } = calculateAchievementLevel(
+    achievement.totalPoints + awardedPoints,
+  );
+  await prisma.achievement.update({ where: { userId }, data: { level } });
+
   if (
     result.course.platform === PlatformType.company &&
     result.course.companyId
@@ -1211,26 +1189,20 @@ const completeCourseIntoDB = async (id: string): Promise<EnrolledCourse> => {
       data: { completed: { increment: 1 } },
     });
   }
-  // check user employee or student
-  const employee = await prisma.employee.findUnique({
-    where: { userId: enrollCourse.user.id },
-  });
 
+  const employee = await prisma.employee.findUnique({
+    where: { userId },
+  });
   if (employee) {
-    // employee completed increment
     await prisma.employee.update({
-      where: { userId: enrollCourse.user.id },
+      where: { userId },
       data: { courseCompleted: { increment: 1 } },
     });
   } else {
-    // student completed increment
-    const student = await prisma.student.findUnique({
-      where: { userId: enrollCourse.user.id },
-    });
-
+    const student = await prisma.student.findUnique({ where: { userId } });
     if (student) {
       await prisma.student.update({
-        where: { userId: enrollCourse.user.id },
+        where: { userId },
         data: { courseCompleted: { increment: 1 } },
       });
     }

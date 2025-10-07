@@ -2,16 +2,9 @@ import catchAsync from '../../utils/catchAsync';
 import httpStatus from 'http-status';
 import sendResponse from '../../utils/sendResponse';
 import { ReportsService } from './achievements.service';
-import pick from '../../utils/pick';
-import {
-  courseSearchableFields,
-  studentSearchableFields,
-} from './achievements.constant';
 
 const myAchievements = catchAsync(async (req, res) => {
-  const filters = pick(req.query, studentSearchableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ReportsService.myAchievementsIntoDB(filters, options);
+  const result = await ReportsService.myAchievementsIntoDB(req.user!.userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -22,22 +15,29 @@ const myAchievements = catchAsync(async (req, res) => {
 });
 
 const earnBadges = catchAsync(async (req, res) => {
-  const filters = pick(req.query, courseSearchableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ReportsService.earnBadgesIntoDB(filters, options);
+  const result = await ReportsService.earnBadgesIntoDB(req.user!.userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'My earn badges retrieval successfully!',
-    meta: result.meta,
-    data: result.data,
+    data: result,
   });
 });
 
 const availableBadges = catchAsync(async (req, res) => {
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await ReportsService.availableBadgesIntoDB(options);
+  const result = await ReportsService.availableBadgesIntoDB(req.user!.userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Available badges retrieval successfully!',
+    data: result,
+  });
+});
+
+const assignBadges = catchAsync(async (req, res) => {
+  const result = await ReportsService.assignBadgesIntoDB(req.params.badgeId, req.body);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -51,4 +51,5 @@ export const AchievementsController = {
   myAchievements,
   earnBadges,
   availableBadges,
+  assignBadges
 };
