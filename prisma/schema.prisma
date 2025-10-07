@@ -44,9 +44,6 @@ model User {
   role                UserRole     @default(student)
   packageExpiry       DateTime?
   fcmToken            String?
-  points              Int          @default(0)
-  freePoints          Int          @default(0)
-  badges              String[]     @default([])
   balance             Float        @default(0.0)
   registerWith        RegisterWith
   lastActive          DateTime     @default(now())
@@ -124,8 +121,45 @@ model User {
   affiliateSale              AffiliateSale[]
   cart                       Cart[]
   coInstructorEarning        CoInstructorEarning[]
+  courseLogs                 CourseLogs[]
+  achievement                Achievement?
+  achievementLogs            AchievementLogs[]
 
   @@map("users")
+}
+
+model Achievement {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  paidCoursePoints    Int      @default(0)
+  freeCoursePoints    Int      @default(0)
+  monthlyStreakPoints Int      @default(0)
+  totalPoints         Int      @default(0)
+  level               Int      @default(0)
+  badges              String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("achievements")
+}
+
+model AchievementLogs {
+  id        String               @id @default(uuid())
+  userId    String
+  courseId  String?
+  badgeId   String?
+  modelType AchievementModelType
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id])
+  badge  Batch?   @relation(fields: [badgeId], references: [id])
+
+  @@map("achievement_logs")
 }
 
 model ZoomAccount {
@@ -519,6 +553,8 @@ model Course {
   chat               Chat[]
   cart               Cart[]
   orderItem          OrderItem[]
+  courseLogs         CourseLogs[]
+  achievementLogs    AchievementLogs[]
 
   @@map("courses")
 }
@@ -763,22 +799,24 @@ model QuizAnswer {
 }
 
 model EnrolledCourse {
-  id             String       @id @default(uuid())
-  userId         String
-  authorId       String
-  courseId       String
-  platform       PlatformType @default(admin)
-  courseCategory String
-  completedRate  Int          @default(0)
-  courseMark     Int?         @default(0)
-  grade          CourseGrade?
-  learningTime   Int          @default(0) // in minutes
-  lectureWatched Int          @default(0)
-  lastActivity   DateTime     @default(now())
-  isComplete     Boolean      @default(false)
-  isDeleted      Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(uuid())
+  userId           String
+  authorId         String
+  courseId         String
+  platform         PlatformType @default(admin)
+  courseCategory   String
+  completedRate    Int          @default(0)
+  courseMark       Int?         @default(0)
+  grade            CourseGrade?
+  learningTime     Int          @default(0) // in minutes
+  lectureWatched   Int          @default(0)
+  courseStartTime  DateTime     @default(now())
+  courseFinishTime DateTime     @default(now())
+  lastActivity     DateTime     @default(now())
+  isComplete       Boolean      @default(false)
+  isDeleted        Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   user   User   @relation("EnrolledUser", fields: [userId], references: [id])
   author User   @relation("CourseAuthor", fields: [authorId], references: [id])
@@ -786,8 +824,23 @@ model EnrolledCourse {
 
   // Many-to-many relation with CourseContent
   watchedLectures CourseContent[] @relation("CourseLectureWatched")
+  courseLogs      CourseLogs[]
 
   @@map("enrolled_courses")
+}
+
+model CourseLogs {
+  id         String   @id @default(uuid())
+  userId     String
+  courseId   String
+  enrolledId String
+  createdAt  DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id])
+  course         Course         @relation(fields: [courseId], references: [id])
+  enrolledCourse EnrolledCourse @relation(fields: [enrolledId], references: [id])
+
+  @@map("course_logs")
 }
 
 model Assignment {
@@ -1197,7 +1250,8 @@ model Batch {
   updatedAt DateTime @updatedAt
 
   // Relations
-  author User @relation(fields: [authorId], references: [id])
+  author          User              @relation(fields: [authorId], references: [id])
+  achievementLogs AchievementLogs[]
 
   @@map("batches")
 }
@@ -1747,6 +1801,7 @@ enum NotificationModeType {
   batch
   withdraw_request
   subscription
+  achievement
 }
 
 enum UserStatus {
@@ -1865,6 +1920,12 @@ enum WishListModelType {
   course
   course_bundle
   book
+}
+
+enum AchievementModelType {
+  course
+  badges
+  monthly_streak
 }
 
 enum ResourceModelType {
