@@ -1304,7 +1304,7 @@ const studentMetaData = async (user: any) => {
       learningTime: true,
       isComplete: true,
       course: {
-        select: { id: true, title: true, category: true },
+        select: { id: true, title: true, thumbnail: true, category: true },
       },
     },
   });
@@ -1321,7 +1321,9 @@ const studentMetaData = async (user: any) => {
       id: ec.course.id,
       name: ec.course.title,
       category: ec.course.category,
+      thumbnail: ec.course.thumbnail,
       completionRate: ec.completedRate,
+      learningTime: ec.learningTime
     }));
 
   const totalCompletedCourseCount = completedCourses.length;
@@ -1333,7 +1335,9 @@ const studentMetaData = async (user: any) => {
       id: ec.course.id,
       name: ec.course.title,
       category: ec.course.category,
+      thumbnail: ec.course.thumbnail,
       completionRate: ec.completedRate,
+      learningTime: ec.learningTime
     }));
 
   const totalInProgressCourseCount = inProgressCourses.length;

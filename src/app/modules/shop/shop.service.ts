@@ -357,15 +357,18 @@ const getAllCategoryFromDB = async () => {
     count: item._count.category,
   }));
 
-  // 🌐 2️⃣ Get unique languages
-  const languageResult = await prisma.book.findMany({
+   // 🌐 2️⃣ Get unique languages + count (same logic as category)
+  const languageResult = await prisma.book.groupBy({
+    by: ['language'],
     where: whereConditions,
-    distinct: ['language'], // ✅ ensures unique languages
-    select: { language: true },
+    _count: { language: true },
     orderBy: { language: 'asc' },
   });
 
-  const languages = languageResult.map(item => item.language);
+  const languages = languageResult.map(item => ({
+    name: item.language,
+    count: item._count.language,
+  }));
 
   return {
     categories,
