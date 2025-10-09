@@ -83,7 +83,7 @@ const myEnrolledCoursesQuiz = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'My enroll course grade data fetched!',
+    message: 'My enroll course quiz data fetched!',
     data: result,
   });
 });
