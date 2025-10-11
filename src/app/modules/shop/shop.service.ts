@@ -159,7 +159,7 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 };
 
 const getTrendingBooks = async () => {
-  const andConditions: Prisma.BookWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.BookWhereInput[] = [{ status: BookStatus.published, isDeleted: false }];
   const whereConditions: Prisma.BookWhereInput = {
     AND: andConditions,
   };
