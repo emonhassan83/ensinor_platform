@@ -433,10 +433,10 @@ model Instructor {
 model Student {
   id              String   @id @unique @default(uuid())
   userId          String   @unique
-  interests       String[]
+  interests       String[] @default([])
   university      String?
   session         String?
-  subjects        String
+  subjects        String?
   courseEnrolled  Int      @default(0)
   courseCompleted Int      @default(0)
   createdAt       DateTime @default(now())
@@ -1260,7 +1260,7 @@ model Batch {
 model Review {
   id             String          @id @default(uuid())
   authorId       String
-  courseId       String
+  courseId       String?
   courseBundleId String?
   modelType      ReviewModelType
   rating         Float

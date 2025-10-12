@@ -80,9 +80,15 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
 
     // 5. Increment student/employee counters
     if (user.role === 'student') {
-      await tx.student.update({
+      await tx.student.upsert({
         where: { userId },
-        data: { courseEnrolled: { increment: 1 } },
+        update: {
+          courseEnrolled: { increment: 1 },
+        },
+        create: {
+          userId,
+          courseEnrolled: 1,
+        },
       });
     } else if (user.role === 'employee') {
       await tx.employee.update({
@@ -175,11 +181,16 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
     });
 
     if (monthlyPurchases > 1) {
-      const achievement = await prisma.achievement.update({
+      const achievement = await prisma.achievement.upsert({
         where: { userId },
-        data: {
+        update: {
           totalPoints: { increment: 50 },
           monthlyStreakPoints: { increment: 50 },
+        },
+        create: {
+          userId,
+          totalPoints: 50,
+          monthlyStreakPoints: 50,
         },
       });
 

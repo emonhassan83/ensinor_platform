@@ -1,4 +1,11 @@
-import { Course, CourseBundle, Prisma, Review, ReviewModelType, UserStatus } from '@prisma/client';
+import {
+  Course,
+  CourseBundle,
+  Prisma,
+  Review,
+  ReviewModelType,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IReview, IReviewFilterRequest } from './review.interface';
@@ -8,7 +15,7 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IReview) => {
- const { authorId, courseId, courseBundleId, modelType, rating } = payload;
+  const { authorId, courseId, courseBundleId, modelType, rating } = payload;
 
   // Step 1: Validate review author
   const user = await prisma.user.findFirst({
@@ -24,22 +31,32 @@ const insertIntoDB = async (payload: IReview) => {
 
   // Step 2: Validate based on modelType
   if (modelType === ReviewModelType.course) {
-    if (!courseId) throw new ApiError(httpStatus.BAD_REQUEST, 'courseId is required for course review!');
+    if (!courseId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'courseId is required for course review!',
+      );
 
     course = await prisma.course.findFirst({
       where: { id: courseId, isDeleted: false },
     });
-    if (!course) throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
+    if (!course)
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
     authorIdToUpdate = course.authorId;
   }
 
   if (modelType === ReviewModelType.bundle_course) {
-    if (!courseBundleId) throw new ApiError(httpStatus.BAD_REQUEST, 'courseBundleId is required for bundle review!');
+    if (!courseBundleId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'courseBundleId is required for bundle review!',
+      );
 
     bundle = await prisma.courseBundle.findFirst({
       where: { id: courseBundleId, isDeleted: false },
     });
-    if (!bundle) throw new ApiError(httpStatus.BAD_REQUEST, 'Course bundle not found!');
+    if (!bundle)
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Course bundle not found!');
     authorIdToUpdate = bundle.authorId;
   }
 
@@ -56,7 +73,9 @@ const insertIntoDB = async (payload: IReview) => {
     });
 
     const count = courseReviews.length;
-    const avgRating = count ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / count : 0;
+    const avgRating = count
+      ? courseReviews.reduce((sum, r) => sum + r.rating, 0) / count
+      : 0;
 
     await prisma.course.update({
       where: { id: course.id },
@@ -71,7 +90,9 @@ const insertIntoDB = async (payload: IReview) => {
     });
 
     const count = bundleReviews.length;
-    const avgRating = count ? bundleReviews.reduce((sum, r) => sum + r.rating, 0) / count : 0;
+    const avgRating = count
+      ? bundleReviews.reduce((sum, r) => sum + r.rating, 0) / count
+      : 0;
 
     await prisma.courseBundle.update({
       where: { id: bundle.id },
@@ -86,10 +107,18 @@ const insertIntoDB = async (payload: IReview) => {
       select: { avgRating: true, ratingCount: true },
     });
 
-    const totalRatings = coursesByAuthor.reduce((sum, c) => sum + c.ratingCount, 0);
-    const totalWeightedRating = coursesByAuthor.reduce((sum, c) => sum + c.avgRating * c.ratingCount, 0);
+    const totalRatings = coursesByAuthor.reduce(
+      (sum, c) => sum + c.ratingCount,
+      0,
+    );
+    const totalWeightedRating = coursesByAuthor.reduce(
+      (sum, c) => sum + c.avgRating * c.ratingCount,
+      0,
+    );
 
-    const avgAuthorRating = totalRatings ? totalWeightedRating / totalRatings : 0;
+    const avgAuthorRating = totalRatings
+      ? totalWeightedRating / totalRatings
+      : 0;
 
     await prisma.user.update({
       where: { id: authorIdToUpdate },
