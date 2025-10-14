@@ -8,6 +8,7 @@ import {
 import { quizAttemptSearchAbleFields } from './quizAttempt.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuizAttempt) => {
   const { quizId, userId } = payload;
