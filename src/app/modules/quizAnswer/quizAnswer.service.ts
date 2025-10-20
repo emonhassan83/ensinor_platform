@@ -12,7 +12,7 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
 
   // 1. Validate attempt
   const attempt = await prisma.quizAttempt.findFirst({
-    where: { id: attemptId, isDeleted: false, isCompleted: false },
+    where: { id: attemptId, isDeleted: false },
     include: { quiz: true },
   });
   if (!attempt)

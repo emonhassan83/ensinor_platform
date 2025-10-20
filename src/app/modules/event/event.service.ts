@@ -3,7 +3,7 @@ import {
   PlatformType,
   Prisma,
   UserRole,
-  UserStatus,
+  UserStatus
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
@@ -13,6 +13,22 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
+import { isValid, parse, parseISO } from 'date-fns';
+
+const parseEventDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  const clean = dateStr.trim();
+
+  // Try ISO (e.g. 2025-12-05)
+  let parsed = parseISO(clean);
+  if (isValid(parsed)) return parsed;
+
+  // Try DD/MM/YYYY (e.g. 20/10/2025)
+  parsed = parse(clean, 'dd/MM/yyyy', new Date());
+  if (isValid(parsed)) return parsed;
+
+  return null;
+};
 
 const insertIntoDB = async (payload: IEvent, file: any) => {
   const { authorId, platform } = payload;
@@ -116,16 +132,12 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
 const getTrendingEventsFromDB = async () => {
   const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
 
-  const whereConditions: Prisma.EventWhereInput = {
-    AND: andConditions,
-  };
+  const whereConditions: Prisma.EventWhereInput = { AND: andConditions };
 
+  // 1️⃣ Fetch events
   const events = await prisma.event.findMany({
     where: whereConditions,
-    take: 4,
-    orderBy: {
-      registered: 'desc',
-    },
+    orderBy: { registered: 'desc' },
     include: {
       coupon: {
         where: { isActive: true, expireAt: { gt: new Date() } },
@@ -142,7 +154,19 @@ const getTrendingEventsFromDB = async () => {
     },
   });
 
-  return events.map(event => {
+  const today = new Date();
+
+  // 2️⃣ Filter only upcoming events (date > today)
+  const futureEvents = events.filter(event => {
+    const parsedDate = parseEventDate(event.date);
+    return parsedDate && parsedDate > today;
+  });
+
+  // 3️⃣ Take top 4 trending upcoming events
+  const trending = futureEvents.slice(0, 4);
+
+  // 4️⃣ Map + include discount logic
+  return trending.map(event => {
     const coupon = event.coupon?.[0];
     const promo = event.promoCode?.[0];
 
@@ -165,7 +189,14 @@ const getTrendingEventsFromDB = async () => {
       discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
 
     const { coupon: _c, promoCode: _p, ...rest } = event;
-    return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
+    return {
+      ...rest,
+      couponCode,
+      promoCode,
+      expiry,
+      discount,
+      discountPrice,
+    };
   });
 };
 
@@ -174,57 +205,38 @@ const getAllFromDB = async (
   options: IPaginationOptions,
   filterBy?: { companyId?: string; authorId?: string },
 ) => {
-  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { page, limit } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, status, ...filterData } = params;
 
   const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
-  // Filter either by authorId or companyId
-  if (filterBy && filterBy.authorId) {
-    andConditions.push({ authorId: filterBy.authorId });
-  }
-  if (filterBy && filterBy.companyId) {
-    andConditions.push({ companyId: filterBy.companyId });
-  }
 
-  // Search across Package and nested User fields
+  if (filterBy?.authorId) andConditions.push({ authorId: filterBy.authorId });
+  if (filterBy?.companyId) andConditions.push({ companyId: filterBy.companyId });
+
   if (searchTerm) {
     andConditions.push({
       OR: eventSearchAbleFields.map(field => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
+        [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
     });
   }
 
-  // Filters
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
+        [key]: { equals: (filterData as any)[key] },
       })),
     });
   }
 
-  const whereConditions: Prisma.EventWhereInput = {
-    AND: andConditions,
-  };
+  const whereConditions: Prisma.EventWhereInput = { AND: andConditions };
 
   const events = await prisma.event.findMany({
     where: whereConditions,
-    skip,
-    take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
     include: {
       coupon: {
         where: { isActive: true, expireAt: { gt: new Date() } },
@@ -240,6 +252,9 @@ const getAllFromDB = async (
       },
     },
   });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const formattedEvents = events.map(event => {
     const coupon = event.coupon?.[0];
@@ -263,15 +278,36 @@ const getAllFromDB = async (
     const discountPrice =
       discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
 
+    const eventDate = parseEventDate(event.date);
+    const generatedStatus =
+      eventDate && eventDate > today ? 'upcoming' : 'completed';
+
     const { coupon: _c, promoCode: _p, ...rest } = event;
-    return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
+    return {
+      ...rest,
+      couponCode,
+      promoCode,
+      expiry,
+      discount,
+      discountPrice,
+      status: generatedStatus,
+    };
   });
 
-  const total = await prisma.event.count({ where: whereConditions });
+  const filteredEvents = status
+    ? formattedEvents.filter(
+        e => e.status.toLowerCase() === status.toLowerCase().trim(),
+      )
+    : formattedEvents;
+
+  const total = filteredEvents.length;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
 
   return {
     meta: { page, limit, total },
-    data: formattedEvents,
+    data: paginatedEvents,
   };
 };
 
@@ -321,12 +357,7 @@ const getByIdFromDB = async (id: string) => {
     where: { id, isDeleted: false },
     include: {
       author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
+        select: { id: true, name: true, email: true, photoUrl: true },
       },
       eventSchedule: true,
       eventSpeaker: true,
@@ -370,8 +401,21 @@ const getByIdFromDB = async (id: string) => {
   const discountPrice =
     discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
 
+  // ✅ Add status
+  const parsedDate = parseEventDate(event.date);
+  const status =
+    parsedDate && parsedDate > new Date() ? 'upcoming' : 'completed';
+
   const { coupon: _c, promoCode: _p, ...rest } = event;
-  return { ...rest, couponCode, promoCode, expiry, discount, discountPrice };
+  return {
+    ...rest,
+    couponCode,
+    promoCode,
+    expiry,
+    discount,
+    discountPrice,
+    status,
+  };
 };
 
 const updateIntoDB = async (

@@ -14,7 +14,7 @@ const getAllFromDB = async (
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, status, ...filterData } = params;
-
+  
   const andConditions: Prisma.StudentWhereInput[] = [];
 
   // Search across Employee and nested User fields

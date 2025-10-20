@@ -862,10 +862,7 @@ const myEnrolledCoursesGrade = async (userId: string) => {
 const myEnrolledCoursesQuiz = async (userId: string) => {
   // 1️⃣ Get all enrolled courses for this user
   const enrolledCourses = await prisma.enrolledCourse.findMany({
-    where: {
-      userId,
-      isDeleted: false,
-    },
+    where: { userId, isDeleted: false },
     select: {
       courseId: true,
       course: {
@@ -873,69 +870,44 @@ const myEnrolledCoursesQuiz = async (userId: string) => {
           id: true,
           title: true,
           thumbnail: true,
-          authorId: true,
         },
       },
     },
   });
 
   if (!enrolledCourses.length) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'No enrolled courses found for this user',
-    );
+    throw new ApiError(httpStatus.NOT_FOUND, 'No enrolled courses found for this user');
   }
 
   // 2️⃣ Collect course IDs
   const courseIds = enrolledCourses.map(c => c.courseId);
 
-  // 3️⃣ Get all quizzes from those courses
+  // 3️⃣ Get all quizzes (ordered by createdAt asc for serial_id)
   const quizzes = await prisma.quiz.findMany({
-    where: {
-      courseId: { in: courseIds },
-      isDeleted: false,
-    },
+    where: { courseId: { in: courseIds }, isDeleted: false },
     include: {
-      course: {
+      course: { select: { id: true, title: true, thumbnail: true } },
+      author: { select: { id: true, name: true, email: true, photoUrl: true } },
+      quizAttempt: {
+        where: { userId, isDeleted: false },
         select: {
           id: true,
-          title: true,
-          thumbnail: true,
-        },
-      },
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
-      },
-      questionsList: {
-        where: { isDeleted: false },
-        select: {
-          id: true,
-          name: true,
-          options: {
-            select: {
-              id: true,
-              optionLevel: true,
-              optionText: true,
-              isCorrect: true,
-            },
-          },
+          marksObtained: true,
+          timeTaken: true,
+          isCompleted: true,
         },
       },
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    orderBy: { createdAt: 'asc' },
   });
 
-  // 4️⃣ Group quizzes under their courses
+  // 4️⃣ Group quizzes by course
   const courseQuizMap: Record<string, any> = {};
 
-  quizzes.forEach(quiz => {
+  // helper: serial counter per course
+  const courseSerialMap: Record<string, number> = {};
+
+  for (const quiz of quizzes) {
     if (!courseQuizMap[quiz.courseId]) {
       courseQuizMap[quiz.courseId] = {
         courseId: quiz.course.id,
@@ -943,18 +915,34 @@ const myEnrolledCoursesQuiz = async (userId: string) => {
         thumbnail: quiz.course.thumbnail,
         quizzes: [],
       };
+      courseSerialMap[quiz.courseId] = 0;
     }
+
+    // increment serial_id based on createdAt
+    courseSerialMap[quiz.courseId] += 1;
+    const serial_id = courseSerialMap[quiz.courseId];
+
+    // find attempt for this user
+    const attempt = quiz.quizAttempt[0]; // user can have multiple attempts; can later sort by latest
+
+    const status = attempt?.isCompleted ? 'completed' : 'incomplete';
+    const marksObtained = attempt?.isCompleted ? attempt.marksObtained : null;
+    const timeTaken = attempt?.isCompleted ? attempt.timeTaken : null;
 
     courseQuizMap[quiz.courseId].quizzes.push({
       quizId: quiz.id,
+      serial_id,
       marks: quiz.marks,
       totalQuestions: quiz.questions,
       timeLimit: quiz.time,
       deadline: quiz.deadline,
-      totalAttempt: quiz.totalAttempt,
+      totalAttend: quiz.totalAttempt,
+      status,
+      marksObtained,
+      timeTaken,
       author: quiz.author,
     });
-  });
+  }
 
   // 5️⃣ Return formatted data
   return {
@@ -975,7 +963,11 @@ const getByIdFromDB = async (id: string) => {
           photoUrl: true,
         },
       },
-      watchedLectures: true,
+      watchedLectures: {
+        select: {
+          id: true,
+        },
+      },
       course: {
         select: {
           id: true,
@@ -994,14 +986,17 @@ const getByIdFromDB = async (id: string) => {
   if (!enrolledCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Enroll course not found!');
   }
-  const watchedLectures = enrolledCourse.watchedLectures.length;
 
-  const result = {
-    ...enrolledCourse,
-    lectureWatched: watchedLectures,
+  // ✅ Count watched lectures
+  const lectureWatched = enrolledCourse.watchedLectures.length;
+
+  // ✅ Return everything except watchedLectures array
+  const { watchedLectures, ...rest } = enrolledCourse;
+
+  return {
+    ...rest,
+    lectureWatched,
   };
-
-  return result;
 };
 
 const updateIntoDB = async (

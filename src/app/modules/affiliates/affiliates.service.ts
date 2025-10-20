@@ -205,11 +205,11 @@ const insertIntoDB = async (payload: IAffiliates) => {
   // 4️⃣ Generate affiliate link dynamically
   let affiliateLink = '';
   if (courseId) {
-    affiliateLink = `${config.client_url}/course/${courseId}?aff=${affiliateId}`;
+    affiliateLink = `${config.client_url}/courses/details/${courseId}?aff=${affiliateId}`;
   } else if (bookId) {
-    affiliateLink = `${config.client_url}/book/${bookId}?aff=${affiliateId}`;
+    affiliateLink = `${config.client_url}/books/details/${bookId}?aff=${affiliateId}`;
   } else if (eventId) {
-    affiliateLink = `${config.client_url}/event/${eventId}?aff=${affiliateId}`;
+    affiliateLink = `${config.client_url}/events/details/${eventId}?aff=${affiliateId}`;
   }
 
   // 5️⃣ Create new affiliate link

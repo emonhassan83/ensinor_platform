@@ -4,6 +4,7 @@ export type IEventFilterRequest = {
   searchTerm?: string | undefined;
   type?: string | undefined;
   location?: string | undefined;
+  status?: string | undefined;
 };
 
 export type IEvent = {

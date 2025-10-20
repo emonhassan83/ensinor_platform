@@ -762,7 +762,7 @@ model QuizAttempt {
   quizId        String
   userId        String
   authorId      String
-  timeTaken     Int?
+  timeTaken     Float?
   marksObtained Int         @default(0)
   totalMarks    Int         @default(0)
   grade         CourseGrade @default(NA)
