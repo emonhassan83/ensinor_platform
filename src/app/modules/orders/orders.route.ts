@@ -53,7 +53,7 @@ router.get(
 
 router.get(
   '/user/my-orders',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   ordersController.getMyOrders,
 );
 
@@ -64,6 +64,7 @@ router.get(
     UserRole.company_admin,
     UserRole.business_instructors,
     UserRole.instructor,
+    UserRole.employee,
     UserRole.student,
   ),
   checkCompanyAdminSubscription(),

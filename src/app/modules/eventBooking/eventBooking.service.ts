@@ -132,6 +132,7 @@ const getAllFromDB = async (
           title: true,
           type: true,
           location: true,
+          thumbnail: true,
           createdAt: true,
           registered: true,
         },

@@ -102,58 +102,83 @@ const getAllFromDB = async (
 
   const andConditions: Prisma.WithdrawRequestWhereInput[] = [];
 
-  // Search across Package and nested User fields
+  // ?? Search filter
   if (searchTerm) {
     andConditions.push({
       OR: withdrawRequestSearchAbleFields.map(field => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
+        [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
     });
   }
 
-  // Filters
+  // ?? Apply filter conditions
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
+        [key]: { equals: (filterData as any)[key] },
       })),
     });
   }
 
-  const whereConditions: Prisma.WithdrawRequestWhereInput = {
-    AND: andConditions,
-  };
+  const whereConditions: Prisma.WithdrawRequestWhereInput = { AND: andConditions };
 
-  const result = await prisma.withdrawRequest.findMany({
+  // ?? Fetch withdraw list
+  const withdrawRequestList = await prisma.withdrawRequest.findMany({
     where: whereConditions,
     skip,
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
   });
 
-  const total = await prisma.withdrawRequest.count({
-    where: whereConditions,
-  });
+  const total = await prisma.withdrawRequest.count({ where: whereConditions });
 
+  // ?? Calculate totals
+  const totalWithdrawAgg = await prisma.withdrawRequest.aggregate({
+    _sum: { amount: true },
+    where: { status: 'completed' },
+  });
+  const totalWithdraw = totalWithdrawAgg._sum.amount || 0;
+
+  // ?? Last month completed withdrawals
+  const now = new Date();
+  const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  const lastMonthWithdrawAgg = await prisma.withdrawRequest.aggregate({
+    _sum: { amount: true },
+    where: {
+      status: 'completed',
+      createdAt: {
+        gte: firstDayLastMonth,
+        lte: lastDayLastMonth,
+      },
+    },
+  });
+  const lastMonthWithdraw = lastMonthWithdrawAgg._sum.amount || 0;
+
+  // ?? Pending withdrawals
+  const pendingWithdrawAgg = await prisma.withdrawRequest.aggregate({
+    _sum: { amount: true },
+    where: { status: 'pending' },
+  });
+  const pendingWithdraw = pendingWithdrawAgg._sum.amount || 0;
+
+  // ?? Final response format
   return {
     meta: {
       page,
       limit,
       total,
     },
-    data: result,
+    data: {
+      totalWithdraw,
+      lastMonthWithdraw,
+      pendingWithdraw,
+      withdrawRequestList,
+    },
   };
 };
 

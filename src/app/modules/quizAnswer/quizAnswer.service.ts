@@ -76,11 +76,11 @@ const completeAttemptIntoDB = async (
   });
   if (!attempt)
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
-  if (attempt.isCompleted)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Quiz attempt already completed!',
-    );
+  // if (attempt.isCompleted)
+  //   throw new ApiError(
+  //     httpStatus.BAD_REQUEST,
+  //     'Quiz attempt already completed!',
+  //   );
 
   const quiz = attempt.quiz;
 
