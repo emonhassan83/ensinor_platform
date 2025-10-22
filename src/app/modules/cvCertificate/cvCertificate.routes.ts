@@ -13,7 +13,7 @@ const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   upload.single('file'),
   parseData(),
   validateRequest(CVCertificateValidation.createValidationSchema),
@@ -22,19 +22,19 @@ router.post(
 
 router.get(
   '/cv/:cvId',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   CVCertificateController.getAllFromDB,
 );
 
 router.get(
   '/:id',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   CVCertificateController.getByIdFromDB,
 );
 
 router.put(
   '/:id',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   upload.single('file'),
   parseData(),
   validateRequest(CVCertificateValidation.updateValidationSchema),
@@ -43,7 +43,7 @@ router.put(
 
 router.delete(
   '/:id',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   CVCertificateController.deleteFromDB,
 );
 

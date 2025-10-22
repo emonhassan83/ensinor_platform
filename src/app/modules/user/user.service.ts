@@ -37,6 +37,7 @@ import {
 import { sendStudentInvitationEmail } from '../../utils/email/sentStudentInvitation';
 import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 
+// TODO: here when register a user then created a student table as well
 const registerAUser = async (
   payload: IRegisterUser,
 ): Promise<IUserResponse> => {
@@ -118,7 +119,7 @@ const registerAUser = async (
 };
 
 const invitationCompanyAdmin = async (
-  payload: ICompanyAdmin
+  payload: ICompanyAdmin,
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);

@@ -9,22 +9,34 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(EducationValidation.createValidationSchema),
   EducationController.insertIntoDB,
 );
 
-router.get('/cv/:cvId', auth(UserRole.student), EducationController.getAllFromDB);
+router.get(
+  '/cv/:cvId',
+  auth(UserRole.student, UserRole.employee),
+  EducationController.getAllFromDB,
+);
 
-router.get('/:id', auth(UserRole.student), EducationController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  EducationController.getByIdFromDB,
+);
 
 router.put(
   '/:id',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(EducationValidation.updateValidationSchema),
   EducationController.updateIntoDB,
 );
 
-router.delete('/:id', auth(UserRole.student), EducationController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  EducationController.deleteFromDB,
+);
 
 export const EducationRoutes = router;

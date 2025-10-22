@@ -46,7 +46,7 @@ const updateValidationSchema = z.object({
     title: z.string({ required_error: 'Newsletter title is required' }).optional(),
     content: z.string({ required_error: 'Newsletter content is required' }).optional(),
     category: z.nativeEnum(NewsletterCategory).optional(),
-    scheduleDate: z.date().optional(),
+    scheduleDate: z.string().optional(),
   }),
 });
 

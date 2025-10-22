@@ -272,13 +272,21 @@ const updateIntoDB = async (id: string, payload: Partial<INewsletter>) => {
 };
 
 const deleteFromDB = async (id: string) => {
+  // 1️. Check if the newsletter exists
   const newsletter = await prisma.newsletter.findUnique({
     where: { id },
   });
+
   if (!newsletter) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Newsletter not found!');
   }
 
+  // 2️. First, delete all related logs (to avoid FK constraint)
+  await prisma.newsletterLog.deleteMany({
+    where: { newsletterId: id },
+  });
+
+  // 3️. Then safely delete the newsletter
   const result = await prisma.newsletter.delete({
     where: { id },
   });

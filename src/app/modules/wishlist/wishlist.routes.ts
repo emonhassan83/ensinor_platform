@@ -9,38 +9,50 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(WishlistValidation.createValidationSchema),
   WishlistController.insertIntoDB,
 );
 
-router.get('/', auth(UserRole.student), WishlistController.getAllFromDB);
+router.get(
+  '/',
+  auth(UserRole.student, UserRole.employee),
+  WishlistController.getAllFromDB,
+);
 
 router.get(
   '/my-wishlist',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   WishlistController.getAllByUserFromDB,
 );
 
-router.get('/:id', auth(UserRole.student), WishlistController.getByIdFromDB);
+router.get(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  WishlistController.getByIdFromDB,
+);
 
-router.delete('/:id', auth(UserRole.student), WishlistController.deleteFromDB);
+router.delete(
+  '/:id',
+  auth(UserRole.student, UserRole.employee),
+  WishlistController.deleteFromDB,
+);
 
 router.delete(
   '/course/:courseId',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   WishlistController.deleteByReferenceFromDB,
 );
 
 router.delete(
   '/courseBundle/:courseBundleId',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   WishlistController.deleteByReferenceFromDB,
 );
 
 router.delete(
   '/book/:bookId',
-  auth(UserRole.student),
+  auth(UserRole.student, UserRole.employee),
   WishlistController.deleteByReferenceFromDB,
 );
 

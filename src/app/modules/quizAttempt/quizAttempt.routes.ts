@@ -26,7 +26,8 @@ router.get(
     UserRole.company_admin,
     UserRole.business_instructors,
     UserRole.instructor,
-    UserRole.student
+    UserRole.student,
+    UserRole.employee
   ),
   QuizAttemptController.getByQuizIdFromDB,
 );

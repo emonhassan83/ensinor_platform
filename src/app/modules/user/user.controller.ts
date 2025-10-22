@@ -7,7 +7,6 @@ import { userFilterableFields } from './user.constant';
 import pick from '../../utils/pick';
 import { otpServices } from '../otp/otp.service';
 import { uploadToS3 } from '../../utils/s3';
-import { ILogUser } from '../../interfaces/common';
 
 const registerAUser = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
