@@ -112,6 +112,14 @@ const registerAUser = async (
         },
       },
     });
+
+    // Create corresponding Student record automatically
+    await tx.student.create({
+      data: {
+        userId: userRecord.id,
+      },
+    });
+
     return userRecord;
   });
 

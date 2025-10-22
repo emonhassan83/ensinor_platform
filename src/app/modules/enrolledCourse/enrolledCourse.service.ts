@@ -875,10 +875,6 @@ const myEnrolledCoursesQuiz = async (userId: string) => {
     },
   });
 
-  if (!enrolledCourses.length) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No enrolled courses found for this user');
-  }
-
   // 2️⃣ Collect course IDs
   const courseIds = enrolledCourses.map(c => c.courseId);
 
