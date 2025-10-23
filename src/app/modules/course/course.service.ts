@@ -273,15 +273,9 @@ const getCombineCoursesFromDB = async (
 
   // ====== WHERE CONDITIONS ======
   const andConditions: Prisma.CourseWhereInput[] = [
-    {
-      isDeleted: false,
-      status: CoursesStatus.approved,
-      type: CourseType.external,
-    },
+    { isDeleted: false, status: CoursesStatus.approved, type: CourseType.external },
   ];
-  const bundleConditions: Prisma.CourseBundleWhereInput[] = [
-    { isDeleted: false },
-  ];
+  const bundleConditions: Prisma.CourseBundleWhereInput[] = [{ isDeleted: false }];
 
   // --- Filter by authorId ---
   if (filterBy?.authorId) {
@@ -322,10 +316,9 @@ const getCombineCoursesFromDB = async (
   const [courses, bundles] = await Promise.all([
     prisma.course.findMany({
       where: whereCourse,
-      orderBy:
-        options.sortBy && options.sortOrder
-          ? { [options.sortBy]: options.sortOrder }
-          : { createdAt: 'desc' },
+      orderBy: options.sortBy && options.sortOrder
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -357,10 +350,9 @@ const getCombineCoursesFromDB = async (
     }),
     prisma.courseBundle.findMany({
       where: whereBundle,
-      orderBy:
-        options.sortBy && options.sortOrder
-          ? { [options.sortBy]: options.sortOrder }
-          : { createdAt: 'desc' },
+      orderBy: options.sortBy && options.sortOrder
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -380,27 +372,15 @@ const getCombineCoursesFromDB = async (
     }),
   ]);
 
-  // ====== MERGE + ADD COUPON/PROMO ======
+  // ====== MERGE COUPON & PROMO ======
   const combined = [
     ...courses.map(c => {
       const coupon = c.coupon?.[0];
       const promo = c.promoCode?.[0];
 
-      let couponCode = null;
-      let promoCode = null;
-      let discount = 0;
-      let expiry = null;
-
-      if (coupon) {
-        couponCode = coupon.code;
-        discount = coupon.discount;
-        expiry = coupon.expireAt;
-      } else if (promo) {
-        promoCode = promo.code;
-        discount = promo.discount;
-        expiry = promo.expireAt;
-      }
-
+      const activeDiscount = coupon || promo;
+      const discount = activeDiscount ? activeDiscount.discount : 0;
+      const expiry = activeDiscount ? activeDiscount.expireAt : null;
       const discountPrice =
         discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
 
@@ -420,8 +400,8 @@ const getCombineCoursesFromDB = async (
         duration: c.duration,
         createdAt: c.createdAt,
         type: 'course',
-        couponCode,
-        promoCode,
+        couponCode: coupon?.code || null,
+        promoCode: promo?.code || null,
         expiry,
         discount,
         discountPrice,
@@ -438,7 +418,7 @@ const getCombineCoursesFromDB = async (
     })),
   ];
 
-  // ====== SORT ======
+  // ====== SORTING ======
   const sortKey = options.sortBy || 'createdAt';
   combined.sort((a, b) => {
     const order = options.sortOrder === 'asc' ? 1 : -1;
@@ -453,7 +433,7 @@ const getCombineCoursesFromDB = async (
   const end = start + limit;
   const paginated = combined.slice(start, end);
 
-  // ====== Wishlist Integration ======
+  // ====== WISHLIST INTEGRATION ======
   let wishlistIds: Set<string> = new Set();
   if (filterBy?.userId) {
     const wishlists = await prisma.wishlist.findMany({
@@ -469,9 +449,32 @@ const getCombineCoursesFromDB = async (
     wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
   }
 
+  // ====== ENROLLED LOGS INTEGRATION ======
+  let enrolledCourseIds = new Set<string>();
+  let enrolledBundleIds = new Set<string>();
+
+  if (filterBy?.userId) {
+    const enrolledLogs = await prisma.enrolledLogs.findMany({
+      where: { userId: filterBy.userId },
+      select: { courseId: true, bundleId: true },
+    });
+
+    enrolledCourseIds = new Set(
+      enrolledLogs.map(e => e.courseId).filter(Boolean) as string[],
+    );
+    enrolledBundleIds = new Set(
+      enrolledLogs.map(e => e.bundleId).filter(Boolean) as string[],
+    );
+  }
+
+  // ====== FINAL DATA ======
   const finalData = paginated.map(item => ({
     ...item,
     isWishlist: wishlistIds.has(item.id),
+    isEnrolled:
+      item.type === 'course'
+        ? enrolledCourseIds.has(item.id)
+        : enrolledBundleIds.has(item.id),
   }));
 
   return {

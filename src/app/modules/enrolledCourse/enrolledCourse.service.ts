@@ -5,6 +5,7 @@ import {
   CourseGrade,
   CoursesStatus,
   EnrolledCourse,
+  EnrolledLogsModelType,
   PlatformType,
   Prisma,
   UserStatus,
@@ -126,6 +127,15 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
       }
     }
 
+    // 🧾  Add enrollment log (for audit/history)
+    await tx.enrolledLogs.create({
+      data: {
+        userId,
+        courseId,
+        modelType: EnrolledLogsModelType.course,
+      },
+    });
+
     return newEnroll;
   });
 
@@ -217,28 +227,27 @@ const enrollBundleCourses = async (payload: {
 }) => {
   const { userId, bundleId } = payload;
 
-  // 1. Fetch user
+  // 1️⃣ Fetch user
   const user = await prisma.user.findFirst({
     where: { id: userId, status: UserStatus.active, isDeleted: false },
     include: { student: true, employee: true },
   });
   if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'User not found!');
 
-  // 2. Fetch bundle and its courses
+  // 2️⃣ Fetch bundle and courses
   const bundle = await prisma.courseBundle.findFirst({
     where: { id: bundleId, isDeleted: false },
     include: {
       courseBundleCourses: { select: { courseId: true } },
     },
   });
-
   if (!bundle || bundle.courseBundleCourses.length === 0) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Bundle or courses not found!');
   }
 
   const courseIds = bundle.courseBundleCourses.map(c => c.courseId);
 
-  // 3. Fetch courses to ensure they are approved
+  // 3️⃣ Fetch approved courses
   const courses = await prisma.course.findMany({
     where: {
       id: { in: courseIds },
@@ -250,77 +259,95 @@ const enrollBundleCourses = async (payload: {
     throw new ApiError(httpStatus.BAD_REQUEST, 'No valid courses found!');
   }
 
-  // 4. Fetch existing enrollments
+  // 4️⃣ Filter out already enrolled courses
   const existingEnrollments = await prisma.enrolledCourse.findMany({
     where: { userId, courseId: { in: courseIds } },
     select: { courseId: true },
   });
   const alreadyEnrolledSet = new Set(existingEnrollments.map(e => e.courseId));
-
-  // 5. Filter courses that are not already enrolled
   const filteredCourses = courses.filter(c => !alreadyEnrolledSet.has(c.id));
   if (filteredCourses.length === 0) {
     return { success: false, message: 'All courses already enrolled' };
   }
 
-  // 6. Prepare enroll data
-  const enrollData = filteredCourses.map(c => ({
-    userId,
-    courseId: c.id,
-    authorId: c.authorId,
-    platform: c.platform,
-    courseCategory: c.category,
-  }));
+  // 5️⃣ Transaction block
+  const result = await prisma.$transaction(async tx => {
+    // Enroll user in all filtered courses
+    const enrollData = filteredCourses.map(c => ({
+      userId,
+      courseId: c.id,
+      authorId: c.authorId,
+      platform: c.platform,
+      courseCategory: c.category,
+    }));
 
-  // 7. Bulk insert enrolled courses
-  await prisma.enrolledCourse.createMany({
-    data: enrollData,
-    skipDuplicates: true,
-  });
-
-  // 8. Update student or employee profile courseEnrolled
-  const incrementCount = filteredCourses.length;
-  if (user.student) {
-    await prisma.student.update({
-      where: { userId },
-      data: { courseEnrolled: { increment: incrementCount } },
+    await tx.enrolledCourse.createMany({
+      data: enrollData,
+      skipDuplicates: true,
     });
-  } else if (user.employee) {
-    await prisma.employee.update({
-      where: { userId },
-      data: { courseEnrolled: { increment: incrementCount } },
-    });
-  }
 
-  // 9. Update instructor / business instructor / company enrolled counts
-  for (const c of filteredCourses) {
-    if (c.platform === 'admin') {
-      // Instructor enrolled increment
-      await prisma.instructor.updateMany({
-        where: { userId: c.authorId },
-        data: { enrolled: { increment: 1 } },
+    // Increment course counts for student or employee
+    const incrementCount = filteredCourses.length;
+    if (user.student) {
+      await tx.student.update({
+        where: { userId },
+        data: { courseEnrolled: { increment: incrementCount } },
       });
-    } else if (c.platform === 'company' && c.companyId) {
-      // Business instructor enrolled increment
-      await prisma.businessInstructor.updateMany({
-        where: { authorId: c.authorId, companyId: c.companyId },
-        data: { enrolled: { increment: 1 } },
-      });
-      // Company enrolled increment
-      await prisma.company.update({
-        where: { id: c.companyId },
-        data: { enrolled: { increment: 1 } },
+    } else if (user.employee) {
+      await tx.employee.update({
+        where: { userId },
+        data: { courseEnrolled: { increment: incrementCount } },
       });
     }
-  }
 
-  // 10. Increment bundle enrollments
-  await prisma.courseBundle.update({
-    where: { id: bundleId },
-    data: { enrollments: { increment: 1 } },
+    // Update instructor / company / businessInstructor counts
+    for (const c of filteredCourses) {
+      if (c.platform === PlatformType.admin) {
+        await tx.instructor.updateMany({
+          where: { userId: c.authorId },
+          data: { enrolled: { increment: 1 } },
+        });
+      } else if (c.platform === PlatformType.company && c.companyId) {
+        await tx.businessInstructor.updateMany({
+          where: { authorId: c.authorId, companyId: c.companyId },
+          data: { enrolled: { increment: 1 } },
+        });
+        await tx.company.update({
+          where: { id: c.companyId },
+          data: { enrolled: { increment: 1 } },
+        });
+      }
+    }
+
+    // Increment bundle enrollment
+    await tx.courseBundle.update({
+      where: { id: bundleId },
+      data: { enrollments: { increment: 1 } },
+    });
+
+    // 🧾 Create enrolled logs
+    await tx.enrolledLogs.createMany({
+      data: [
+        // Logs for each enrolled course
+        ...filteredCourses.map(c => ({
+          userId,
+          courseId: c.id,
+          bundleId,
+          modelType: EnrolledLogsModelType.course,
+        })),
+        // One log for the bundle itself
+        {
+          userId,
+          bundleId,
+          modelType: EnrolledLogsModelType.courseBundle,
+        },
+      ],
+    });
+
+    return { enrollCount: filteredCourses.length };
   });
 
-  // 11. Auto-join user into all chats (discussion + announcement) of each course
+  // 6️⃣ Auto-join all chats for each course
   for (const course of filteredCourses) {
     const chats = await prisma.chat.findMany({
       where: {
@@ -337,16 +364,12 @@ const enrollBundleCourses = async (payload: {
 
       if (!alreadyParticipant) {
         await prisma.chatParticipant.create({
-          data: {
-            userId,
-            chatId: chat.id,
-            role: ChatRole.member,
-          },
+          data: { userId, chatId: chat.id, role: ChatRole.member },
         });
       }
     }
 
-    //12. send congratulation email for each course
+    // Send congratulatory email
     await sendCourseEnrollmentEmail(
       user.email,
       user.name,
@@ -355,7 +378,7 @@ const enrollBundleCourses = async (payload: {
     );
   }
 
-  // 13. Monthly Streak Bonus Check (for bundle purchases) ---
+  // 7️⃣ Achievement bonus for paid bundle courses
   const paidCourses = filteredCourses.filter(c => c.price > 0);
   if (paidCourses.length > 0) {
     const startOfMonth = new Date();
@@ -374,13 +397,17 @@ const enrollBundleCourses = async (payload: {
       },
     });
 
-    if (monthlyPurchases > paidCourses.length) {
-      // of have one paid course here
-      const achievement = await prisma.achievement.update({
+    if (monthlyPurchases >= paidCourses.length) {
+      const achievement = await prisma.achievement.upsert({
         where: { userId },
-        data: {
+        update: {
           totalPoints: { increment: 50 },
           monthlyStreakPoints: { increment: 50 },
+        },
+        create: {
+          userId,
+          totalPoints: 50,
+          monthlyStreakPoints: 50,
         },
       });
 
@@ -394,13 +421,15 @@ const enrollBundleCourses = async (payload: {
         });
       }
 
-      // upgrade level
       const { level } = calculateAchievementLevel(achievement.totalPoints);
-      await prisma.achievement.update({ where: { userId }, data: { level } });
+      await prisma.achievement.update({
+        where: { userId },
+        data: { level },
+      });
     }
   }
 
-  return filteredCourses;
+  return result
 };
 
 const getEnrolledStudent = async (

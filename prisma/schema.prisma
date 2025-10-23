@@ -124,6 +124,7 @@ model User {
   courseLogs                 CourseLogs[]
   achievement                Achievement?
   achievementLogs            AchievementLogs[]
+  enrolledLogs               EnrolledLogs[]
 
   @@map("users")
 }
@@ -555,6 +556,7 @@ model Course {
   orderItem          OrderItem[]
   courseLogs         CourseLogs[]
   achievementLogs    AchievementLogs[]
+  enrolledLogs       EnrolledLogs[]
 
   @@map("courses")
 }
@@ -610,6 +612,7 @@ model CourseBundle {
   wishlist            Wishlist[]
   review              Review[]
   cart                Cart[]
+  enrolledLogs        EnrolledLogs[]
 
   @@map("course_bundles")
 }
@@ -827,6 +830,22 @@ model EnrolledCourse {
   courseLogs      CourseLogs[]
 
   @@map("enrolled_courses")
+}
+
+model EnrolledLogs {
+  id        String   @id @default(uuid())
+  userId    String
+  modelType EnrolledLogsModelType
+  courseId  String?
+  bundleId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  course       Course?       @relation(fields: [courseId], references: [id])
+  bundleCourse CourseBundle? @relation(fields: [bundleId], references: [id])
+
+  @@map("enrolled_logs")
 }
 
 model CourseLogs {
@@ -1196,7 +1215,7 @@ model Payment {
   orderId            String?
   subscriptionId     String?
   modelType          PaymentModelType
-  type               PaymentType
+  type               PaymentType      @default(course)
   transactionId      String           @unique
   amount             Float            @default(0.00)
   platformShare      Float            @default(0.00)
@@ -1667,6 +1686,11 @@ enum CartModelType {
   courseBundle
 }
 
+enum EnrolledLogsModelType {
+  course
+  courseBundle
+}
+
 enum OrderModelType {
   book
   course
@@ -1759,6 +1783,7 @@ enum PaymentModelType {
 
 enum PaymentType {
   course
+  courseBundle
   book
   event
   instructor_subscription
