@@ -59,7 +59,7 @@ const insertIntoDB = async (payload: IWishlist) => {
       );
     }
     const courseBundle = await prisma.courseBundle.findFirst({
-      where: { id: courseId, isDeleted: false },
+      where: { id: courseBundleId, isDeleted: false },
     });
     if (!courseBundle) {
       throw new ApiError(
@@ -91,6 +91,7 @@ const insertIntoDB = async (payload: IWishlist) => {
       modelType,
       courseId: courseId ?? undefined,
       bookId: bookId ?? undefined,
+      courseBundleId: courseBundleId ?? undefined,
     },
   });
 
