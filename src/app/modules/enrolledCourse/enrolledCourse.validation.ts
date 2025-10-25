@@ -12,14 +12,40 @@ const createValidationSchema = z.object({
   }),
 });
 
-const bulkEnrollValidationSchema = z.object({
+const bulkEnrolledValidationSchema = z.object({
+  body: z.object({
+    userId: z
+      .string({ required_error: 'Author id is required' })
+      .uuid('author id must be a valid UUID'),
+    courseIds: z.array(
+      z
+        .string({ required_error: 'Course id is required' })
+        .uuid('course id must be a valid UUID'),
+    ),
+  }),
+});
+
+const bundleEnrollValidationSchema = z.object({
   body: z.object({
     userId: z
       .string({ required_error: 'Author id is required' })
       .uuid('author id must be a valid UUID'),
     bundleId: z
-      .string({ required_error: 'Course id is required' })
+      .string({ required_error: 'Course bundle id is required' })
       .uuid('course id must be a valid UUID'),
+  }),
+});
+
+const bulkBundleEnrollValidationSchema = z.object({
+  body: z.object({
+    userId: z
+      .string({ required_error: 'Author id is required' })
+      .uuid('author id must be a valid UUID'),
+    bundleIds: z.array(
+      z
+        .string({ required_error: 'Course bundle id is required' })
+        .uuid('course id must be a valid UUID'),
+    ),
   }),
 });
 
@@ -58,7 +84,9 @@ const updateValidationSchema = z.object({
 
 export const EnrolledCourseValidation = {
   createValidationSchema,
-  bulkEnrollValidationSchema,
+  bulkEnrolledValidationSchema,
+  bundleEnrollValidationSchema,
+  bulkBundleEnrollValidationSchema,
   watchLectureValidationSchema,
   updateValidationSchema,
 };

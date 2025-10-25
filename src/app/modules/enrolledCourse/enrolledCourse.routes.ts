@@ -16,10 +16,24 @@ router.post(
 );
 
 router.post(
+  '/bulk-enroll-courses',
+  auth(UserRole.student, UserRole.employee),
+  validateRequest(EnrolledCourseValidation.bulkEnrolledValidationSchema),
+  EnrolledCourseController.bulkInsertIntoDB,
+);
+
+router.post(
   '/bundle-courses',
   auth(UserRole.student, UserRole.employee),
-  validateRequest(EnrolledCourseValidation.bulkEnrollValidationSchema),
-  EnrolledCourseController.bulkInsertIntoDB,
+  validateRequest(EnrolledCourseValidation.bundleEnrollValidationSchema),
+  EnrolledCourseController.enrollBundleCourses,
+);
+
+router.post(
+  '/bulk-bundle-courses',
+  auth(UserRole.student, UserRole.employee),
+  validateRequest(EnrolledCourseValidation.bulkBundleEnrollValidationSchema),
+  EnrolledCourseController.bulkEnrollBundleCourses,
 );
 
 router.get(

@@ -18,3 +18,8 @@ export type IEnrolledCourse = {
   learningTime?: number;
   isCompleted?: boolean;
 };
+
+export type IBulkEnrolledCourse = {
+  userId: string;
+  courseIds: string[]
+};

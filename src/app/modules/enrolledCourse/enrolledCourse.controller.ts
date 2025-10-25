@@ -10,17 +10,37 @@ const insertIntoDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Enroll course enroll successfully!',
+    message: 'Course enrolled successfully!',
     data: result,
   });
 });
 
 const bulkInsertIntoDB = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.bulkInsertIntoDB(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Bulk course enroll successfully!',
+    data: result,
+  });
+});
+
+const enrollBundleCourses = catchAsync(async (req, res) => {
   const result = await EnrolledCourseService.enrollBundleCourses(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Bundle course enrolled successfully!',
+    data: result,
+  });
+});
+
+const bulkEnrollBundleCourses = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.bundleEnrollBundleCourses(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Bulk bundle course enrolled successfully!',
     data: result,
   });
 });
@@ -163,6 +183,8 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const EnrolledCourseController = {
   insertIntoDB,
   bulkInsertIntoDB,
+  enrollBundleCourses,
+  bulkEnrollBundleCourses,
   getEnrolledStudent,
   getMyFromDB,
   myEnrolledCoursesGrade,
