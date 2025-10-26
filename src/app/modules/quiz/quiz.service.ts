@@ -89,14 +89,7 @@ const getAllFromDB = async (
     where: whereConditions,
     skip,
     take: limit,
-    orderBy:
-      options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+    orderBy: { createdAt: 'asc' },
     include: {
       course: {
         select: { id: true, title: true },
@@ -104,17 +97,29 @@ const getAllFromDB = async (
     },
   });
 
+  // 🔹 Group by courseId and assign serial_id
+  const courseWiseMap: Record<string, number> = {};
+
+  const quizzesWithSerial = result.map(quiz => {
+    if (!courseWiseMap[quiz.courseId]) {
+      courseWiseMap[quiz.courseId] = 1;
+    } else {
+      courseWiseMap[quiz.courseId] += 1;
+    }
+
+    return {
+      ...quiz,
+      serial_id: courseWiseMap[quiz.courseId],
+    };
+  });
+
   const total = await prisma.quiz.count({
     where: whereConditions,
   });
 
   return {
-    meta: {
-      page,
-      limit,
-      total,
-    },
-    data: result,
+    meta: { page, limit, total },
+    data: quizzesWithSerial,
   };
 };
 
