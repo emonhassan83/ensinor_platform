@@ -1,7 +1,9 @@
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 import { NotificationService } from '../notification/notification.service';
 import { messages } from '../notification/notification.constant';
 import { NotificationModeType, User } from '@prisma/client';
+import { IUser } from '../user/user.interface';
+import config from '../../config';
 
 export type TExpiresIn =
   | number
@@ -13,42 +15,56 @@ export type TExpiresIn =
   | '1d'
   | '7d'
   | '30d'
-  | '365d'
+  | '365d';
 
 export const createToken = (
   jwtPayload: { userId: string; email: string; role: string },
   secret: string,
   expiresIn: TExpiresIn,
 ) => {
-  return jwt.sign(jwtPayload, secret, { expiresIn })
-}
+  return jwt.sign(jwtPayload, secret, { expiresIn });
+};
 
 export const verifyToken = (token: string, secret: string) => {
-  return jwt.verify(token, secret) as jwt.JwtPayload
-}
+  return jwt.verify(token, secret) as jwt.JwtPayload;
+};
+
+export const generateTokens = (user: IUser) => {
+  const jwtPayload = { userId: user.id, email: user.email, role: user.role };
+  const accessToken = createToken(
+    jwtPayload,
+    config.jwt_access_secret as string,
+    config.jwt_access_expires_in as TExpiresIn,
+  );
+  const refreshToken = createToken(
+    jwtPayload,
+    config.jwt_refresh_secret as string,
+    config.jwt_refresh_expires_in as TExpiresIn,
+  );
+  return { accessToken, refreshToken };
+};
 
 export const authNotify = async (
   action: 'PASSWORD_CHANGE' | 'PASSWORD_RESET',
-  user: Partial<User>
+  user: Partial<User>,
 ) => {
-
   // Determine the message and description based on the action
-  let message
-  let description
+  let message;
+  let description;
 
-    switch (action) {
-    case "PASSWORD_CHANGE":
+  switch (action) {
+    case 'PASSWORD_CHANGE':
       message = messages.authSettings.passwordChanged;
       description = `Hello ${user?.name}, your password was successfully changed. If you did not perform this action, please contact support immediately.`;
       break;
 
-    case "PASSWORD_RESET":
+    case 'PASSWORD_RESET':
       message = messages.authSettings.passwordReset;
       description = `Hello ${user?.name}, your password has been reset. Use your new password to login. If this was not you, please secure your account.`;
       break;
 
     default:
-      throw new Error("Invalid action type");
+      throw new Error('Invalid action type');
   }
 
   // Create a notification entry
@@ -56,6 +72,6 @@ export const authNotify = async (
     receiverId: user?.id,
     message,
     description,
-     modeType: NotificationModeType.users,
-  })
-}
+    modeType: NotificationModeType.users,
+  });
+};

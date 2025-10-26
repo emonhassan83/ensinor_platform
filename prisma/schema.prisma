@@ -45,7 +45,7 @@ model User {
   packageExpiry       DateTime?
   fcmToken            String?
   balance             Float        @default(0.0)
-  registerWith        RegisterWith
+  registerWith        RegisterWith @default(credentials)
   lastActive          DateTime     @default(now())
   needsPasswordChange Boolean      @default(true)
   passwordChangedAt   DateTime     @default(now())

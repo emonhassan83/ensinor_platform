@@ -7,16 +7,109 @@ import {
   authNotify,
   // authNotifyAdmin,
   createToken,
+  generateTokens,
   TExpiresIn,
   verifyToken,
 } from './auth.utils';
-import { TLoginUser } from './auth.interface';
+import { SocialLoginPayload, TLoginUser } from './auth.interface';
 import { generateOtp } from '../../utils/generateOtp';
 import moment from 'moment';
 import ApiError from '../../errors/ApiError';
 import { RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import { IUser } from '../user/user.interface';
 import prisma from '../../utils/prisma';
+
+const socialLogin = async (
+  payload: SocialLoginPayload,
+  platform: RegisterWith,
+) => {
+  if ((payload as any).role === UserRole.super_admin) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'You cannot assign super admin role directly.',
+    );
+  }
+
+  // Check if user exists
+  let user = await prisma.user.findUnique({
+    where: { email: payload.email },
+    include: { verification: true, student: true },
+  });
+
+  if (user) {
+    if (user.registerWith !== platform) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `This account is registered with ${user.registerWith}. Use that method to login.`,
+      );
+    }
+
+    // Reactivate soft-deleted user
+    if (user.isDeleted) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          name: payload.name,
+          photoUrl: payload.photoUrl,
+          isDeleted: false,
+          registerWith: platform,
+          verification: {
+            update: { otp: '', expiresAt: new Date(), status: true },
+          },
+          expireAt: null,
+        },
+        include: { verification: true, student: true },
+      });
+    }
+
+    // Update lastActive + FCM token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastActive: new Date(),
+        ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+      },
+    });
+
+    // Create Student record if not exists
+    if (!user.student) {
+      await prisma.student.create({ data: { userId: user.id } });
+    }
+
+    const tokens = generateTokens({ ...user, password: user.password ?? '' } as IUser);
+    return { user, ...tokens };
+  }
+
+  // Create new user
+  const newUser = await prisma.user.create({
+    data: {
+      name: payload.name!,
+      email: payload.email!,
+      photoUrl: payload.photoUrl,
+      registerWith: platform,
+      verification: {
+        create: { otp: '', expiresAt: new Date(), status: true },
+      },
+      expireAt: null,
+    },
+    include: { verification: true },
+  });
+
+  // Create student record
+  await prisma.student.create({ data: { userId: newUser.id } });
+
+  // Update lastActive + FCM token
+  await prisma.user.update({
+    where: { id: newUser.id },
+    data: {
+      lastActive: new Date(),
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  });
+
+  const tokens = generateTokens({ ...newUser, password: newUser.password ?? '' } as IUser);
+  return { user: newUser, ...tokens };
+};
 
 // ---------------------- LOGIN ----------------------
 const loginUser = async (payload: TLoginUser) => {
@@ -83,513 +176,15 @@ const loginUser = async (payload: TLoginUser) => {
   };
 };
 
-// ---------------------- REGISTER WITH GOOGLE ----------------------
-const registerWithGoogle = async (payload: Partial<IUser>) => {
-  // 🚫 Prevent admin role assignment by user
-  if (payload.role === UserRole.super_admin) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      'You cannot directly assign super admin role',
-    );
-  }
+// ---------------------- REGISTER WITH SOCIAL ----------------------
+const registerWithGoogle = (payload: SocialLoginPayload) =>
+  socialLogin(payload, RegisterWith.google);
 
-  const user = await prisma.user.findUnique({
-    where: { email: payload.email as string },
-    include: { verification: true },
-  });
-  if (user) {
-    // Check if account was not created with Google
-    if (user?.registerWith !== RegisterWith.google) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `This account is registered with ${user.registerWith}, so you should try logging in using that method.`,
-      );
-    }
+const registerWithLinkedIn = (payload: SocialLoginPayload) =>
+  socialLogin(payload, RegisterWith.linkedIn);
 
-    // If user is soft deleted, reactivate
-    if (user?.isDeleted) {
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name: payload.name,
-          email: payload.email,
-          photoUrl: payload.photoUrl,
-          registerWith: RegisterWith.google,
-          isDeleted: false,
-          verification: {
-            update: {
-              otp: '',
-              expiresAt: new Date(),
-              status: true,
-            },
-          },
-          expireAt: null,
-        },
-        include: { verification: true },
-      });
-
-      if (!updatedUser) {
-        throw new ApiError(
-          httpStatus.INTERNAL_SERVER_ERROR,
-          'Failed to reactivate deleted user.',
-        );
-      }
-
-      const jwtPayload = {
-        userId: updatedUser.id,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      };
-
-      const accessToken = createToken(
-        jwtPayload,
-        config.jwt_access_secret as string,
-        config.jwt_access_expires_in as TExpiresIn,
-      );
-
-      const refreshToken = createToken(
-        jwtPayload,
-        config.jwt_refresh_secret as string,
-        config.jwt_refresh_expires_in as TExpiresIn,
-      );
-
-      return {
-        user: updatedUser,
-        accessToken,
-        refreshToken,
-      };
-    }
-
-    // If user is valid and active
-    const jwtPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const accessToken = createToken(
-      jwtPayload,
-      config.jwt_access_secret as string,
-      config.jwt_access_expires_in as TExpiresIn,
-    );
-
-    const refreshToken = createToken(
-      jwtPayload,
-      config.jwt_refresh_secret as string,
-      config.jwt_refresh_expires_in as TExpiresIn,
-    );
-
-    // Update lastActive + save FCM token if provided
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastActive: new Date(),
-        ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-      },
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  }
-
-  // Create new user if not exists
-  const newUser = await prisma.user.create({
-    data: {
-      name: payload.name!,
-      email: payload.email!,
-      photoUrl: payload.photoUrl,
-      registerWith: RegisterWith.google,
-      verification: {
-        create: {
-          otp: '',
-          expiresAt: new Date(),
-          status: true,
-        },
-      },
-      expireAt: null,
-    },
-    include: { verification: true },
-  });
-
-  if (!newUser) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Failed to create user!',
-    );
-  }
-
-  const jwtPayload = {
-    userId: newUser.id,
-    email: newUser.email,
-    role: newUser.role,
-  };
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt_access_secret as string,
-    config.jwt_access_expires_in as TExpiresIn,
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt_refresh_secret as string,
-    config.jwt_refresh_expires_in as TExpiresIn,
-  );
-
-  // Update lastActive + save FCM token if provided
-  await prisma.user.update({
-    where: { id: newUser.id },
-    data: {
-      lastActive: new Date(),
-      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-    },
-  });
-
-  return {
-    user: newUser,
-    accessToken,
-    refreshToken,
-  };
-};
-
-const registerWithLinkedIn = async (payload: Partial<IUser>) => {
-  // 🚫 Prevent admin role assignment by user
-  if (payload.role === UserRole.super_admin) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      'You cannot directly assign super admin role',
-    );
-  }
-
-  //* checking if the user is exist
-  const user = await prisma.user.findUnique({
-    where: { email: payload.email as string },
-    include: { verification: true },
-  });
-
-  // if login Linkedin with existing user
-  if (user) {
-    if (user?.registerWith !== RegisterWith.linkedIn) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `This account is registered with ${user.registerWith}, so you should try logging in using that method.`,
-      );
-    }
-
-    if (user?.isDeleted) {
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name: payload.name,
-          email: payload.email,
-          photoUrl: payload.photoUrl,
-          registerWith: RegisterWith.linkedIn,
-          isDeleted: false,
-          verification: {
-            update: {
-              otp: '',
-              expiresAt: new Date(),
-              status: true,
-            },
-          },
-          expireAt: null,
-        },
-        include: { verification: true },
-      });
-
-      if (!updatedUser) {
-        throw new ApiError(
-          httpStatus.INTERNAL_SERVER_ERROR,
-          'Failed to reactivate deleted user.',
-        );
-      }
-
-      const jwtPayload = {
-        userId: updatedUser.id,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      };
-
-      const accessToken = createToken(
-        jwtPayload,
-        config.jwt_access_secret as string,
-        config.jwt_access_expires_in as TExpiresIn,
-      );
-
-      const refreshToken = createToken(
-        jwtPayload,
-        config.jwt_refresh_secret as string,
-        config.jwt_refresh_expires_in as TExpiresIn,
-      );
-
-      // Update lastActive + save FCM token if provided
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          lastActive: new Date(),
-          ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-        },
-      });
-
-      return {
-        user: updatedUser,
-        accessToken,
-        refreshToken,
-      };
-    }
-
-    const jwtPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const accessToken = createToken(
-      jwtPayload,
-      config.jwt_access_secret as string,
-      config.jwt_access_expires_in as TExpiresIn,
-    );
-
-    const refreshToken = createToken(
-      jwtPayload,
-      config.jwt_refresh_secret as string,
-      config.jwt_refresh_expires_in as TExpiresIn,
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  }
-
-  const newUser = await prisma.user.create({
-    data: {
-      name: payload.name!,
-      email: payload.email!,
-      photoUrl: payload.photoUrl,
-      registerWith: RegisterWith.linkedIn,
-      verification: {
-        create: {
-          otp: '',
-          expiresAt: new Date(),
-          status: true,
-        },
-      },
-      expireAt: null,
-    },
-    include: { verification: true },
-  });
-
-  if (!newUser) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Failed to create user!',
-    );
-  }
-
-  const jwtPayload = {
-    userId: newUser.id,
-    email: newUser.email,
-    role: newUser.role,
-  };
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt_access_secret as string,
-    config.jwt_access_expires_in as TExpiresIn,
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt_refresh_secret as string,
-    config.jwt_refresh_expires_in as TExpiresIn,
-  );
-
-  // Update lastActive + save FCM token if provided
-  await prisma.user.update({
-    where: { id: newUser.id },
-    data: {
-      lastActive: new Date(),
-      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-    },
-  });
-
-  return {
-    user: newUser,
-    accessToken,
-    refreshToken,
-  };
-};
-
-const registerWithFacebook = async (payload: Partial<IUser>) => {
-  // 🚫 Prevent admin role assignment by user
-  if (payload.role === UserRole.super_admin) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      'You cannot directly assign admin role',
-    );
-  }
-
-  //* checking if the user is exist
-  const user = await prisma.user.findUnique({
-    where: { email: payload.email as string },
-    include: { verification: true },
-  });
-
-  if (user) {
-    if (user?.registerWith !== RegisterWith.facebook) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `This account is registered with ${user.registerWith}, so you should try logging in using that method.`,
-      );
-    }
-
-    if (user?.isDeleted) {
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name: payload.name,
-          email: payload.email,
-          photoUrl: payload.photoUrl,
-          registerWith: RegisterWith.facebook,
-          isDeleted: false,
-          verification: {
-            update: {
-              otp: '',
-              expiresAt: new Date(),
-              status: true,
-            },
-          },
-          expireAt: null,
-        },
-        include: { verification: true },
-      });
-
-      if (!updatedUser) {
-        throw new ApiError(
-          httpStatus.INTERNAL_SERVER_ERROR,
-          'Failed to reactivate deleted user.',
-        );
-      }
-
-      const jwtPayload = {
-        userId: updatedUser.id,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      };
-
-      const accessToken = createToken(
-        jwtPayload,
-        config.jwt_access_secret as string,
-        config.jwt_access_expires_in as TExpiresIn,
-      );
-
-      const refreshToken = createToken(
-        jwtPayload,
-        config.jwt_refresh_secret as string,
-        config.jwt_refresh_expires_in as TExpiresIn,
-      );
-
-      return {
-        user: updatedUser,
-        accessToken,
-        refreshToken,
-      };
-    }
-
-    const jwtPayload = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const accessToken = createToken(
-      jwtPayload,
-      config.jwt_access_secret as string,
-      config.jwt_access_expires_in as TExpiresIn,
-    );
-
-    const refreshToken = createToken(
-      jwtPayload,
-      config.jwt_refresh_secret as string,
-      config.jwt_refresh_expires_in as TExpiresIn,
-    );
-
-    // Update lastActive + save FCM token if provided
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastActive: new Date(),
-        ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-      },
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  }
-
-  const newUser = await prisma.user.create({
-    data: {
-      name: payload.name!,
-      email: payload.email!,
-      photoUrl: payload.photoUrl,
-      registerWith: RegisterWith.facebook,
-      verification: {
-        create: {
-          otp: '',
-          expiresAt: new Date(),
-          status: true,
-        },
-      },
-      expireAt: null,
-    },
-    include: { verification: true },
-  });
-
-  if (!newUser) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Failed to create user!',
-    );
-  }
-
-  const jwtPayload = {
-    userId: newUser.id,
-    email: newUser.email,
-    role: newUser.role,
-  };
-
-  const accessToken = createToken(
-    jwtPayload,
-    config.jwt_access_secret as string,
-    config.jwt_access_expires_in as TExpiresIn,
-  );
-
-  const refreshToken = createToken(
-    jwtPayload,
-    config.jwt_refresh_secret as string,
-    config.jwt_refresh_expires_in as TExpiresIn,
-  );
-
-  // Update lastActive + save FCM token if provided
-  await prisma.user.update({
-    where: { id: newUser.id },
-    data: {
-      lastActive: new Date(),
-      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
-    },
-  });
-
-  return {
-    user: newUser,
-    accessToken,
-    refreshToken,
-  };
-};
+const registerWithFacebook = (payload: SocialLoginPayload) =>
+  socialLogin(payload, RegisterWith.facebook);
 
 const changePassword = async (
   userData: JwtPayload,
