@@ -1,7 +1,7 @@
 import { CompanyAdmin, CoursesStatus, Prisma, User, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
-import { ICompanyAdminFilterRequest } from './companyAdmin.interface';
+import { IBranding, ICompanyAdminFilterRequest } from './companyAdmin.interface';
 import { companyAdminSearchAbleFields } from './companyAdmin.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
@@ -270,6 +270,56 @@ const updateIntoDB = async (
   return updated;
 };
 
+const changedBranding = async (
+  userId: string,
+  payload: IBranding,
+  file?: Express.Multer.File,
+) => {
+  // 1️⃣ Find user and linked company admin
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+    include: { companyAdmin: true },
+  });
+
+  if (!user || !user.companyAdmin) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found for this user!');
+  }
+
+  const companyAdmin = user.companyAdmin;
+
+  // 2️⃣ Check if company exists
+  const existingCompany = await prisma.company.findUnique({
+    where: { userId: companyAdmin.id },
+  });
+
+  if (!existingCompany) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No company record found for this admin!');
+  }
+
+  // 3️⃣ Handle logo upload
+  if (file) {
+    const uploaded = await uploadToS3({
+      file,
+      fileName: `images/company/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    });
+
+    if (uploaded) {
+      payload.logo = uploaded;
+    }
+  }
+
+  // 4️⃣ Update branding details
+  const updated = await prisma.company.update({
+    where: { userId: companyAdmin.id },
+    data: {
+      ...(payload ?? {}),
+      updatedAt: new Date(),
+    },
+  });
+
+  return updated;
+};
+
 const deleteFromDB = async (id: string): Promise<User> => {
   const companyAdmin = await prisma.companyAdmin.findUniqueOrThrow({
     where: { id },
@@ -293,5 +343,6 @@ export const CompanyAdminService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedBranding,
   deleteFromDB,
 };

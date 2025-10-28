@@ -42,6 +42,16 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const changedBranding = catchAsync(async (req, res) => {
+  const result = await CompanyAdminService.changedBranding(req.user!.userId, req.body, req.file);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Company branding data updated!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CompanyAdminService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -56,5 +66,6 @@ export const CompanyAdminController = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  changedBranding,
   deleteFromDB
 };

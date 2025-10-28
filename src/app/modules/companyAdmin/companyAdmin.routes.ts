@@ -24,6 +24,15 @@ router.get(
 );
 
 router.put(
+  '/changed-branding',
+  auth(UserRole.company_admin),
+  upload.single('image'),
+  parseData(),
+  validateRequest(CompanyAdminValidation.changedBrandingValidationSchema),
+  CompanyAdminController.changedBranding,
+);
+
+router.put(
   '/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
   upload.single('image'),

@@ -27,7 +27,7 @@ router.get(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
-  checkCompanyAdminSubscription(),
+  // checkCompanyAdminSubscription(),
   WithdrawRequestController.getAuthorPayout,
 );
 

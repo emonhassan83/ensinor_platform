@@ -20,6 +20,14 @@ const updateValidationSchema = z.object({
   }),
 });
 
+const changedBrandingValidationSchema = z.object({
+  body: z.object({
+    name: z.string().optional(),
+    color: z.string().optional(),
+  }),
+});
+
 export const CompanyAdminValidation = {
   updateValidationSchema,
+  changedBrandingValidationSchema,
 };
