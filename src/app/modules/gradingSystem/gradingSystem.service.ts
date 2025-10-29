@@ -60,10 +60,7 @@ const insertIntoDB = async (payload: IGradingSystem, currentUser: any) => {
       },
     });
     if (existingSystem) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'You have already created a grading system for this course!',
-      );
+      return existingSystem;
     }
   } else {
     // 5. For default grading system, prevent duplicates
@@ -273,25 +270,29 @@ const getByIdFromDB = async (id: string): Promise<GradingSystem | null> => {
   return result;
 };
 
-const getDefaultGradingSystemFromDB = async (): Promise<GradingSystem | null> => {
-  const result = await prisma.gradingSystem.findFirst({
-    where: { isDefault: true, isDeleted: false },
-    include: {
-      grades: {
-        orderBy: { minScore: 'desc' },
+const getDefaultGradingSystemFromDB =
+  async (): Promise<GradingSystem | null> => {
+    const result = await prisma.gradingSystem.findFirst({
+      where: { isDefault: true, isDeleted: false },
+      include: {
+        grades: {
+          orderBy: { minScore: 'desc' },
+        },
+        course: {
+          select: { title: true },
+        },
       },
-      course: {
-        select: { title: true },
-      },
-    },
-  });
+    });
 
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'No default grading system found!');
-  }
+    if (!result) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'No default grading system found!',
+      );
+    }
 
-  return result;
-};
+    return result;
+  };
 
 const updateIntoDB = async (
   id: string,

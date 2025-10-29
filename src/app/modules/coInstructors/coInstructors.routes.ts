@@ -32,17 +32,17 @@ router.get(
   CoInstructorController.getByIdFromDB,
 );
 
+router.patch(
+  '/revoke/:id',
+  auth(UserRole.business_instructors, UserRole.instructor),
+  CoInstructorController.revokeAccess,
+);
+
 router.put(
   '/:id',
   auth(UserRole.business_instructors, UserRole.instructor),
   validateRequest(CoInstructorValidation.updateValidationSchema),
   CoInstructorController.updateIntoDB,
-);
-
-router.patch(
-  '/revoke/:id',
-  auth(UserRole.business_instructors, UserRole.instructor),
-  CoInstructorController.revokeAccess,
 );
 
 router.delete(

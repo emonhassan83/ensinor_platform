@@ -207,6 +207,9 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      courseBundleCourses: true,
+    },
   });
 
   // Format bundles to include default coupon/promo fields

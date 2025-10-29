@@ -93,7 +93,7 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     where: {
       id: coInstructorId,
       role: { in: [UserRole.instructor, UserRole.business_instructors] },
-      status: UserStatus.active,
+      // status: UserStatus.active,
       isDeleted: false,
     },
   });
@@ -319,7 +319,7 @@ const revokeAccess = async (id: string): Promise<CoInstructor> => {
   if (!coInstructor) {
     throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
   }
-  const inviter = await prisma.coInstructor.findUnique({
+  const inviter = await prisma.user.findUnique({
     where: { id: coInstructor.invitedById, isDeleted: false },
   });
   if (!inviter) {
@@ -335,7 +335,7 @@ const revokeAccess = async (id: string): Promise<CoInstructor> => {
   }
 
   // sent notification to invitee
-  await sendCoInstructorNotification(inviter, coInstructor.id, 'revoke');
+  await sendCoInstructorNotification(inviter, coInstructor.coInstructorId, 'revoke');
 
   return result;
 };

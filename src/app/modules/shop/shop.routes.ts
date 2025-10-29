@@ -30,12 +30,6 @@ router.post(
   ShopController.insertIntoDB,
 );
 
-router.get('/trending', ShopController.getTrendingBooks);
-
-router.get('/', ShopController.getAllFromDB);
-
-router.get('/categories', ShopController.getAllCategoriesFromDB);
-
 router.get(
   '/author/my-shop',
   auth(
@@ -47,6 +41,12 @@ router.get(
   checkCompanyAdminSubscription(),
   ShopController.getMyShopFromDB,
 );
+
+router.get('/categories', ShopController.getAllCategoriesFromDB);
+
+router.get('/trending', ShopController.getTrendingBooks);
+
+router.get('/', ShopController.getAllFromDB);
 
 router.get(
   '/company/:companyId',
