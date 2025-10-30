@@ -15,9 +15,23 @@ const createValidationSchema = z.object({
 // Group enrolled validation
 const groupEnrolledValidationSchema = z.object({
   body: z.object({
-    userId: z
-      .string({ required_error: 'Author id is required' })
-      .uuid('author id must be a valid UUID'),
+    userIds: z.array(
+      z
+        .string({ required_error: 'Author id is required' })
+        .uuid('author id must be a valid UUID'),
+    ),
+    courseId: z
+      .string({ required_error: 'Course id is required' })
+      .uuid('course id must be a valid UUID'),
+  }),
+});
+
+// Group enrolled validation
+const departmentEnrolledValidationSchema = z.object({
+  body: z.object({
+    departmentId: z
+      .string({ required_error: 'Department id is required' })
+      .uuid('department id must be a valid UUID'),
     courseId: z
       .string({ required_error: 'Course id is required' })
       .uuid('course id must be a valid UUID'),
@@ -97,6 +111,7 @@ const updateValidationSchema = z.object({
 export const EnrolledCourseValidation = {
   createValidationSchema,
   groupEnrolledValidationSchema,
+  departmentEnrolledValidationSchema,
   bulkEnrolledValidationSchema,
   bundleEnrollValidationSchema,
   bulkBundleEnrollValidationSchema,

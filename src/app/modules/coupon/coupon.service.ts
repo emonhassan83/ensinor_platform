@@ -59,7 +59,7 @@ const insertIntoDB = async (payload: ICoupon) => {
   // 4️⃣ Validate code uniqueness
   const existing = await prisma.coupon.findUnique({ where: { code } });
   if (existing)
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists!');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists! Please choose a different code.');
 
   if (!payload.isGlobal) {
     // 5️⃣ Validate model-specific reference + active coupon check
@@ -168,14 +168,18 @@ const insertIntoDB = async (payload: ICoupon) => {
 const getAllFromDB = async (
   params: ICouponFilterRequest,
   options: IPaginationOptions,
-  authorId?: string,
+  filterBy?: { authorId?: string; isGlobal?: boolean },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.CouponWhereInput[] = [{ isActive: true }];
-  if (authorId) {
-    andConditions.push({ authorId });
+    // Filter either by authorId
+  if ( filterBy && filterBy.authorId) {
+    andConditions.push({ authorId: filterBy.authorId });
+  }
+  if( filterBy && filterBy.isGlobal !== undefined) {
+    andConditions.push({ isGlobal: filterBy.isGlobal });
   }
 
   // Search across Package and nested User fields

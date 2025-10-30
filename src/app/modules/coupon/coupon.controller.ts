@@ -30,6 +30,22 @@ const getAllFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getGlobalCoupon = catchAsync(async (req, res) => {
+  const filters = pick(req.query, couponFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CouponService.getAllFromDB(filters, options, {
+    isGlobal: true,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Coupons data fetched!',
+    data: result.data,
+  });
+});
+
 const getAllByReferenceFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, couponFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -49,7 +65,9 @@ const getMyCouponsFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, couponFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await CouponService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await CouponService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -71,10 +89,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await CouponService.updateIntoDB(
-    req.params.id,
-    req.body
-  );
+  const result = await CouponService.updateIntoDB(req.params.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -84,9 +99,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
 });
 
 const changedActiveStatus = catchAsync(async (req, res) => {
-  const result = await CouponService.changedActiveStatusIntoDB(
-    req.params.id
-  );
+  const result = await CouponService.changedActiveStatusIntoDB(req.params.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -108,6 +121,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CouponController = {
   insertIntoDB,
   getAllFromDB,
+  getGlobalCoupon,
   getAllByReferenceFromDB,
   getMyCouponsFromDB,
   getByIdFromDB,

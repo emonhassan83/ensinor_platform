@@ -26,7 +26,7 @@ const groupEnrolledCourse = catchAsync(async (req, res) => {
 });
 
 const enrolledCourseByDepartment = catchAsync(async (req, res) => {
-  const result = await EnrolledCourseService.groupEnrolledCourse(req.body);
+  const result = await EnrolledCourseService.departmentEnrolledCourse(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

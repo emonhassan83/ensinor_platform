@@ -2,18 +2,21 @@ import {
   AchievementModelType,
   ChatRole,
   ChatType,
+  Course,
   CourseGrade,
   CoursesStatus,
   EnrolledCourse,
   EnrolledLogsModelType,
   PlatformType,
   Prisma,
+  User,
   UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
   IBulkEnrolledCourse,
+  IDepartmentEnrolledCourse,
   IEnrolledCourse,
   IEnrolledCourseFilterRequest,
   IGroupEnrolledCourse,
@@ -34,6 +37,130 @@ const defaultGradingSystem = [
   { gradeLabel: 'D', minScore: 60, maxScore: 69 },
   { gradeLabel: 'F', minScore: 0, maxScore: 59 },
 ];
+
+const enrollUser = async (tx: any, user: User, course: Course) => {
+  // 1️⃣ Create enrollment
+  const newEnroll = await tx.enrolledCourse.create({
+    data: {
+      userId: user.id,
+      courseId: course.id,
+      authorId: course.authorId,
+      platform: course.platform,
+      courseCategory: course.category,
+    },
+  });
+
+  // 2️⃣ Increment student/employee counters
+  if (user.role === 'student') {
+    await tx.student.upsert({
+      where: { userId: user.id },
+      update: { courseEnrolled: { increment: 1 } },
+      create: { userId: user.id, courseEnrolled: 1 },
+    });
+  } else if (user.role === 'employee') {
+    await tx.employee.update({
+      where: { userId: user.id },
+      data: { courseEnrolled: { increment: 1 } },
+    });
+  }
+
+  // 3️⃣ Increment instructor/business/company counters
+  if (course.platform === PlatformType.admin) {
+    await tx.instructor.updateMany({
+      where: { userId: course.authorId },
+      data: { enrolled: { increment: 1 } },
+    });
+  } else if (course.platform === PlatformType.company && course.companyId) {
+    await tx.businessInstructor.updateMany({
+      where: { companyId: course.companyId, authorId: course.authorId },
+      data: { enrolled: { increment: 1 } },
+    });
+    await tx.company.update({
+      where: { id: course.companyId },
+      data: { enrolled: { increment: 1 } },
+    });
+    await tx.companyAdmin.updateMany({
+      where: { company: { id: course.companyId } },
+      data: { enrolled: { increment: 1 } },
+    });
+  }
+
+  // 4️⃣ Add enrolled log
+  await tx.enrolledLogs.create({
+    data: { userId: user.id, courseId: course.id, modelType: EnrolledLogsModelType.course },
+  });
+
+  // 5️⃣ Auto-join course chats
+  const chats = await tx.chat.findMany({
+    where: {
+      courseId: course.id,
+      type: { in: [ChatType.group, ChatType.announcement] },
+      isDeleted: false,
+    },
+  });
+  for (const chat of chats) {
+    const alreadyParticipant = await tx.chatParticipant.findFirst({
+      where: { chatId: chat.id, userId: user.id },
+    });
+    if (!alreadyParticipant) {
+      await tx.chatParticipant.create({
+        data: { userId: user.id, chatId: chat.id, role: ChatRole.member },
+      });
+    }
+  }
+
+  // 6️⃣ Send congratulatory email
+  await sendCourseEnrollmentEmail(
+    user.email,
+    user.name,
+    course.title,
+    'https://dashboard.ensinor.com',
+  );
+
+  // 7️⃣ Monthly streak bonus + update achievement level
+  if (course.price > 0) {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date(startOfMonth);
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+    const monthlyPurchases = await tx.enrolledCourse.count({
+      where: {
+        userId: user.id,
+        isDeleted: false,
+        createdAt: { gte: startOfMonth, lt: endOfMonth },
+        course: { price: { gt: 0 } },
+      },
+    });
+
+    if (monthlyPurchases > 1) {
+      const achievement = await tx.achievement.upsert({
+        where: { userId: user.id },
+        update: {
+          totalPoints: { increment: 50 },
+          monthlyStreakPoints: { increment: 50 },
+        },
+        create: {
+          userId: user.id,
+          totalPoints: 50,
+          monthlyStreakPoints: 50,
+        },
+      });
+
+      await tx.achievementLogs.create({
+        data: { userId: user.id, courseId: course.id, modelType: AchievementModelType.monthly_streak },
+      });
+
+      // Update level
+      const { level } = calculateAchievementLevel(achievement.totalPoints);
+      await tx.achievement.update({ where: { userId: user.id }, data: { level } });
+    }
+  }
+
+  return newEnroll;
+};
 
 const insertIntoDB = async (payload: IEnrolledCourse) => {
   const { userId, courseId } = payload;
@@ -226,137 +353,74 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
 const groupEnrolledCourse = async (payload: IGroupEnrolledCourse) => {
   const { userIds, courseId } = payload;
 
-  // 1️⃣ Fetch course
   const course = await prisma.course.findFirst({
-    where: {
-      id: courseId,
-      status: CoursesStatus.approved,
-      isDeleted: false,
-    },
+    where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
   });
   if (!course) throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
 
-  // 2️⃣ Fetch all users
   const users = await prisma.user.findMany({
-    where: {
-      id: { in: userIds },
-      status: UserStatus.active,
-      isDeleted: false,
-    },
+    where: { id: { in: userIds }, status: UserStatus.active, isDeleted: false },
   });
 
-  if (!users || users.length === 0) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'No valid users found!');
-  }
-
-  // 3️⃣ Filter out users already enrolled
   const existingEnrollments = await prisma.enrolledCourse.findMany({
-    where: {
-      courseId,
-      userId: { in: userIds },
-      isDeleted: false,
-    },
+    where: { courseId, userId: { in: userIds }, isDeleted: false },
   });
-  const alreadyEnrolledUserIds = existingEnrollments.map(e => e.userId);
-  const usersToEnroll = users.filter(
-    u => !alreadyEnrolledUserIds.includes(u.id),
-  );
 
-  if (usersToEnroll.length === 0) {
-    return {
-      message: 'All users are already enrolled!',
-      enrolledUsers: [],
-      skippedUsers: userIds,
-    };
+  const alreadyEnrolledUserIds = existingEnrollments.map(e => e.userId);
+  const usersToEnroll = users.filter(u => !alreadyEnrolledUserIds.includes(u.id));
+
+  const enrolledUsers: string[] = [];
+  const skippedUsers = alreadyEnrolledUserIds;
+
+  if (usersToEnroll.length > 0) {
+    await prisma.$transaction(async tx => {
+      for (const user of usersToEnroll) {
+        const enrollment = await enrollUser(tx, user, course);
+        enrolledUsers.push(user.id);
+      }
+    });
   }
 
-  // 4️⃣ Transaction → enroll multiple users
-  const enrolledCourses = await prisma.$transaction(async tx => {
-    const results: any[] = [];
+  return { enrolledUsers, skippedUsers };
+};
 
-    for (const user of usersToEnroll) {
-      const newEnroll = await tx.enrolledCourse.create({
-        data: {
-          userId: user.id,
-          courseId,
-          authorId: course.authorId,
-          platform: course.platform,
-          courseCategory: course.category,
-        },
-      });
+const departmentEnrolledCourse = async (payload: IDepartmentEnrolledCourse) => {
+  const { departmentId, courseId } = payload;
 
-      // Increment counters
-      if (user.role === 'student') {
-        await tx.student.upsert({
-          where: { userId: user.id },
-          update: { courseEnrolled: { increment: 1 } },
-          create: { userId: user.id, courseEnrolled: 1 },
-        });
-      } else if (user.role === 'employee') {
-        await tx.employee.update({
-          where: { userId: user.id },
-          data: { courseEnrolled: { increment: 1 } },
-        });
-      }
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, status: CoursesStatus.approved, isDeleted: false },
+  });
+  if (!course) throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
 
-      if (course.platform === PlatformType.admin) {
-        await tx.instructor.updateMany({
-          where: { userId: course.authorId },
-          data: { enrolled: { increment: 1 } },
-        });
-      } else if (course.platform === PlatformType.company && course.companyId) {
-        await tx.businessInstructor.updateMany({
-          where: { companyId: course.companyId, authorId: course.authorId },
-          data: { enrolled: { increment: 1 } },
-        });
-        await tx.company.update({
-          where: { id: course.companyId },
-          data: { enrolled: { increment: 1 } },
-        });
-        await tx.companyAdmin.updateMany({
-          where: { company: { id: course.companyId } },
-          data: { enrolled: { increment: 1 } },
-        });
-      }
+  const employees = await prisma.employee.findMany({
+    where: { departmentId },
+    include: { user: true },
+  });
+  if (!employees.length) throw new ApiError(httpStatus.BAD_REQUEST, 'No employees found in this department!');
 
-      // Enrollment logs
-      await tx.enrolledLogs.create({
-        data: {
-          userId: user.id,
-          courseId,
-          modelType: EnrolledLogsModelType.course,
-        },
-      });
+  const employeeIds = employees.map(emp => emp.userId);
 
-      // Join course chats
-      const chats = await tx.chat.findMany({
-        where: {
-          courseId,
-          type: { in: [ChatType.group, ChatType.announcement] },
-          isDeleted: false,
-        },
-      });
-      for (const chat of chats) {
-        const alreadyParticipant = await tx.chatParticipant.findFirst({
-          where: { chatId: chat.id, userId: user.id },
-        });
-        if (!alreadyParticipant) {
-          await tx.chatParticipant.create({
-            data: { userId: user.id, chatId: chat.id, role: ChatRole.member },
-          });
-        }
-      }
-
-      results.push(newEnroll);
-    }
-
-    return results;
+  const existingEnrollments = await prisma.enrolledCourse.findMany({
+    where: { courseId, userId: { in: employeeIds }, isDeleted: false },
   });
 
-  return {
-    enrolledUsers: enrolledCourses.map(e => e.userId),
-    skippedUsers: alreadyEnrolledUserIds,
-  };
+  const alreadyEnrolledIds = existingEnrollments.map(e => e.userId);
+  const employeesToEnroll = employees.filter(emp => !alreadyEnrolledIds.includes(emp.userId));
+
+  const enrolledUsers: string[] = [];
+  const skippedUsers = alreadyEnrolledIds;
+
+  if (employeesToEnroll.length > 0) {
+    await prisma.$transaction(async tx => {
+      for (const emp of employeesToEnroll) {
+        const user = emp.user;
+        const enrollment = await enrollUser(tx, user, course);
+        enrolledUsers.push(user.id);
+      }
+    });
+  }
+
+  return { enrolledUsers, skippedUsers };
 };
 
 const bulkInsertIntoDB = async (payload: IBulkEnrolledCourse) => {
@@ -1670,6 +1734,7 @@ const deleteFromDB = async (id: string): Promise<EnrolledCourse> => {
 export const EnrolledCourseService = {
   insertIntoDB,
   groupEnrolledCourse,
+  departmentEnrolledCourse,
   enrollBundleCourses,
   bulkInsertIntoDB,
   bundleEnrollBundleCourses,

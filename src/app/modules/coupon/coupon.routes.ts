@@ -20,6 +20,12 @@ router.post(
 );
 
 router.get(
+  '/global-coupon',
+  auth(UserRole.super_admin),
+  CouponController.getGlobalCoupon,
+);
+
+router.get(
   '/my-coupon',
   auth(
     UserRole.super_admin,

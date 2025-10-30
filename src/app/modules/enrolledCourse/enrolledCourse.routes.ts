@@ -23,6 +23,13 @@ router.post(
 );
 
 router.post(
+  '/department-enrolled',
+  auth(UserRole.company_admin),
+  validateRequest(EnrolledCourseValidation.departmentEnrolledValidationSchema),
+  EnrolledCourseController.enrolledCourseByDepartment,
+);
+
+router.post(
   '/bulk-enroll-courses',
   auth(UserRole.student, UserRole.employee),
   validateRequest(EnrolledCourseValidation.bulkEnrolledValidationSchema),
