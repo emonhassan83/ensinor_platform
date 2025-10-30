@@ -120,13 +120,25 @@ const getAllFromDB = async (
     });
   }
 
-  const whereConditions: Prisma.WithdrawRequestWhereInput = { AND: andConditions };
+  const whereConditions: Prisma.WithdrawRequestWhereInput = {
+    AND: andConditions,
+  };
 
   // ?? Fetch withdraw list
   const withdrawRequestList = await prisma.withdrawRequest.findMany({
     where: whereConditions,
     skip,
     take: limit,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
     orderBy:
       options.sortBy && options.sortOrder
         ? { [options.sortBy]: options.sortOrder }
@@ -210,6 +222,16 @@ const getAuthorPayout = async (
     where: whereConditions,
     skip,
     take: limit,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+    },
     orderBy:
       options.sortBy && options.sortOrder
         ? { [options.sortBy]: options.sortOrder }
@@ -323,6 +345,9 @@ const getByIdFromDB = async (id: string): Promise<WithdrawRequest | null> => {
           name: true,
           email: true,
           photoUrl: true,
+        },
+        include: {
+          bankDetail: true,
         },
       },
     },

@@ -68,9 +68,10 @@ const getAllNotificationFromDB = async (
   const { searchTerm, ...filterData } = filters;
 
   const andConditions: Prisma.NotificationWhereInput[] = [
-    { receiverId: userId},
+    { receiverId: userId },
   ];
 
+  // 🔍 Search by term (case insensitive)
   if (searchTerm) {
     andConditions.push({
       OR: notificationSearchableFields.map(field => ({
@@ -82,6 +83,7 @@ const getAllNotificationFromDB = async (
     });
   }
 
+  // 🔧 Filter by other fields
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
@@ -95,28 +97,41 @@ const getAllNotificationFromDB = async (
   const whereConditions: Prisma.NotificationWhereInput =
     andConditions.length > 0 ? { AND: andConditions } : {};
 
-  const result = await prisma.notification.findMany({
+  // 📬 Get notifications list
+  const notificationsList = await prisma.notification.findMany({
     where: whereConditions,
     skip,
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
         ? { [options.sortBy]: options.sortOrder }
-        : {
-            createdAt: 'desc',
-          },
+        : { createdAt: 'desc' },
   });
+
+  // 📊 Total notification count
   const total = await prisma.notification.count({
     where: whereConditions,
   });
 
+  // 🔔 Count of unread notifications
+  const unreadNotification = await prisma.notification.count({
+    where: {
+      receiverId: userId,
+      read: false,
+    },
+  });
+
+  // 🧾 Response format
   return {
     meta: {
       total,
       page,
       limit,
     },
-    data: result,
+    data: {
+      unreadNotification,
+      notificationsList,
+    },
   };
 };
 
