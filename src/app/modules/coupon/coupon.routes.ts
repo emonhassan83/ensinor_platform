@@ -19,14 +19,18 @@ router.post(
   CouponController.insertIntoDB,
 );
 
-router.get('/', CouponController.getAllFromDB);
-
 router.get(
-  '/reference/:referenceId',
-  auth(UserRole.super_admin),
-  CouponController.getAllByReferenceFromDB,
+  '/my-coupon',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  CouponController.getMyCouponsFromDB,
 );
 
+router.get('/', CouponController.getAllFromDB);
 
 router.get('/:id', CouponController.getByIdFromDB);
 

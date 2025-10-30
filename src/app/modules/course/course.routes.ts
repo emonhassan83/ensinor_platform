@@ -34,6 +34,12 @@ router.get(
   CourseController.getCombineCourses,
 );
 
+router.get(
+  '/internal-courses',
+  optionalAuth(UserRole.company_admin),
+  CourseController.getMyInternalCourse,
+);
+
 router.get('/author-courses/:authorId', CourseController.getByAuthorId);
 
 router.get('/popular', CourseController.getPopularCourses);

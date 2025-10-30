@@ -16,6 +16,7 @@ import {
   IBulkEnrolledCourse,
   IEnrolledCourse,
   IEnrolledCourseFilterRequest,
+  IGroupEnrolledCourse,
 } from './enrolledCourse.interface';
 import { enrolledCourseSearchAbleFields } from './enrolledCourse.constant';
 import prisma from '../../utils/prisma';
@@ -220,6 +221,142 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
   }
 
   return enrolledCourse;
+};
+
+const groupEnrolledCourse = async (payload: IGroupEnrolledCourse) => {
+  const { userIds, courseId } = payload;
+
+  // 1️⃣ Fetch course
+  const course = await prisma.course.findFirst({
+    where: {
+      id: courseId,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
+  });
+  if (!course) throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
+
+  // 2️⃣ Fetch all users
+  const users = await prisma.user.findMany({
+    where: {
+      id: { in: userIds },
+      status: UserStatus.active,
+      isDeleted: false,
+    },
+  });
+
+  if (!users || users.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No valid users found!');
+  }
+
+  // 3️⃣ Filter out users already enrolled
+  const existingEnrollments = await prisma.enrolledCourse.findMany({
+    where: {
+      courseId,
+      userId: { in: userIds },
+      isDeleted: false,
+    },
+  });
+  const alreadyEnrolledUserIds = existingEnrollments.map(e => e.userId);
+  const usersToEnroll = users.filter(
+    u => !alreadyEnrolledUserIds.includes(u.id),
+  );
+
+  if (usersToEnroll.length === 0) {
+    return {
+      message: 'All users are already enrolled!',
+      enrolledUsers: [],
+      skippedUsers: userIds,
+    };
+  }
+
+  // 4️⃣ Transaction → enroll multiple users
+  const enrolledCourses = await prisma.$transaction(async tx => {
+    const results: any[] = [];
+
+    for (const user of usersToEnroll) {
+      const newEnroll = await tx.enrolledCourse.create({
+        data: {
+          userId: user.id,
+          courseId,
+          authorId: course.authorId,
+          platform: course.platform,
+          courseCategory: course.category,
+        },
+      });
+
+      // Increment counters
+      if (user.role === 'student') {
+        await tx.student.upsert({
+          where: { userId: user.id },
+          update: { courseEnrolled: { increment: 1 } },
+          create: { userId: user.id, courseEnrolled: 1 },
+        });
+      } else if (user.role === 'employee') {
+        await tx.employee.update({
+          where: { userId: user.id },
+          data: { courseEnrolled: { increment: 1 } },
+        });
+      }
+
+      if (course.platform === PlatformType.admin) {
+        await tx.instructor.updateMany({
+          where: { userId: course.authorId },
+          data: { enrolled: { increment: 1 } },
+        });
+      } else if (course.platform === PlatformType.company && course.companyId) {
+        await tx.businessInstructor.updateMany({
+          where: { companyId: course.companyId, authorId: course.authorId },
+          data: { enrolled: { increment: 1 } },
+        });
+        await tx.company.update({
+          where: { id: course.companyId },
+          data: { enrolled: { increment: 1 } },
+        });
+        await tx.companyAdmin.updateMany({
+          where: { company: { id: course.companyId } },
+          data: { enrolled: { increment: 1 } },
+        });
+      }
+
+      // Enrollment logs
+      await tx.enrolledLogs.create({
+        data: {
+          userId: user.id,
+          courseId,
+          modelType: EnrolledLogsModelType.course,
+        },
+      });
+
+      // Join course chats
+      const chats = await tx.chat.findMany({
+        where: {
+          courseId,
+          type: { in: [ChatType.group, ChatType.announcement] },
+          isDeleted: false,
+        },
+      });
+      for (const chat of chats) {
+        const alreadyParticipant = await tx.chatParticipant.findFirst({
+          where: { chatId: chat.id, userId: user.id },
+        });
+        if (!alreadyParticipant) {
+          await tx.chatParticipant.create({
+            data: { userId: user.id, chatId: chat.id, role: ChatRole.member },
+          });
+        }
+      }
+
+      results.push(newEnroll);
+    }
+
+    return results;
+  });
+
+  return {
+    enrolledUsers: enrolledCourses.map(e => e.userId),
+    skippedUsers: alreadyEnrolledUserIds,
+  };
 };
 
 const bulkInsertIntoDB = async (payload: IBulkEnrolledCourse) => {
@@ -1532,6 +1669,7 @@ const deleteFromDB = async (id: string): Promise<EnrolledCourse> => {
 
 export const EnrolledCourseService = {
   insertIntoDB,
+  groupEnrolledCourse,
   enrollBundleCourses,
   bulkInsertIntoDB,
   bundleEnrollBundleCourses,

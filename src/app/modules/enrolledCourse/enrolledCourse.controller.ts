@@ -15,6 +15,26 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const groupEnrolledCourse = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.groupEnrolledCourse(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Group users course enrolled successfully!',
+    data: result,
+  });
+});
+
+const enrolledCourseByDepartment = catchAsync(async (req, res) => {
+  const result = await EnrolledCourseService.groupEnrolledCourse(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Department users course enrolled successfully!',
+    data: result,
+  });
+});
+
 const bulkInsertIntoDB = catchAsync(async (req, res) => {
   const result = await EnrolledCourseService.bulkInsertIntoDB(req.body);
   sendResponse(res, {
@@ -182,6 +202,8 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EnrolledCourseController = {
   insertIntoDB,
+  groupEnrolledCourse,
+  enrolledCourseByDepartment,
   bulkInsertIntoDB,
   enrollBundleCourses,
   bulkEnrollBundleCourses,

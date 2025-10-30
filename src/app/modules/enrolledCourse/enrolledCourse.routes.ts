@@ -16,6 +16,13 @@ router.post(
 );
 
 router.post(
+  '/group-enrolled',
+  auth(UserRole.company_admin, UserRole.business_instructors),
+  validateRequest(EnrolledCourseValidation.groupEnrolledValidationSchema),
+  EnrolledCourseController.groupEnrolledCourse,
+);
+
+router.post(
   '/bulk-enroll-courses',
   auth(UserRole.student, UserRole.employee),
   validateRequest(EnrolledCourseValidation.bulkEnrolledValidationSchema),

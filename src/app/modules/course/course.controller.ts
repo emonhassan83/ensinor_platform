@@ -4,6 +4,7 @@ import catchAsync from '../../utils/catchAsync';
 import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 import { courseFilterableFields } from './course.constant';
+import { CourseType } from '@prisma/client';
 
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await CourseService.insertIntoDB(req.body, req.file);
@@ -124,6 +125,24 @@ const getMyCourseFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getMyInternalCourse = catchAsync(async (req, res) => {
+  const filters = pick(req.query, courseFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await CourseService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+    type: CourseType.internal
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My Courses data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.getByIdFromDB(req.params.id);
   sendResponse(res, {
@@ -190,6 +209,7 @@ export const CourseController = {
   getPopularCourses,
   getAllFromDB,
   getCombineCourses,
+  getMyInternalCourse,
   getByAuthorId,
   getAllFilterDataFromDB,
   getByCompanyFromDB,

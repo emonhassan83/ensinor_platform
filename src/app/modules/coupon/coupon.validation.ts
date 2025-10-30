@@ -22,7 +22,7 @@ const createValidationSchema = z.object({
       .number({ required_error: 'Coupon discount is required!' })
       .int('Coupon discount must be an integer')
       .nonnegative('Coupon discount must be a positive number'),
-       maxUsage: z.number().int().positive().optional(),
+    maxUsage: z.number().int().positive().optional(),
   }),
 });
 
@@ -39,7 +39,7 @@ const updateValidationSchema = z.object({
       .int('Coupon discount must be an integer')
       .nonnegative('Coupon discount must be a positive number')
       .optional(),
-      maxUsage: z.number().int().positive().optional(),
+    maxUsage: z.number().int().positive().optional(),
   }),
 });
 

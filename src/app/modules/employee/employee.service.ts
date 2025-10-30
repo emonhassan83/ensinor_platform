@@ -6,6 +6,7 @@ import { employeeSearchAbleFields } from './employee.constant';
 import prisma from '../../utils/prisma';
 import { uploadToS3 } from '../../utils/s3';
 import ApiError from '../../errors/ApiError';
+import httpStatus from 'http-status';
 
 const getAllFromDB = async (
   params: IEmployeeFilterRequest,

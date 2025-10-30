@@ -19,6 +19,16 @@ export type IEnrolledCourse = {
   isCompleted?: boolean;
 };
 
+export type IGroupEnrolledCourse = {
+  userIds: string[];
+  courseId: string;
+};
+
+export type IDepartmentEnrolledCourse = {
+  departmentId: string;
+  courseId: string;
+};
+
 export type IBulkEnrolledCourse = {
   userId: string;
   courseIds: string[]
