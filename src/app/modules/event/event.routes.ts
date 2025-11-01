@@ -34,7 +34,7 @@ router.get('/', EventController.getAllFromDB);
 router.get('/filter-data', EventController.eventFilterData);
 
 router.get(
-  '/user/my-events',
+  '/author/my-events',
   auth(
     UserRole.super_admin,
     UserRole.company_admin,

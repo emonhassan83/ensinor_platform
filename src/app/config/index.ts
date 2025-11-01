@@ -42,4 +42,9 @@ export default {
     bucket: process.env.AWS_BUCKET_NAME,
     endpoint: process.env.SPACES_API,  
   },
+  zoom: {
+    client_id: process.env.ZOOM_CLIENT_ID,
+    client_secret: process.env.ZOOM_CLIENT_SECRET,
+    redirect_url: process.env.ZOOM_REDIRECT_URI
+  }
 }
