@@ -4,6 +4,7 @@ import ApiError from '../../errors/ApiError';
 import { IZoomAccount, IZoomMeeting } from './zoom.interface';
 import axios from 'axios';
 import { UserStatus } from '@prisma/client';
+import config from '../../config';
 
 const connectZoomAccount = async (payload: IZoomAccount) => {
   const { userId } = payload;
@@ -55,8 +56,8 @@ const refreshAccessToken = async (userId: string) => {
         refresh_token: account.refreshToken,
       },
       auth: {
-        username: process.env.ZOOM_CLIENT_ID!,
-        password: process.env.ZOOM_CLIENT_SECRET!,
+        username: config.zoom.client_id!,
+        password: config.zoom.client_secret!,
       },
     });
 
