@@ -285,7 +285,7 @@ const moduleRoutes = [
     route: ContentsRoutes,
   },
   {
-    path: '/zoom',
+    path: '/',
     route: ZoomRoutes,
   },
   {

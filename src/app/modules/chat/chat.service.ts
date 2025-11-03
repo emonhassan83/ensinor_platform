@@ -1,4 +1,4 @@
-import { Chat, Prisma, UserStatus } from '@prisma/client';
+import { Chat, ChatType, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import { IChat, IChatFilterRequest } from './chat.interface';
@@ -118,7 +118,13 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
-    include: {
+
+    select: {
+      id: true,
+      type: true,
+      groupName: true,
+      groupImage: true,
+
       participants: true,
     },
   });
@@ -137,13 +143,21 @@ const getAllFromDB = async (
   };
 };
 
-const getMyChatList = async (userId: string, searchTerm?: string) => {
+const getMyChatList = async (
+  userId: string,
+  searchTerm?: string,
+  chatType?: ChatType,
+) => {
   // Step 1: Find all chats where this user is a participant
   const chats = await prisma.chat.findMany({
     where: {
       participants: {
         some: { userId: userId }, // user is inside participants
       },
+      ...(chatType && { type: chatType }),
+      ...(searchTerm && {
+        groupName: { contains: searchTerm, mode: 'insensitive' },
+      }),
     },
     include: {
       participants: {
@@ -177,14 +191,14 @@ const getMyChatList = async (userId: string, searchTerm?: string) => {
       p => p.userId !== userId,
     );
 
-    // যদি সার্চ টার্ম থাকে তবে নাম দিয়ে ফিল্টার করব
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      const match = otherParticipants.some(p =>
-        p.user?.name?.toLowerCase().includes(lower),
-      );
-      if (!match) continue;
-    }
+    // // যদি সার্চ টার্ম থাকে তবে নাম দিয়ে ফিল্টার করব
+    // if (searchTerm) {
+    //   const lower = searchTerm.toLowerCase();
+    //   const match = otherParticipants.some(p =>
+    //     p.user?.name?.toLowerCase().includes(lower),
+    //   );
+    //   if (!match) continue;
+    // }
 
     const latestMessage = chat.messages[0] || null;
 

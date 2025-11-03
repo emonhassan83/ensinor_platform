@@ -25,6 +25,8 @@ router.post(
   ChatController.insertIntoDB,
 );
 
+router.get('/', auth(UserRole.super_admin), ChatController.getAllFromDB);
+
 router.get(
   '/my-chat-list',
   auth(

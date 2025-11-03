@@ -1,104 +1,63 @@
-import { ZoomService } from './zoom.service';
 import httpStatus from 'http-status';
+import { Request, Response } from 'express';
+import { ZoomService } from './zoom.service';
+import config from '../../config';
 import catchAsync from '../../utils/catchAsync';
-import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 
-// Connect Zoom Account
-const connectZoom = catchAsync(async (req, res) => {
-  const result = await ZoomService.connectZoomAccount(req.body)
+// Redirect to Zoom Authorization
+const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
+  const authUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${config.zoom.client_id}&redirect_uri=${config.zoom.redirect_url}`;
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Zoom account connected successfully!',
-    data: result,
-  })
-})
+    message: 'Zoom token refreshed successfully!',
+    data: authUrl,
+  });
+});
 
-// Refresh Token
-const refreshToken = catchAsync(async (req, res) => {
-  const result = await ZoomService.refreshAccessToken(req.body.userId)
+// Handle Zoom OAuth Callback
+const zoomAuthCallback = catchAsync(async (req: Request, res: Response) => {
+  const { code } = req.query;
+  if (!code) {
+    throw new Error('Missing authorization code!');
+  }
+
+  const result = await ZoomService.handleOAuthCallback(code as string);
+
+  res.send(
+    `<h1>✅ Zoom account connected successfully!</h1>
+     <p>Access Token: ${result.accessToken}</p>`
+  );
+});
+
+// Refresh Zoom Token
+const refreshZoomToken = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.body;
+
+  const result = await ZoomService.refreshAccessToken(userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Zoom access token refreshed!',
+    message: 'Zoom token refreshed successfully!',
     data: result,
-  })
-})
+  });
+});
 
 // Create Meeting
-const createMeeting = catchAsync(async (req, res) => {
-  const result = await ZoomService.createMeeting(req.body)
+const createZoomMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await ZoomService.createMeeting(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Zoom meeting created!',
+    message: 'Meeting created successfully!',
     data: result,
-  })
-})
-
-// Get All Meetings
-const getMeetings = catchAsync(async (req, res) => {
-  const result = await ZoomService.getMeetings(req.query.userId as string)
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom meetings fetched!',
-    data: result,
-  })
-})
-
-// Get Single Meeting
-const getMeeting = catchAsync(async (req, res) => {
-  const result = await ZoomService.getMeeting(req.params.id)
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom meeting fetched!',
-    data: result,
-  })
-})
-
-// Update Meeting
-const updateMeeting = catchAsync(async (req, res) => {
-  const result = await ZoomService.updateMeeting(req.params.id, req.body)
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom meeting updated!',
-    data: result,
-  })
-})
-
-// Delete Meeting
-const deleteMeeting = catchAsync(async (req, res) => {
-  const result = await ZoomService.deleteMeeting(req.params.id)
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom meeting deleted!',
-    data: result,
-  })
-})
-
-// Sync Meetings
-const syncMeetings = catchAsync(async (req, res) => {
-  const result = await ZoomService.syncMeetings(req.body.userId)
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom meetings synced!',
-    data: result,
-  })
-})
+  });
+});
 
 export const ZoomController = {
-  connectZoom,
-  refreshToken,
-  createMeeting,
-  getMeetings,
-  getMeeting,
-  updateMeeting,
-  deleteMeeting,
-  syncMeetings
-};
+  redirectToZoomAuth,
+  zoomAuthCallback,
+  refreshZoomToken,
+  createZoomMeeting
+}

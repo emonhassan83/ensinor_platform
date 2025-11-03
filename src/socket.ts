@@ -149,7 +149,7 @@ const initializeSocketIO = (server: HttpServer) => {
         const senderMessage = 'new-message::' + chat.id;
         io.emit(senderMessage, result);
 
-         const ChatListSender = await ChatService.getMyChatList(
+        const ChatListSender = await ChatService.getMyChatList(
           result?.senderId.toString(),
         );
         const senderChat = 'chat-list::' + result.senderId.toString();
@@ -170,6 +170,100 @@ const initializeSocketIO = (server: HttpServer) => {
           data: result,
         });
       });
+
+      socket.on(
+        'send-group-message',
+        async (
+          payload: {
+            text: string;
+            sender: string;
+            chatId: string; // <-- must be provided
+            imageUrl?: string[];
+          },
+          callback,
+        ) => {
+          // const userId = (socket.data.user as { id: string }).id;
+          payload.sender = user.id;
+
+          try {
+            // 1. Validate: chat exists + user is participant
+            const chat = await prisma.chat.findUnique({
+              where: { id: payload.chatId },
+              include: {
+                participants: {
+                  select: { userId: true },
+                },
+              },
+            });
+
+            if (!chat) {
+              return callbackFn(callback, {
+                success: false,
+                message: 'Chat not found',
+              });
+            }
+
+            if (chat.type !== 'group') {
+              return callbackFn(callback, {
+                success: false,
+                message: 'This endpoint is for group chats only',
+              });
+            }
+
+            const isParticipant = chat.participants.some(
+              p => p.userId === user.id,
+            );
+            if (!isParticipant) {
+              return callbackFn(callback, {
+                success: false,
+                message: 'You are not a member of this group',
+              });
+            }
+
+            // console.log({chat, isParticipant});
+
+            // 2. Create message (receiverId = null for group)
+            const message = await prisma.message.create({
+              data: {
+                chatId: payload.chatId,
+                senderId: payload.sender,
+                receiverId: null, // <-- GROUP MESSAGE
+                text: payload.text,
+                imageUrl: payload.imageUrl ?? [],
+              },
+              include: {
+                sender: { select: { id: true, name: true, photoUrl: true } },
+              },
+            });
+
+            // 3. Emit to ALL participants via room
+            const roomName = `chat_${payload.chatId}`;
+            io.to(roomName).emit(`new-message::${payload.chatId}`, message);
+
+            // 4. Update chat list for every participant
+            const participantIds = chat.participants.map(p => p.userId);
+
+            for (const uid of participantIds) {
+              const chatList = await ChatService.getMyChatList(uid);
+              io.to(`user_${uid}`).emit(`chat-list::${uid}`, chatList);
+            }
+
+            // 5. Success callback
+            callbackFn(callback, {
+              statusCode: httpStatus.OK,
+              success: true,
+              message: 'Group message sent!',
+              data: message,
+            });
+          } catch (err: any) {
+            console.error('send-group-message error:', err);
+            callbackFn(callback, {
+              success: false,
+              message: err.message || 'Failed to send message',
+            });
+          }
+        },
+      );
 
       // ----------------- typing -----------------
       socket.on('typing', data => {

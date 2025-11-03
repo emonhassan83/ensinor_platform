@@ -7,42 +7,20 @@ import { ZoomValidation } from './zoom.validation';
 
 const router = express.Router();
 
-router.post(
-  '/connect',
-  validateRequest(ZoomValidation.createAccountValidation),
-  ZoomController.connectZoom,
-);
-
-router.post('/', ZoomController.refreshToken);
-
-router.post(
-  '/meetings',
-  auth(UserRole.super_admin),
-  validateRequest(ZoomValidation.createMeetingValidation),
-  ZoomController.createMeeting,
-);
-
-router.get('/meetings', auth(UserRole.super_admin), ZoomController.getMeetings);
-
 router.get(
-  '/meetings/:id',
-  auth(UserRole.super_admin),
-  ZoomController.getMeeting,
+  '/auth/zoom',
+  ZoomController.redirectToZoomAuth,
 );
 
-router.put(
-  '/meetings/:id',
-  auth(UserRole.super_admin),
-  validateRequest(ZoomValidation.updateMeetingValidation),
-  ZoomController.updateMeeting,
-);
+router.get('/auth/zoom/callback', ZoomController.zoomAuthCallback);
 
-router.delete(
-  '/meetings/:id',
-  auth(UserRole.super_admin),
-  ZoomController.deleteMeeting,
-);
+router.post('/refresh', ZoomController.refreshZoomToken);
 
-router.post('/sync', auth(UserRole.super_admin), ZoomController.syncMeetings);
+router.post(
+  '/zoom/create-meeting',
+  // auth(UserRole.super_admin),
+  // validateRequest(ZoomValidation.createMeetingValidation),
+  ZoomController.createZoomMeeting,
+);
 
 export const ZoomRoutes = router;

@@ -208,7 +208,17 @@ const getAllFromDB = async (
             createdAt: 'desc',
           },
     include: {
-      courseBundleCourses: true,
+      courseBundleCourses: {
+        select: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              price: true,
+            },
+          },
+        },
+      },
     },
   });
 

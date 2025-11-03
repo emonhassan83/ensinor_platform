@@ -4,6 +4,7 @@ import catchAsync from '../../utils/catchAsync';
 import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 import { chatFilterableFields } from './chat.constant';
+import { ChatType } from '@prisma/client';
 
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await ChatService.insertIntoDB(req.body);
@@ -29,7 +30,11 @@ const getAllFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, chatFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ChatService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await ChatService.getAllFromDB(
+    filters,
+    options,
+    req.user!.userId,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -41,7 +46,12 @@ const getAllFromDB = catchAsync(async (req, res) => {
 });
 
 const getMyChatFromDB = catchAsync(async (req, res) => {
-  const result = await ChatService.getMyChatList(req.user!.userId);
+  const { type, searchTerm } = req.query;
+  const result = await ChatService.getMyChatList(
+    req.user!.userId,
+    searchTerm as string | undefined,
+    type as ChatType | undefined,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -65,7 +75,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
   const result = await ChatService.updateIntoDB(
     req.params.id,
     req.body,
-    req.file
+    req.file,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
