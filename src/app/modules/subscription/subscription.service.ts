@@ -292,14 +292,7 @@ const getAllSubscription = async (
     },
   }));
 
-  return {
-    meta: {
-      page,
-      limit,
-      total,
-    },
-    data: dataWithLevel,
-  };
+  return  dataWithLevel
 };
 
 const getSubscriptionById = async (id: string) => {
