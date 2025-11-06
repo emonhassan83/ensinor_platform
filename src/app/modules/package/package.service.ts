@@ -91,13 +91,13 @@ const getAllFromDB = async (
   });
 
   // 🧩 Map subscription type → level
-  const typeToLevel: Record<string, string> = {
-    basic: 'instructor-l1',
-    standard: 'instructor-l2',
-    premium: 'instructor-l3',
-    ngo: 'company-l1',
-    sme: 'company-l2',
-    enterprise: 'company-l3',
+  const typeToLevel: Record<string, number> = {
+    basic: 1,
+    standard: 2,
+    premium: 3,
+    ngo: 1,
+    sme: 2,
+    enterprise: 3,
   };
 
   const dataWithLevel = result.map(pkg => ({

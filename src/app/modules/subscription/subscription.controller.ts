@@ -26,8 +26,7 @@ const getMySubscription = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: 'My subscriptions fetched successfully !',
-    meta: result?.meta,
-    data: result?.data,
+    data: result,
   });
 });
 

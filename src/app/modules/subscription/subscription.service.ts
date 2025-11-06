@@ -218,7 +218,7 @@ const getAllSubscription = async (
     },
   ];
 
-  // Search across Subscription and nested User fields
+  // 🔍 Search across fields
   if (searchTerm) {
     andConditions.push({
       OR: subscriptionSearchAbleFields.map(field => ({
@@ -230,7 +230,7 @@ const getAllSubscription = async (
     });
   }
 
-  // Filters
+  // 🎯 Apply filters
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
@@ -245,6 +245,17 @@ const getAllSubscription = async (
     AND: andConditions,
   };
 
+  // 🧠 Map subscription type → level
+  const typeToLevel: Record<string, number> = {
+    basic: 1,
+    standard: 2,
+    premium: 3,
+    ngo: 1,
+    sme: 2,
+    enterprise: 3,
+  };
+
+  // 📦 Fetch subscription with related package
   const result = await prisma.subscription.findMany({
     where: whereConditions,
     skip,
@@ -272,13 +283,22 @@ const getAllSubscription = async (
     where: whereConditions,
   });
 
+  // 🧩 Append computed level to each subscription
+  const dataWithLevel = result.map(sub => ({
+    ...sub,
+    package: {
+      ...sub.package,
+      level: typeToLevel[sub.package?.type ?? ''] ?? 0,
+    },
+  }));
+
   return {
     meta: {
       page,
       limit,
       total,
     },
-    data: result,
+    data: dataWithLevel,
   };
 };
 

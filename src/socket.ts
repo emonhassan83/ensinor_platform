@@ -1,11 +1,14 @@
 import { Server as HttpServer } from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
 import httpStatus from 'http-status';
 import getUserDetailsFromToken from './app/utils/vaildateUserFromToken';
 import { callbackFn } from './app/utils/CallbackFn';
 import ApiError from './app/errors/ApiError';
 import prisma from './app/utils/prisma';
 import { ChatService } from './app/modules/chat/chat.service';
+import config from './app/config';
+import jwt from 'jsonwebtoken';
 
 let io: Server;
 const initializeSocketIO = (server: HttpServer) => {
@@ -17,6 +20,43 @@ const initializeSocketIO = (server: HttpServer) => {
 
   // Online users
   const onlineUser = new Set();
+
+  // Set Namespace
+  const chatNamespace = io.of("/chat");
+  const notificationNamespace = io.of("/notification");
+
+    // Middleware for authentication
+    chatNamespace.use(
+      async (
+        socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
+        next
+      ) => {
+        const token =
+          socket.handshake.auth.token ||
+          socket.handshake.headers["authorization"]?.split(" ")[1];
+        if (!token) {
+          return next(new ApiError(401, "Authentication token required"));
+        }
+   
+        try {
+          const decoded = jwt.verify(
+            token,
+            config.jwt_access_secret as string
+          ) as { id: string; role: string };
+          socket.data.userId = decoded.id;
+          socket.data.role = decoded.role;
+          next();
+        } catch (error) {
+          next(
+            new ApiError(
+              401,
+              error instanceof Error ? error.message : "Invalid or expired token"
+            )
+          );
+        }
+      }
+    );
+
 
   io.on('connection', async socket => {
     console.log('connected', socket?.id);
