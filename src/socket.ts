@@ -254,4 +254,12 @@ const initializeSocketIO = (server: HttpServer) => {
   return io;
 };
 
+// Getter to use io in service functions
+export const getIO = (): Server => {
+  if (!io) {
+    throw new Error('Socket.io not initialized!');
+  }
+  return io;
+};
+
 export default initializeSocketIO;
