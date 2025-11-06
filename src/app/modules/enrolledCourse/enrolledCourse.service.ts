@@ -87,7 +87,11 @@ const enrollUser = async (tx: any, user: User, course: Course) => {
 
   // 4️⃣ Add enrolled log
   await tx.enrolledLogs.create({
-    data: { userId: user.id, courseId: course.id, modelType: EnrolledLogsModelType.course },
+    data: {
+      userId: user.id,
+      courseId: course.id,
+      modelType: EnrolledLogsModelType.course,
+    },
   });
 
   // 5️⃣ Auto-join course chats
@@ -150,12 +154,19 @@ const enrollUser = async (tx: any, user: User, course: Course) => {
       });
 
       await tx.achievementLogs.create({
-        data: { userId: user.id, courseId: course.id, modelType: AchievementModelType.monthly_streak },
+        data: {
+          userId: user.id,
+          courseId: course.id,
+          modelType: AchievementModelType.monthly_streak,
+        },
       });
 
       // Update level
       const { level } = calculateAchievementLevel(achievement.totalPoints);
-      await tx.achievement.update({ where: { userId: user.id }, data: { level } });
+      await tx.achievement.update({
+        where: { userId: user.id },
+        data: { level },
+      });
     }
   }
 
@@ -367,18 +378,26 @@ const groupEnrolledCourse = async (payload: IGroupEnrolledCourse) => {
   });
 
   const alreadyEnrolledUserIds = existingEnrollments.map(e => e.userId);
-  const usersToEnroll = users.filter(u => !alreadyEnrolledUserIds.includes(u.id));
+  const usersToEnroll = users.filter(
+    u => !alreadyEnrolledUserIds.includes(u.id),
+  );
 
   const enrolledUsers: string[] = [];
   const skippedUsers = alreadyEnrolledUserIds;
 
   if (usersToEnroll.length > 0) {
-    await prisma.$transaction(async tx => {
-      for (const user of usersToEnroll) {
-        const enrollment = await enrollUser(tx, user, course);
-        enrolledUsers.push(user.id);
-      }
-    });
+    await prisma.$transaction(
+      async tx => {
+        for (const user of usersToEnroll) {
+          await enrollUser(tx, user, course);
+          enrolledUsers.push(user.id);
+        }
+      },
+      {
+        timeout: 20000, // 20 seconds
+        maxWait: 10000, // Wait max 10s to acquire transaction slot
+      },
+    );
   }
 
   return { enrolledUsers, skippedUsers };
@@ -396,28 +415,38 @@ const departmentEnrolledCourse = async (payload: IDepartmentEnrolledCourse) => {
     where: { departmentId },
     include: { user: true },
   });
-  if (!employees.length) throw new ApiError(httpStatus.BAD_REQUEST, 'No employees found in this department!');
+  if (!employees.length)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'No employees found in this department!',
+    );
 
   const employeeIds = employees.map(emp => emp.userId);
-
   const existingEnrollments = await prisma.enrolledCourse.findMany({
     where: { courseId, userId: { in: employeeIds }, isDeleted: false },
   });
 
   const alreadyEnrolledIds = existingEnrollments.map(e => e.userId);
-  const employeesToEnroll = employees.filter(emp => !alreadyEnrolledIds.includes(emp.userId));
+  const employeesToEnroll = employees.filter(
+    emp => !alreadyEnrolledIds.includes(emp.userId),
+  );
 
   const enrolledUsers: string[] = [];
   const skippedUsers = alreadyEnrolledIds;
 
-  if (employeesToEnroll.length > 0) {
-    await prisma.$transaction(async tx => {
-      for (const emp of employeesToEnroll) {
+ // ⚡ Run enrollments in parallel batches of 10 to prevent timeout
+  const chunkSize = 10;
+  for (let i = 0; i < employeesToEnroll.length; i += chunkSize) {
+    const chunk = employeesToEnroll.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async emp => {
         const user = emp.user;
-        const enrollment = await enrollUser(tx, user, course);
-        enrolledUsers.push(user.id);
-      }
-    });
+        await prisma.$transaction(async tx => {
+          await enrollUser(tx, user, course);
+          enrolledUsers.push(user.id);
+        });
+      })
+    );
   }
 
   return { enrolledUsers, skippedUsers };

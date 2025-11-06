@@ -8,6 +8,7 @@ import archiver from 'archiver'
 import axios from 'axios'
 import prisma from './app/utils/prisma';
 import sanitize from 'sanitize-filename';
+import { ZoomController } from './app/modules/zoom/zoom.controller';
 
 const app: Application = express();
 app.use(express.static('public'));
@@ -28,6 +29,8 @@ app.use(
 
 // application routes
 app.use('/api/v1', routes);
+
+app.get("/auth/zoom/callback", ZoomController.zoomAuthCallback)
 
 // @ts-ignore
 app.get('/api/v1/download/order/:orderId', async (req: Request, res: Response) => {

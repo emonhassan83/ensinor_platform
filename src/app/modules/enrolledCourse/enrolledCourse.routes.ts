@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.student, UserRole.employee),
+  auth(UserRole.student, UserRole.employee, UserRole.company_admin),
   validateRequest(EnrolledCourseValidation.createValidationSchema),
   EnrolledCourseController.insertIntoDB,
 );

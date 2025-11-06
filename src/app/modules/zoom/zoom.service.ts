@@ -7,6 +7,7 @@ import { IZoomMeeting } from './zoom.interface';
 
 // Handle OAuth Callback (Save Zoom Account)
 const handleOAuthCallback = async (code: string) => {
+  console.log("🚀 ~ handleOAuthCallback ~ code:", code)
   try {
     const tokenResponse = await axios.post(
       'https://zoom.us/oauth/token',
