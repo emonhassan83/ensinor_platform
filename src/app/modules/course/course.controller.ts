@@ -4,7 +4,8 @@ import catchAsync from '../../utils/catchAsync';
 import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 import { courseFilterableFields } from './course.constant';
-import { CourseType } from '@prisma/client';
+import { CourseType, PlatformType } from '@prisma/client';
+import { platform } from 'os';
 
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await CourseService.insertIntoDB(req.body, req.file);
@@ -27,12 +28,11 @@ const getPopularCourses = catchAsync(async (req, res) => {
   });
 });
 
-const getAllFromDB = catchAsync(async (req, res) => {
+const getAllPlatformCourses = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
   const filterBy = {
-    authorId: req.query.authorId as string | undefined,
-    instructorId: req.query.instructorId as string | undefined,
+    platform: PlatformType.admin
   };
 
   const result = await CourseService.getAllFromDB(filters, options, filterBy);
@@ -97,6 +97,7 @@ const getByCompanyFromDB = catchAsync(async (req, res) => {
 
   const result = await CourseService.getAllFromDB(filters, options, {
     companyId: req.params.companyId,
+    platform: PlatformType.company
   });
 
   sendResponse(res, {
@@ -207,7 +208,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CourseController = {
   insertIntoDB,
   getPopularCourses,
-  getAllFromDB,
+  getAllPlatformCourses,
   getCombineCourses,
   getMyInternalCourse,
   getByAuthorId,

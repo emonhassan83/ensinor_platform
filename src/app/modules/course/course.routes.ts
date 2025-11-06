@@ -44,7 +44,7 @@ router.get('/author-courses/:authorId', CourseController.getByAuthorId);
 
 router.get('/popular', CourseController.getPopularCourses);
 
-router.get('/', CourseController.getAllFromDB);
+router.get('/', CourseController.getAllPlatformCourses);
 
 router.get('/filter-data', CourseController.getAllFilterDataFromDB);
 

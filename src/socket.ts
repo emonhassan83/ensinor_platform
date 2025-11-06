@@ -1,342 +1,256 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { DefaultEventsMap } from "socket.io/dist/typed-events";
+import { DefaultEventsMap } from 'socket.io/dist/typed-events';
 import httpStatus from 'http-status';
-import getUserDetailsFromToken from './app/utils/vaildateUserFromToken';
-import { callbackFn } from './app/utils/CallbackFn';
+import jwt from 'jsonwebtoken';
 import ApiError from './app/errors/ApiError';
 import prisma from './app/utils/prisma';
 import { ChatService } from './app/modules/chat/chat.service';
 import config from './app/config';
-import jwt from 'jsonwebtoken';
+import { callbackFn } from './app/utils/CallbackFn';
 
 let io: Server;
+
 const initializeSocketIO = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
       origin: '*',
+      methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 
-  // Online users
   const onlineUser = new Set();
+  const chatNamespace = io.of('/chat');
+  const notificationNamespace = io.of('/notification');
 
-  // Set Namespace
-  const chatNamespace = io.of("/chat");
-  const notificationNamespace = io.of("/notification");
-
-    // Middleware for authentication
-    chatNamespace.use(
-      async (
-        socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
-        next
-      ) => {
-        const token =
-          socket.handshake.auth.token ||
-          socket.handshake.headers["authorization"]?.split(" ")[1];
-        if (!token) {
-          return next(new ApiError(401, "Authentication token required"));
-        }
-   
-        try {
-          const decoded = jwt.verify(
-            token,
-            config.jwt_access_secret as string
-          ) as { id: string; role: string };
-          socket.data.userId = decoded.id;
-          socket.data.role = decoded.role;
-          next();
-        } catch (error) {
-          next(
-            new ApiError(
-              401,
-              error instanceof Error ? error.message : "Invalid or expired token"
-            )
-          );
-        }
-      }
-    );
-
-
-  io.on('connection', async socket => {
-    console.log('connected', socket?.id);
-
-    try {
-      // ----------------- get user token -----------------
+  // ✅ Middleware for Authentication
+  chatNamespace.use(
+    async (
+      socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
+      next,
+    ) => {
       const token =
-        socket.handshake.auth?.token || socket.handshake.headers?.token;
+        socket.handshake.auth?.token ||
+        socket.handshake.headers['authorization']?.split(' ')[1] ||
+        (socket.handshake.headers['token'] as string);
 
-      let user: any;
+      if (!token) return next(new ApiError(401, 'Authentication token required'));
+
       try {
-        user = await getUserDetailsFromToken(token);
-        if (!user) {
-          throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid token');
-        }
+        const decoded = jwt.verify(
+          token,
+          config.jwt_access_secret as string,
+        ) as { userId: string; role: string };
+        socket.data.userId = decoded.userId;
+        socket.data.role = decoded.role;
+        next();
       } catch (error) {
-        console.log(error);
-        return;
+        next(
+          new ApiError(
+            401,
+            error instanceof Error ? error.message : 'Invalid or expired token',
+          ),
+        );
       }
+    },
+  );
 
-      socket.join(user?.id.toString());
-      onlineUser.add(user?.id.toString());
+  // ✅ Chat Namespace Connection Handler
+  chatNamespace.on('connection', async (socket) => {
+    try {
+      const user = socket.data;
+      if (!user?.userId) return;
 
-      // send all online users
+      console.log(`✅ User connected: ${user.userId}`);
+
+      // Private room
+      socket.join(`user_${user.userId}`);
+
+      // ✅ Auto join all group rooms where user is member
+      const userGroups = await prisma.chat.findMany({
+        where: {
+          // type: 'group',
+          participants: { some: { userId: user.userId } },
+        },
+        select: { id: true },
+      });
+
+      userGroups.forEach((g) => {
+        const roomName = `chat_${g.id}`;
+        socket.join(roomName);
+        console.log(`🟢 Auto-joined group room: ${roomName}`);
+      });
+
+      // Track online users
+      onlineUser.add(user.userId.toString());
       io.emit('onlineUser', Array.from(onlineUser));
 
-      // ----------------- message-page -----------------
-      socket.on('message-page', async (userId, callback) => {
-        if (!userId) {
-          return callbackFn(callback, {
-            success: false,
-            message: 'userId is required',
-          });
-        }
-
-        try {
-          const receiverDetails = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, email: true, role: true, photoUrl: true },
-          });
-
-          if (!receiverDetails) {
-            return callbackFn(callback, {
-              success: false,
-              message: 'user not found',
-            });
-          }
-
-          socket.emit('user-details', receiverDetails);
-
-          const getPreMessage = await prisma.message.findMany({
-            where: {
-              OR: [
-                { senderId: user.id, receiverId: userId },
-                { senderId: userId, receiverId: user.id },
-              ],
-            },
-            orderBy: { createdAt: 'asc' },
-          });
-
-          socket.emit('message', getPreMessage || []);
-        } catch (error: any) {
-          callbackFn(callback, { success: false, message: error.message });
-        }
-      });
-
-      // ----------------- my chat list -----------------
+      // ---------------- my chat list ----------------
       socket.on('my-chat-list', async (data, callback) => {
         try {
-          const chatList = await prisma.chat.findMany({
-            where: {
-              participants: { some: { userId: user.id } },
-            },
-            include: {
-              participants: {
-                include: { user: true },
-              },
-              messages: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-              },
-            },
-          });
-
-          const myChat = 'chat-list::' + user.id;
-          io.emit(myChat, chatList);
-
+          const chatList = await ChatService.getMyChatList(user.userId);
+          const eventName = `chat-list::${user.userId}`;
+          chatNamespace.to(`user_${user.userId}`).emit(eventName, chatList);
           callbackFn(callback, { success: true, message: chatList });
-        } catch (error: any) {
-          callbackFn(callback, { success: false, message: error.message });
+        } catch (err: any) {
+          callbackFn(callback, { success: false, message: err.message });
         }
       });
 
-      // ----------------- send-message -----------------
+      // ---------------- send private message ----------------
       socket.on('send-message', async (payload, callback) => {
-        payload.sender = user.id;
+        try {
+          payload.sender = user.userId;
 
-        let chat = await prisma.chat.findFirst({
-          where: {
-            participants: {
-              every: { userId: { in: [payload.sender, payload.receiver] } },
-            },
-          },
-        });
-
-        if (!chat) {
-          chat = await prisma.chat.create({
-            data: {
+          let chat = await prisma.chat.findFirst({
+            where: {
               type: 'private',
               participants: {
-                create: [
-                  { userId: payload.sender },
-                  { userId: payload.receiver },
-                ],
+                every: { userId: { in: [payload.sender, payload.receiver] } },
               },
             },
           });
-        }
 
-        const result = await prisma.message.create({
-          data: {
-            chatId: chat.id,
-            senderId: payload.sender,
-            receiverId: payload.receiver,
-            text: payload.text,
-            imageUrl: payload.imageUrl,
-          },
-        });
-
-        const senderMessage = 'new-message::' + chat.id;
-        io.emit(senderMessage, result);
-
-        const ChatListSender = await ChatService.getMyChatList(
-          result?.senderId.toString(),
-        );
-        const senderChat = 'chat-list::' + result.senderId.toString();
-        io.emit(senderChat, ChatListSender);
-
-        const ChatListReceiver = await ChatService.getMyChatList(
-          result?.receiverId!.toString(),
-        );
-
-        const receiverChat = 'chat-list::' + result.receiverId!.toString();
-
-        io.emit(receiverChat, ChatListReceiver);
-
-        callbackFn(callback, {
-          statusCode: httpStatus.OK,
-          success: true,
-          message: 'Message sent successfully!',
-          data: result,
-        });
-      });
-
-      socket.on(
-        'send-group-message',
-        async (
-          payload: {
-            text: string;
-            sender: string;
-            chatId: string; // <-- must be provided
-            imageUrl?: string[];
-          },
-          callback,
-        ) => {
-          // const userId = (socket.data.user as { id: string }).id;
-          payload.sender = user.id;
-
-          try {
-            // 1. Validate: chat exists + user is participant
-            const chat = await prisma.chat.findUnique({
-              where: { id: payload.chatId },
-              include: {
+          if (!chat) {
+            chat = await prisma.chat.create({
+              data: {
+                type: 'private',
                 participants: {
-                  select: { userId: true },
+                  create: [
+                    { userId: payload.sender },
+                    { userId: payload.receiver },
+                  ],
                 },
               },
             });
+          }
 
-            if (!chat) {
-              return callbackFn(callback, {
-                success: false,
-                message: 'Chat not found',
-              });
-            }
+          const result = await prisma.message.create({
+            data: {
+              chatId: chat.id,
+              senderId: payload.sender,
+              receiverId: payload.receiver,
+              text: payload.text,
+              imageUrl: payload.imageUrl,
+            },
+            include: {
+              sender: { select: { id: true, name: true, photoUrl: true } },
+              receiver: { select: { id: true, name: true, photoUrl: true } },
+            },
+          });
 
-            if (chat.type !== 'group') {
-              return callbackFn(callback, {
-                success: false,
-                message: 'This endpoint is for group chats only',
-              });
-            }
+          // Emit to both sender & receiver
+          chatNamespace.to(`user_${payload.sender}`).emit('new-message', result);
+          chatNamespace.to(`user_${payload.receiver}`).emit('new-message', result);
 
-            const isParticipant = chat.participants.some(
-              p => p.userId === user.id,
-            );
-            if (!isParticipant) {
-              return callbackFn(callback, {
-                success: false,
-                message: 'You are not a member of this group',
-              });
-            }
+          // Update chat list for both
+          const senderChatList = await ChatService.getMyChatList(payload.sender);
+          const receiverChatList = await ChatService.getMyChatList(payload.receiver);
+          chatNamespace
+            .to(`user_${payload.sender}`)
+            .emit(`chat-list::${payload.sender}`, senderChatList);
+          chatNamespace
+            .to(`user_${payload.receiver}`)
+            .emit(`chat-list::${payload.receiver}`, receiverChatList);
 
-            // console.log({chat, isParticipant});
+          callbackFn(callback, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: 'Message sent successfully!',
+            data: result,
+          });
+        } catch (err: any) {
+          callbackFn(callback, { success: false, message: err.message });
+        }
+      });
 
-            // 2. Create message (receiverId = null for group)
-            const message = await prisma.message.create({
-              data: {
-                chatId: payload.chatId,
-                senderId: payload.sender,
-                receiverId: null, // <-- GROUP MESSAGE
-                text: payload.text,
-                imageUrl: payload.imageUrl ?? [],
-              },
-              include: {
-                sender: { select: { id: true, name: true, photoUrl: true } },
-              },
-            });
+      // ---------------- send group message ----------------
+      socket.on('send-group-message', async (payload, callback) => {
+        try {
+          payload.sender = user.userId;
 
-            // 3. Emit to ALL participants via room
-            const roomName = `chat_${payload.chatId}`;
-            io.to(roomName).emit(`new-message::${payload.chatId}`, message);
+          const chat = await prisma.chat.findUnique({
+            where: { id: payload.chatId },
+            include: { participants: { select: { userId: true } } },
+          });
 
-            // 4. Update chat list for every participant
-            const participantIds = chat.participants.map(p => p.userId);
-
-            for (const uid of participantIds) {
-              const chatList = await ChatService.getMyChatList(uid);
-              io.to(`user_${uid}`).emit(`chat-list::${uid}`, chatList);
-            }
-
-            // 5. Success callback
-            callbackFn(callback, {
-              statusCode: httpStatus.OK,
-              success: true,
-              message: 'Group message sent!',
-              data: message,
-            });
-          } catch (err: any) {
-            console.error('send-group-message error:', err);
-            callbackFn(callback, {
+          if (!chat || chat.type !== 'group') {
+            return callbackFn(callback, {
               success: false,
-              message: err.message || 'Failed to send message',
+              message: 'Invalid or non-group chat!',
             });
           }
-        },
-      );
 
-      // ----------------- typing -----------------
-      socket.on('typing', data => {
-        const chat = 'typing::' + data.chatId.toString();
-        const message = user?.name + ' is typing...';
-        socket.emit(chat, { message });
+          const message = await prisma.message.create({
+            data: {
+              chatId: payload.chatId,
+              senderId: payload.sender,
+              receiverId: null,
+              text: payload.text,
+              imageUrl: payload.imageUrl ?? [],
+            },
+            include: {
+              sender: { select: { id: true, name: true, photoUrl: true } },
+            },
+          });
+
+          // Emit message to all members in group room
+          const roomName = `chat_${payload.chatId}`;
+          chatNamespace.to(roomName).emit(`new-message::${payload.chatId}`, message);
+
+          // Update chat list for each member
+          for (const p of chat.participants) {
+            const list = await ChatService.getMyChatList(p.userId);
+            chatNamespace
+              .to(`user_${p.userId}`)
+              .emit(`chat-list::${p.userId}`, list);
+          }
+
+          callbackFn(callback, {
+            statusCode: httpStatus.OK,
+            success: true,
+            message: 'Group message sent!',
+            data: message,
+          });
+        } catch (err: any) {
+          callbackFn(callback, { success: false, message: err.message });
+        }
       });
 
-      socket.on('stopTyping', data => {
-        const chat = 'stopTyping::' + data.chatId.toString();
-        const message = user?.name + ' stopped typing...';
-        socket.emit(chat, { message });
+      // ---------------- typing events ----------------
+      socket.on('typing', (data) => {
+        const event = `typing::${data.chatId}`;
+        socket.to(`chat_${data.chatId}`).emit(event, {
+          userId: user.userId,
+          message: 'typing...',
+        });
       });
 
-      // ----------------- disconnect -----------------
+      socket.on('stopTyping', (data) => {
+        const event = `stopTyping::${data.chatId}`;
+        socket.to(`chat_${data.chatId}`).emit(event, {
+          userId: user.userId,
+          message: 'stopped typing',
+        });
+      });
+
+      // ---------------- disconnect ----------------
       socket.on('disconnect', () => {
-        onlineUser.delete(user?.id.toString());
+        onlineUser.delete(user.userId.toString());
         io.emit('onlineUser', Array.from(onlineUser));
-        console.log('disconnect user ', socket.id);
+        console.log(`❌ Disconnected: ${user.userId}`);
       });
     } catch (error) {
-      console.error('-- socket.io connection error --', error);
+      console.error('Socket Connection Error:', error);
     }
   });
 
-  return io;
-};
+  // Notification Namespace (for future)
+  notificationNamespace.on('connection', (socket) => {
+    console.log('🔔 Notification connected:', socket.data);
+  });
 
-// Getter to use io in service functions
-export const getIO = (): Server => {
-  if (!io) {
-    throw new Error('Socket.io not initialized!');
-  }
   return io;
 };
 

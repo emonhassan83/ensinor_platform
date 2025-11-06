@@ -486,7 +486,7 @@ const getCombineCoursesFromDB = async (
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  filterBy: { authorId?: string; companyId?: string, type?: CourseType } ,
+  filterBy: { authorId?: string; companyId?: string, type?: CourseType, platform?: PlatformType } ,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
@@ -498,6 +498,7 @@ const getAllFromDB = async (
   if (filterBy.authorId) andConditions.push({ authorId: filterBy.authorId });
   if (filterBy.companyId) andConditions.push({ companyId: filterBy.companyId });
   if (filterBy.type) andConditions.push({ type: filterBy.type });
+  if (filterBy.platform) andConditions.push({ platform: filterBy.platform });
 
   // Search filter
   if (searchTerm) {
