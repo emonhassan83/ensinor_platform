@@ -704,49 +704,67 @@ const geUserById = async (userId: string) => {
     },
   });
 
-  let profileData;
-  if (userData?.role === UserRole.super_admin) {
-    profileData = await prisma.superAdmin.findUnique({
-      where: {
-        userId: userData.id,
-      },
-    });
-  } else if (userData?.role === UserRole.company_admin) {
-    profileData = await prisma.companyAdmin.findUnique({
-      where: {
-        userId: userData.id,
-      },
-      include: {
-        company: true,
-      },
-    });
-  } else if (userData?.role === UserRole.business_instructors) {
-    profileData = await prisma.businessInstructor.findUnique({
-      where: {
-        userId: userData.id,
-      },
-      include: {
-        company: true,
-      },
-    });
-  } else if (userData?.role === UserRole.employee) {
-    profileData = await prisma.employee.findUnique({
-      where: {
-        userId: userData.id,
-      },
-      include: {
-        company: true,
-        department: true,
-      },
-    });
-  } else if (userData?.role === UserRole.student) {
-    profileData = await prisma.student.findUnique({
-      where: {
-        userId: userData.id,
-      },
-    });
+  if (!userData) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
-  return { ...profileData, ...userData };
+
+  // ✅ Check subscription status
+  const activeSubscription = await prisma.subscription.findFirst({
+    where: {
+      userId,
+      isDeleted: false,
+      isExpired: false,
+      expiredAt: { gt: new Date() },
+    },
+  });
+
+  const isActiveSubscription = !!activeSubscription;
+
+  let profileData;
+
+  switch (userData.role) {
+    case UserRole.super_admin:
+      profileData = await prisma.superAdmin.findUnique({ where: { userId } });
+      break;
+
+    case UserRole.company_admin:
+      profileData = await prisma.companyAdmin.findUnique({
+        where: { userId },
+        include: { company: true },
+      });
+      break;
+
+    case UserRole.business_instructors:
+      profileData = await prisma.businessInstructor.findUnique({
+        where: { userId },
+        include: { company: true },
+      });
+      break;
+
+    case UserRole.instructor:
+      profileData = await prisma.instructor.findUnique({ where: { userId } });
+      break;
+
+    case UserRole.employee:
+      profileData = await prisma.employee.findUnique({
+        where: { userId },
+        include: { company: true, department: true },
+      });
+      break;
+
+    case UserRole.student:
+      profileData = await prisma.student.findUnique({ where: { userId } });
+      break;
+
+    default:
+      profileData = null;
+  }
+
+  return {
+    ...profileData,
+    ...userData,
+    isActiveSubscription,
+  };
 };
 
 const updateAProfile = async (userId: string, payload: any) => {

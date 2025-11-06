@@ -44,7 +44,7 @@ const getAllFromDB = async (
 
   const andConditions: Prisma.PackageWhereInput[] = [{ isDeleted: false }];
 
-  // Search across Package and nested User fields
+  // 🔍 Search support
   if (searchTerm) {
     andConditions.push({
       OR: packageSearchAbleFields.map(field => ({
@@ -56,7 +56,7 @@ const getAllFromDB = async (
     });
   }
 
-  // Filters
+  // 🎯 Apply filters
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
@@ -71,6 +71,7 @@ const getAllFromDB = async (
     AND: andConditions,
   };
 
+  // 🗂 Fetch data
   const result = await prisma.package.findMany({
     where: whereConditions,
     skip,
@@ -89,13 +90,28 @@ const getAllFromDB = async (
     where: whereConditions,
   });
 
+  // 🧩 Map subscription type → level
+  const typeToLevel: Record<string, string> = {
+    basic: 'instructor-l1',
+    standard: 'instructor-l2',
+    premium: 'instructor-l3',
+    ngo: 'company-l1',
+    sme: 'company-l2',
+    enterprise: 'company-l3',
+  };
+
+  const dataWithLevel = result.map(pkg => ({
+    ...pkg,
+    level: typeToLevel[pkg.type] ?? null,
+  }));
+
   return {
     meta: {
       page,
       limit,
       total,
     },
-    data: result,
+    data: dataWithLevel,
   };
 };
 
