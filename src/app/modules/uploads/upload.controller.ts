@@ -3,7 +3,7 @@ import sendResponse from '../../utils/sendResponse';
 import uploadService from './upload.service';
 
 const multiple = catchAsync(async (req, res) => {
-  const result = await uploadService.multiple(req.files);
+  const result = await uploadService.multiple(req.files as any[]);
   sendResponse(res, {
     statusCode: 201,
     success: true,

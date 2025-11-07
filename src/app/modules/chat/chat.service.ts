@@ -172,6 +172,13 @@ const getMyChatList = async (
         },
       },
       messages: {
+        include: {
+          sender: {
+            select: {
+              name: true
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         take: 1, // latest message only
       },
