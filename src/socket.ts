@@ -25,73 +25,59 @@ const initializeSocketIO = (server: HttpServer) => {
   const notificationNamespace = io.of('/notification');
 
   // ✅ Middleware for Authentication
-  chatNamespace.use(
-    async (
-      socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
-      next,
-    ) => {
-      const token =
-        socket.handshake.auth?.token ||
-        socket.handshake.headers['authorization']?.split(' ')[1] ||
-        (socket.handshake.headers['token'] as string);
+  chatNamespace.use(async (socket, next) => {
+    const token =
+      socket.handshake.auth?.token ||
+      socket.handshake.headers['authorization']?.split(' ')[1] ||
+      (socket.handshake.headers['token'] as string);
 
-      if (!token) return next(new ApiError(401, 'Authentication token required'));
+    if (!token) return next(new ApiError(401, 'Authentication token required'));
 
-      try {
-        const decoded = jwt.verify(
-          token,
-          config.jwt_access_secret as string,
-        ) as { userId: string; role: string };
-        socket.data.userId = decoded.userId;
-        socket.data.role = decoded.role;
-        next();
-      } catch (error) {
-        next(
-          new ApiError(
-            401,
-            error instanceof Error ? error.message : 'Invalid or expired token',
-          ),
-        );
-      }
-    },
-  );
+    try {
+      const decoded = jwt.verify(
+        token,
+        config.jwt_access_secret as string,
+      ) as { userId: string; role: string };
+      socket.data.userId = decoded.userId;
+      socket.data.role = decoded.role;
+      next();
+    } catch (error) {
+      next(
+        new ApiError(
+          401,
+          error instanceof Error ? error.message : 'Invalid or expired token',
+        ),
+      );
+    }
+  });
 
   // ✅ Chat Namespace Connection Handler
-  chatNamespace.on('connection', async (socket) => {
+  chatNamespace.on('connection', async (socket: Socket) => {
     try {
       const user = socket.data;
       if (!user?.userId) return;
 
       console.log(`✅ User connected: ${user.userId}`);
 
-      // Private room
+      // Private room for user
       socket.join(`user_${user.userId}`);
 
-      // ✅ Auto join all group rooms where user is member
-      const userGroups = await prisma.chat.findMany({
-        where: {
-          // type: 'group',
-          participants: { some: { userId: user.userId } },
-        },
+      // ✅ Auto join all chats (private + group)
+      const userChats = await prisma.chat.findMany({
+        where: { participants: { some: { userId: user.userId } } },
         select: { id: true },
       });
 
-      userGroups.forEach((g) => {
-        const roomName = `chat_${g.id}`;
-        socket.join(roomName);
-        console.log(`🟢 Auto-joined group room: ${roomName}`);
-      });
+      userChats.forEach((chat) => socket.join(`chat_${chat.id}`));
 
-      // Track online users
       onlineUser.add(user.userId.toString());
       io.emit('onlineUser', Array.from(onlineUser));
 
       // ---------------- my chat list ----------------
-      socket.on('my-chat-list', async (data, callback) => {
+      socket.on('my-chat-list', async (_, callback) => {
         try {
           const chatList = await ChatService.getMyChatList(user.userId);
-          const eventName = `chat-list::${user.userId}`;
-          chatNamespace.to(`user_${user.userId}`).emit(eventName, chatList);
+          chatNamespace.to(`user_${user.userId}`).emit('chat-list', chatList);
           callbackFn(callback, { success: true, message: chatList });
         } catch (err: any) {
           callbackFn(callback, { success: false, message: err.message });
@@ -140,19 +126,15 @@ const initializeSocketIO = (server: HttpServer) => {
             },
           });
 
-          // Emit to both sender & receiver
+          // ✅ Emit globally (no chatId-based event)
           chatNamespace.to(`user_${payload.sender}`).emit('new-message', result);
           chatNamespace.to(`user_${payload.receiver}`).emit('new-message', result);
 
-          // Update chat list for both
-          const senderChatList = await ChatService.getMyChatList(payload.sender);
-          const receiverChatList = await ChatService.getMyChatList(payload.receiver);
-          chatNamespace
-            .to(`user_${payload.sender}`)
-            .emit(`chat-list::${payload.sender}`, senderChatList);
-          chatNamespace
-            .to(`user_${payload.receiver}`)
-            .emit(`chat-list::${payload.receiver}`, receiverChatList);
+          // ✅ Update chat list for both users
+          const senderList = await ChatService.getMyChatList(payload.sender);
+          const receiverList = await ChatService.getMyChatList(payload.receiver);
+          chatNamespace.to(`user_${payload.sender}`).emit('chat-list', senderList);
+          chatNamespace.to(`user_${payload.receiver}`).emit('chat-list', receiverList);
 
           callbackFn(callback, {
             statusCode: httpStatus.OK,
@@ -175,7 +157,7 @@ const initializeSocketIO = (server: HttpServer) => {
             include: { participants: { select: { userId: true } } },
           });
 
-          if (!chat || chat.type !== 'group') {
+          if (!chat) {
             return callbackFn(callback, {
               success: false,
               message: 'Invalid or non-group chat!',
@@ -195,16 +177,13 @@ const initializeSocketIO = (server: HttpServer) => {
             },
           });
 
-          // Emit message to all members in group room
-          const roomName = `chat_${payload.chatId}`;
-          chatNamespace.to(roomName).emit(`new-message::${payload.chatId}`, message);
+          // ✅ Emit only 'new-message' (global listener)
+          chatNamespace.to(`chat_${payload.chatId}`).emit('new-message', message);
 
-          // Update chat list for each member
+          // ✅ Update chat-list for every participant
           for (const p of chat.participants) {
             const list = await ChatService.getMyChatList(p.userId);
-            chatNamespace
-              .to(`user_${p.userId}`)
-              .emit(`chat-list::${p.userId}`, list);
+            chatNamespace.to(`user_${p.userId}`).emit('chat-list', list);
           }
 
           callbackFn(callback, {
@@ -218,18 +197,16 @@ const initializeSocketIO = (server: HttpServer) => {
         }
       });
 
-      // ---------------- typing events ----------------
+      // ---------------- typing ----------------
       socket.on('typing', (data) => {
-        const event = `typing::${data.chatId}`;
-        socket.to(`chat_${data.chatId}`).emit(event, {
+        socket.to(`chat_${data.chatId}`).emit('typing', {
           userId: user.userId,
           message: 'typing...',
         });
       });
 
       socket.on('stopTyping', (data) => {
-        const event = `stopTyping::${data.chatId}`;
-        socket.to(`chat_${data.chatId}`).emit(event, {
+        socket.to(`chat_${data.chatId}`).emit('stopTyping', {
           userId: user.userId,
           message: 'stopped typing',
         });
@@ -246,7 +223,6 @@ const initializeSocketIO = (server: HttpServer) => {
     }
   });
 
-  // Notification Namespace (for future)
   notificationNamespace.on('connection', (socket) => {
     console.log('🔔 Notification connected:', socket.data);
   });
@@ -254,11 +230,9 @@ const initializeSocketIO = (server: HttpServer) => {
   return io;
 };
 
-// Getter to use io in service functions
+// Getter
 export const getIO = (): Server => {
-  if (!io) {
-    throw new Error('Socket.io not initialized!');
-  }
+  if (!io) throw new Error('Socket.io not initialized!');
   return io;
 };
 
