@@ -12,7 +12,7 @@ import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuizAttempt) => {
   const { quizId, userId } = payload;
-  
+
   // 1. Validate quiz
   const quiz = await prisma.quiz.findFirst({
     where: { id: quizId, isDeleted: false },
@@ -33,15 +33,7 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
   const existingAttempt = await prisma.quizAttempt.findFirst({
     where: { quizId, userId, isDeleted: false },
   });
-  if (existingAttempt) {
-    // if (existingAttempt.isCompleted) {
-    //   throw new ApiError(
-    //     httpStatus.BAD_REQUEST,
-    //     'Quiz attempt already completed!',
-    //   );
-    // }
-    return existingAttempt;
-  }
+  if (existingAttempt) return existingAttempt;
 
   const result = await prisma.quizAttempt.create({
     data: {
@@ -207,7 +199,7 @@ const getByIdFromDB = async (id: string): Promise<QuizAttempt | null> => {
           },
         },
       },
-      quizAnswer: true
+      quizAnswer: true,
     },
   });
 

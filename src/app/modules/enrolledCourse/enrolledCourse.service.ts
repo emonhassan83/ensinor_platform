@@ -434,7 +434,7 @@ const departmentEnrolledCourse = async (payload: IDepartmentEnrolledCourse) => {
   const enrolledUsers: string[] = [];
   const skippedUsers = alreadyEnrolledIds;
 
- // ⚡ Run enrollments in parallel batches of 10 to prevent timeout
+  // ⚡ Run enrollments in parallel batches of 10 to prevent timeout
   const chunkSize = 10;
   for (let i = 0; i < employeesToEnroll.length; i += chunkSize) {
     const chunk = employeesToEnroll.slice(i, i + chunkSize);
@@ -445,7 +445,7 @@ const departmentEnrolledCourse = async (payload: IDepartmentEnrolledCourse) => {
           await enrollUser(tx, user, course);
           enrolledUsers.push(user.id);
         });
-      })
+      }),
     );
   }
 
@@ -1606,9 +1606,12 @@ const watchLectureIntoDB = async (payload: {
   });
 
   // --- Update completion percentage ---
-  const completedRate = Math.floor(
+  let completedRate = Math.floor(
     ((updated.lectureWatched + (alreadyWatched ? 0 : 1)) / totalLectures) * 100,
   );
+
+  // Cap completedRate at 100% maximum
+  if (completedRate > 100) completedRate = 100;
 
   // --- Mark course as complete and update courseFinishTime if all lectures watched ---
   let finalUpdate = updated;
