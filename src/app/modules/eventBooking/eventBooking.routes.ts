@@ -21,6 +21,20 @@ router.post(
   EventBookingController.insertIntoDB,
 );
 
+router.post(
+  '/bulk-event-booking',
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  validateRequest(EventValidation.bulkInsertValidationSchema),
+  EventBookingController.bulkInsertIntoDB,
+);
+
 router.get(
   '/author/my-event-booking',
   auth(

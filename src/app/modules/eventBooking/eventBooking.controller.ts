@@ -15,6 +15,16 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const bulkInsertIntoDB = catchAsync(async (req, res) => {
+  const result = await EventBookingService.insertIntoDB(req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Event booking insert successfully!',
+    data: result,
+  });
+});
+
 const getByAuthorFromDB = catchAsync(async (req, res) => {
   const filters = pick(req.query, eventBookingFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
@@ -84,6 +94,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EventBookingController = {
   insertIntoDB,
+  bulkInsertIntoDB,
   getByAuthorFromDB,
   getByUserFromDB,
   getByIdFromDB,

@@ -273,9 +273,15 @@ const getCombineCoursesFromDB = async (
 
   // ====== WHERE CONDITIONS ======
   const andConditions: Prisma.CourseWhereInput[] = [
-    { isDeleted: false, status: CoursesStatus.approved, type: CourseType.external },
+    {
+      isDeleted: false,
+      status: CoursesStatus.approved,
+      type: CourseType.external,
+    },
   ];
-  const bundleConditions: Prisma.CourseBundleWhereInput[] = [{ isDeleted: false }];
+  const bundleConditions: Prisma.CourseBundleWhereInput[] = [
+    { isDeleted: false },
+  ];
 
   // --- Filter by authorId ---
   if (filterBy?.authorId) {
@@ -316,9 +322,10 @@ const getCombineCoursesFromDB = async (
   const [courses, bundles] = await Promise.all([
     prisma.course.findMany({
       where: whereCourse,
-      orderBy: options.sortBy && options.sortOrder
-        ? { [options.sortBy]: options.sortOrder }
-        : { createdAt: 'desc' },
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -350,9 +357,10 @@ const getCombineCoursesFromDB = async (
     }),
     prisma.courseBundle.findMany({
       where: whereBundle,
-      orderBy: options.sortBy && options.sortOrder
-        ? { [options.sortBy]: options.sortOrder }
-        : { createdAt: 'desc' },
+      orderBy:
+        options.sortBy && options.sortOrder
+          ? { [options.sortBy]: options.sortOrder }
+          : { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -486,7 +494,12 @@ const getCombineCoursesFromDB = async (
 const getAllFromDB = async (
   params: ICourseFilterRequest,
   options: IPaginationOptions,
-  filterBy: { authorId?: string; companyId?: string, type?: CourseType, platform?: PlatformType } ,
+  filterBy: {
+    authorId?: string;
+    companyId?: string;
+    type?: CourseType;
+    platform?: PlatformType;
+  },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
@@ -724,7 +737,10 @@ const getAllFilterDataFromDB = async () => {
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<Course | null> => {
+const getByIdFromDB = async (
+  id: string,
+  userId: string,
+): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
     where: { id, isDeleted: false },
     include: {
@@ -765,6 +781,18 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
   }
 
+  // ====== Check enrollment ======
+  const enrolled = await prisma.enrolledCourse.findFirst({
+    where: {
+      courseId: id,
+      userId: userId,
+      isDeleted: false,
+    },
+    select: { id: true },
+  });
+
+  const isEnrolled = !!enrolled;
+
   // ====== Flatten coupon/promo ======
   const coupon = result.coupon?.[0];
   const promo = result.promoCode?.[0];
@@ -791,6 +819,7 @@ const getByIdFromDB = async (id: string): Promise<Course | null> => {
     expiry,
     discount,
     discountPrice,
+    isEnrolled
   };
 };
 

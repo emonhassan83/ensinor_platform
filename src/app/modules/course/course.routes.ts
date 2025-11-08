@@ -67,7 +67,18 @@ router.get(
   CourseController.getMyCourseFromDB,
 );
 
-router.get('/:id', CourseController.getByIdFromDB);
+router.get(
+  '/:id',
+  optionalAuth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+    UserRole.student,
+    UserRole.employee,
+  ),
+  CourseController.getByIdFromDB,
+);
 
 router.put(
   '/:id',

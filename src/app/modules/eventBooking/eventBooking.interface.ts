@@ -23,3 +23,21 @@ export type IEventBooking = {
   transactionId?: string;
   document?: string;
 };
+
+export type IEventsBooking = {
+  eventIds: string;
+  userId: string;
+  authorId: string;
+  name: string;
+  phone: string;
+  email: string;
+  organization: string;
+  profession: string;
+  city: string;
+  country: string;
+  amount: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  transactionId?: string;
+  document?: string;
+};

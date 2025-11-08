@@ -4,6 +4,7 @@ import { IPaginationOptions } from '../../interfaces/pagination';
 import {
   IEventBooking,
   IEventBookingFilterRequest,
+  IEventsBooking,
 } from './eventBooking.interface';
 import { eventBookingSearchAbleFields } from './eventBooking.constant';
 import prisma from '../../utils/prisma';
@@ -67,6 +68,92 @@ const insertIntoDB = async (payload: IEventBooking) => {
   });
 
   return result;
+};
+
+const bulkInsertIntoDB = async (payload: IEventsBooking) => {
+  const { eventIds, userId, name, phone, email, organization, profession, city, country, document } = payload;
+
+  if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No events provided for booking!');
+  }
+
+  // ✅ Validate user
+  const user = await prisma.user.findFirst({
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  // ✅ Fetch all valid events
+  const events = await prisma.event.findMany({
+    where: {
+      id: { in: eventIds },
+      isDeleted: false,
+    },
+  });
+
+  if (!events.length) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No valid events found!');
+  }
+
+  // ✅ Filter out events the user has already booked
+  const existingBookings = await prisma.eventBooking.findMany({
+    where: {
+      userId,
+      eventId: { in: eventIds },
+      isDeleted: false,
+    },
+    select: { eventId: true },
+  });
+
+  const alreadyBookedIds = existingBookings.map(b => b.eventId);
+  const newEventIds = events
+    .filter(e => !alreadyBookedIds.includes(e.id))
+    .map(e => e.id);
+
+  if (!newEventIds.length) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'You already booked all selected events!');
+  }
+
+  // ✅ Prepare data for bulk insert
+  const createData = events
+    .filter(e => newEventIds.includes(e.id))
+    .map(e => ({
+      eventId: e.id,
+      userId,
+      authorId: e.authorId || userId,
+      name,
+      phone,
+      email,
+      organization,
+      profession,
+      city,
+      country,
+      amount: e.price,
+      document,
+    }));
+
+  // ✅ Bulk create
+  const result = await prisma.eventBooking.createMany({
+    data: createData,
+    skipDuplicates: true,
+  });
+
+  // ✅ Increment "registered" count for each event
+  await Promise.all(
+    newEventIds.map(eventId =>
+      prisma.event.update({
+        where: { id: eventId },
+        data: { registered: { increment: 1 } },
+      }),
+    ),
+  );
+
+  return {
+    result,
+    existingBookings
+  };
 };
 
 const getAllFromDB = async (
@@ -230,6 +317,7 @@ const deleteFromDB = async (id: string): Promise<EventBooking> => {
 
 export const EventBookingService = {
   insertIntoDB,
+  bulkInsertIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
