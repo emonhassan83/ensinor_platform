@@ -7,6 +7,7 @@ import { CourseBundleValidation } from './courseBundle.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
 import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
+import { optionalAuth } from '../../middlewares/optionalAuth';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -48,7 +49,11 @@ router.get(
   CourseBundleController.getByCompanyFromDB,
 );
 
-router.get('/:id', CourseBundleController.getByIdFromDB);
+router.get(
+  '/:id',
+  optionalAuth(UserRole.student, UserRole.employee),
+  CourseBundleController.getByIdFromDB,
+);
 
 router.put(
   '/:id',

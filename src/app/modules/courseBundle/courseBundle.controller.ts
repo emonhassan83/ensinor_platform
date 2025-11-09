@@ -73,7 +73,7 @@ const getByCompanyFromDB = catchAsync(async (req, res) => {
 });
 
 const getByIdFromDB = catchAsync(async (req, res) => {
-  const result = await CourseBundleService.getByIdFromDB(req.params.id);
+  const result = await CourseBundleService.getByIdFromDB(req.params.id, req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

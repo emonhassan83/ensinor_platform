@@ -1,5 +1,6 @@
 import {
   CourseBundle,
+  EnrolledLogsModelType,
   Prisma,
   SubscriptionStatus,
   UserRole,
@@ -246,7 +247,7 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string) => {
+const getByIdFromDB = async (id: string, userId: string) => {
   const result = await prisma.courseBundle.findUnique({
     where: { id, isDeleted: false },
     include: {
@@ -259,6 +260,17 @@ const getByIdFromDB = async (id: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course bundle not found!');
   }
 
+  // check if user is enrolled in this bundle
+  const enrolled = await prisma.enrolledLogs.findFirst({
+    where: {
+      userId,
+      bundleId: id,
+      modelType: EnrolledLogsModelType.courseBundle,
+    },
+  });
+
+  const isEnrolled = !!enrolled;
+
   return {
     ...result,
     couponCode: null,
@@ -266,6 +278,7 @@ const getByIdFromDB = async (id: string) => {
     expiry: null,
     discount: 0,
     discountPrice: result.price,
+    isEnrolled,
   };
 };
 

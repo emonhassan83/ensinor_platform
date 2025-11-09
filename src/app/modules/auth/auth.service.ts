@@ -76,7 +76,10 @@ const socialLogin = async (
       await prisma.student.create({ data: { userId: user.id } });
     }
 
-    const tokens = generateTokens({ ...user, password: user.password ?? '' } as IUser);
+    const tokens = generateTokens({
+      ...user,
+      password: user.password ?? '',
+    } as IUser);
     return { user, ...tokens };
   }
 
@@ -107,7 +110,10 @@ const socialLogin = async (
     },
   });
 
-  const tokens = generateTokens({ ...newUser, password: newUser.password ?? '' } as IUser);
+  const tokens = generateTokens({
+    ...newUser,
+    password: newUser.password ?? '',
+  } as IUser);
   return { user: newUser, ...tokens };
 };
 
@@ -207,6 +213,20 @@ const changePassword = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
+  //* checking if the password is correct
+  const isPasswordMatched = await bcrypt.compare(oldPassword, user.password!);
+  if (!isPasswordMatched)
+    throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !');
+
+  // * Check if old and new password are the same
+  const isSamePassword = await bcrypt.compare(newPassword, user.password!);
+  if (isSamePassword) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'New password cannot be the same as your old password!',
+    );
+  }
+
   // if new pass and confirm pass not matched
   if (newPassword !== confirmPassword) {
     throw new ApiError(
@@ -214,11 +234,6 @@ const changePassword = async (
       'New password and confirmation password do not match. Please re-enter your password.',
     );
   }
-
-  //* checking if the password is correct
-  const isPasswordMatched = await bcrypt.compare(oldPassword, user.password!);
-  if (!isPasswordMatched)
-    throw new ApiError(httpStatus.FORBIDDEN, 'Invalid Password !');
 
   //* hash new password
   const newHashedPassword = await bcrypt.hash(

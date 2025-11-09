@@ -7,6 +7,7 @@ import { userFilterableFields } from './user.constant';
 import pick from '../../utils/pick';
 import { otpServices } from '../otp/otp.service';
 import { uploadToS3 } from '../../utils/s3';
+import ApiError from '../../errors/ApiError';
 
 const registerAUser = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
@@ -32,9 +33,7 @@ const registerAUser = catchAsync(async (req: Request, res: Response) => {
 
 const invitationCompanyAdmin = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await UserServices.invitationCompanyAdmin(
-      req.body
-    );
+    const result = await UserServices.invitationCompanyAdmin(req.body);
     const { id, name, email, photoUrl, contactNo, status } = result;
 
     sendResponse(res, {
@@ -104,7 +103,7 @@ const invitationInstructor = catchAsync(async (req: Request, res: Response) => {
 
 const createStudent = catchAsync(async (req: Request, res: Response) => {
   const result = await UserServices.createStudent(req.body, req.user!.userId);
-  
+
   const { id, name, email, photoUrl, contactNo, status } = result;
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -151,6 +150,18 @@ const getMyProfile = catchAsync(async (req: Request, res: Response) => {
 
 const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
+
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid file type!');
+    }
+
     req.body.photoUrl = await uploadToS3({
       file: req.file,
       fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,
@@ -169,6 +180,18 @@ const updateMyProfile = catchAsync(async (req: Request, res: Response) => {
 
 const updateAProfile = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
+
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid file type!');
+    }
+
     req.body.photoUrl = await uploadToS3({
       file: req.file,
       fileName: `images/user/photoUrl/${Math.floor(100000 + Math.random() * 900000)}`,

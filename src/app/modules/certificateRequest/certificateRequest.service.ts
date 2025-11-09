@@ -59,13 +59,12 @@ const insertIntoDB = async (payload: ICertificateRequest) => {
       'User is not enrolled in this course!',
     );
   }
-  console.log(enrollment.isComplete);
 
-  // Check if course is completed
-  if (enrollment.isComplete === false) {
+  //  Check if course is completed
+  if (!enrollment.isComplete) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Cannot request certificate. Course is not completed!',
+      'Cannot create certificate request. Course is not completed!',
     );
   }
 
@@ -196,9 +195,7 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (
-  id: string,
-): Promise<any> => {
+const getByIdFromDB = async (id: string): Promise<any> => {
   const result = await prisma.certificateRequest.findUnique({
     where: { id },
     include: {
@@ -331,7 +328,7 @@ const updateIntoDB = async (
     );
   }
 
-   // 3. If approved → create certificate automatically
+  // 3. If approved → create certificate automatically
   if (status === CertificateRequestStatus.approved) {
     // Ensure no duplicate certificate
     const existingCertificate = await prisma.certificate.findFirst({
@@ -351,7 +348,6 @@ const updateIntoDB = async (
       });
     }
   }
-
 
   // Notify student about status change
   await sendCertificateStatusNotificationToUser(
