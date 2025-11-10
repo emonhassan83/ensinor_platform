@@ -1,5 +1,6 @@
 import {
   CourseBundle,
+  CoursesStatus,
   EnrolledLogsModelType,
   Prisma,
   SubscriptionStatus,
@@ -58,6 +59,7 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     where: {
       id: { in: courseIds },
       // instructorId: authorId,
+      status: CoursesStatus.approved,
       isDeleted: false,
     },
     select: {

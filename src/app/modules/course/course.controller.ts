@@ -145,7 +145,7 @@ const getMyInternalCourse = catchAsync(async (req, res) => {
 });
 
 const getByIdFromDB = catchAsync(async (req, res) => {
-  const result = await CourseService.getByIdFromDB(req.params.id, req.user!._id);
+  const result = await CourseService.getByIdFromDB(req.params.id, req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

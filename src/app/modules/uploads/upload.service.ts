@@ -5,51 +5,54 @@ import { uploadManyToS3, uploadToS3 } from '../../utils/s3';
 const multiple = async (files: any) => {
   let fileArray: any[] = [];
 
-  // Case 1: if multer.array() is used → files is already an array
+  // ✅ Handle different multer upload structures
   if (Array.isArray(files)) {
     fileArray = files;
-  }
-  // Case 2: if multer.fields() or upload.array('files') wrapped in object
-  else if (files?.files && Array.isArray(files.files)) {
+  } else if (files?.files && Array.isArray(files.files)) {
     fileArray = files.files;
-  }
-  // Case 3: if multer.fields() returns multiple named arrays (like { images: [...], videos: [...] })
-  else if (typeof files === 'object') {
+  } else if (typeof files === 'object') {
     Object.values(files).forEach((arr: any) => {
       if (Array.isArray(arr)) fileArray.push(...arr);
     });
   }
 
   if (!fileArray.length) {
-    return { images: [], videos: [] };
+    return [];
   }
 
-  const imageFiles = [];
-  const videoFiles = [];
 
-  for (const file of fileArray) {
+  // ✅ Detect file type and assign upload path
+  const uploadTasks = fileArray.map((file: any) => {
+    let path = 'others'; // default fallback
+
     if (file.mimetype.startsWith('image/')) {
-      imageFiles.push({
-        file,
-        path: 'images',
-      });
+      path = 'images';
     } else if (file.mimetype.startsWith('video/')) {
-      videoFiles.push({
-        file,
-        path: 'videos',
-      });
+      path = 'videos';
+    } else if (
+      file.mimetype.startsWith('application/pdf') ||
+      file.originalname.toLowerCase().endsWith('.pdf')
+    ) {
+      path = 'documents';
+    } else if (
+      file.mimetype.startsWith('application/vnd') ||
+      file.originalname.match(/\.(docx?|xlsx?|pptx?)$/i)
+    ) {
+      path = 'documents';
+    } else if (file.mimetype.startsWith('audio/')) {
+      path = 'audios';
     }
-  }
 
-  const [imagesArray, videosArray] = await Promise.all([
-    imageFiles.length > 0 ? uploadManyToS3(imageFiles) : [],
-    videoFiles.length > 0 ? uploadManyToS3(videoFiles) : [],
-  ]);
+    return { file, path };
+  });
 
-  return {
-    images: imagesArray || [],
-    videos: videosArray || [],
-  };
+  // ✅ Upload all to S3
+  const uploadedFiles = await uploadManyToS3(uploadTasks);
+
+  // ✅ Return only the URLs
+  const urls = uploadedFiles.map((item: any) => item.url);
+
+  return urls;
 };
 
 const single = async (file: any) => {

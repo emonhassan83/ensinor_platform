@@ -739,7 +739,7 @@ const getAllFilterDataFromDB = async () => {
 
 const getByIdFromDB = async (
   id: string,
-  userId: string,
+  userId?: string,
 ): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
     where: { id, isDeleted: false },
