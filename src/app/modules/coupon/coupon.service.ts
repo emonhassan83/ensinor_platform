@@ -2,6 +2,7 @@ import {
   Coupon,
   CouponModel,
   Prisma,
+  PromoCodeModel,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -59,7 +60,10 @@ const insertIntoDB = async (payload: ICoupon) => {
   // 4️⃣ Validate code uniqueness
   const existing = await prisma.coupon.findUnique({ where: { code } });
   if (existing)
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Coupon code already exists! Please choose a different code.');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Coupon code already exists! Please choose a different code.',
+    );
 
   if (!payload.isGlobal) {
     // 5️⃣ Validate model-specific reference + active coupon check
@@ -79,6 +83,16 @@ const insertIntoDB = async (payload: ICoupon) => {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             'Book not found or does not belong to author!',
+          );
+
+        // ⚠️ Prevent coupon if promo exists
+        const existingBookPromo = await prisma.promoCode.findFirst({
+          where: { modelType: PromoCodeModel.book, bookId, isActive: true },
+        });
+        if (existingBookPromo)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'A promo code already exists for this book! Cannot create coupon.',
           );
 
         // Check active coupon for this book
@@ -103,6 +117,15 @@ const insertIntoDB = async (payload: ICoupon) => {
         });
         if (!course)
           throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found !');
+
+        const existingCoursePromo = await prisma.promoCode.findFirst({
+          where: { modelType: PromoCodeModel.course, courseId, isActive: true },
+        });
+        if (existingCoursePromo)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'A promo code already exists for this course! Cannot create coupon.',
+          );
 
         // Check active coupon for this course
         const existingCourseCoupon = await prisma.coupon.findFirst({
@@ -129,6 +152,12 @@ const insertIntoDB = async (payload: ICoupon) => {
             httpStatus.BAD_REQUEST,
             'Event not found or does not belong to author!',
           );
+
+          const existingEventPromo = await prisma.promoCode.findFirst({
+          where: { modelType: PromoCodeModel.event, eventId, isActive: true },
+        });
+        if (existingEventPromo)
+          throw new ApiError(httpStatus.BAD_REQUEST, 'A promo code already exists for this event! Cannot create coupon.');  
 
         // Check active coupon for this event
         const existingEventCoupon = await prisma.coupon.findFirst({
@@ -174,11 +203,11 @@ const getAllFromDB = async (
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.CouponWhereInput[] = [{ isActive: true }];
-    // Filter either by authorId
-  if ( filterBy && filterBy.authorId) {
+  // Filter either by authorId
+  if (filterBy && filterBy.authorId) {
     andConditions.push({ authorId: filterBy.authorId });
   }
-  if( filterBy && filterBy.isGlobal !== undefined) {
+  if (filterBy && filterBy.isGlobal !== undefined) {
     andConditions.push({ isGlobal: filterBy.isGlobal });
   }
 

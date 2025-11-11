@@ -53,7 +53,8 @@ const registerAUser = async (
     where: { email: user.email },
     include: { verification: true },
   });
-
+  console.log({existingUser});
+  
   if (existingUser) {
     if (existingUser.isDeleted) {
       return prisma.user.update({

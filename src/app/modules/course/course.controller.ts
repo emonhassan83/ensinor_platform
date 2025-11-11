@@ -32,7 +32,7 @@ const getAllPlatformCourses = catchAsync(async (req, res) => {
   const filters = pick(req.query, courseFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
   const filterBy = {
-    platform: PlatformType.admin
+    platform: PlatformType.admin,
   };
 
   const result = await CourseService.getAllFromDB(filters, options, filterBy);
@@ -97,7 +97,7 @@ const getByCompanyFromDB = catchAsync(async (req, res) => {
 
   const result = await CourseService.getAllFromDB(filters, options, {
     companyId: req.params.companyId,
-    platform: PlatformType.company
+    platform: PlatformType.company,
   });
 
   sendResponse(res, {
@@ -132,7 +132,7 @@ const getMyInternalCourse = catchAsync(async (req, res) => {
 
   const result = await CourseService.getAllFromDB(filters, options, {
     authorId: req.user!.userId,
-    type: CourseType.internal
+    type: CourseType.internal,
   });
 
   sendResponse(res, {
@@ -145,7 +145,9 @@ const getMyInternalCourse = catchAsync(async (req, res) => {
 });
 
 const getByIdFromDB = catchAsync(async (req, res) => {
-  const result = await CourseService.getByIdFromDB(req.params.id, req.user!.userId);
+  const result = await CourseService.getByIdFromDB(req.params.id, {
+    userId: req.user?.userId,
+  });
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -185,7 +187,7 @@ const assignACourse = catchAsync(async (req, res) => {
   const result = await CourseService.assignACourseIntoDB(
     req.params.id,
     req.body,
-    req.user!.userId
+    req.user!.userId,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

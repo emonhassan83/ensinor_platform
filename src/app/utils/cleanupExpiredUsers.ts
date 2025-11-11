@@ -2,8 +2,8 @@ import cron from 'node-cron';
 import prisma from './prisma';
 
 export const scheduleExpiredUserCleanup = () => {
-  // Run every 5 minutes
-  cron.schedule('*/5 * * * *', async () => {
+  // Run every 12 hours (at minute 0)
+  cron.schedule('0 */12 * * *', async () => {
     const now = new Date();
 
     // Fetch users that should be deleted

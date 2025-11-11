@@ -739,26 +739,16 @@ const getAllFilterDataFromDB = async () => {
 
 const getByIdFromDB = async (
   id: string,
-  userId?: string,
+  filterBy?: { userId?: string },
 ): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
     where: { id, isDeleted: false },
     include: {
       author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          photoUrl: true,
-        },
+        select: { id: true, name: true, email: true, photoUrl: true },
       },
       courseContent: {
-        select: {
-          id: true,
-          title: true,
-          video: true,
-          duration: true,
-        },
+        select: { id: true, title: true, video: true, duration: true },
       },
       resource: true,
       assignment: true,
@@ -781,17 +771,15 @@ const getByIdFromDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
   }
 
-  // ====== Check enrollment ======
-  const enrolled = await prisma.enrolledCourse.findFirst({
-    where: {
-      courseId: id,
-      userId: userId,
-      isDeleted: false,
-    },
-    select: { id: true },
-  });
-
-  const isEnrolled = !!enrolled;
+  // ====== Check enrollment only if userId is provided ======
+  let isEnrolled = false;
+  if (filterBy && filterBy.userId) {
+    const enrolled = await prisma.enrolledCourse.findFirst({
+      where: { courseId: id, userId: filterBy.userId, isDeleted: false },
+      select: { id: true },
+    });
+    isEnrolled = !!enrolled;
+  }
 
   // ====== Flatten coupon/promo ======
   const coupon = result.coupon?.[0];
@@ -819,7 +807,7 @@ const getByIdFromDB = async (
     expiry,
     discount,
     discountPrice,
-    isEnrolled
+    isEnrolled, // will be false if userId not provided
   };
 };
 

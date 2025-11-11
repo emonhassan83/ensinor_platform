@@ -1,4 +1,5 @@
 import {
+  CouponModel,
   Prisma,
   PromoCode,
   PromoCodeModel,
@@ -84,6 +85,16 @@ const insertIntoDB = async (payload: IPromoCode) => {
             'Book not found or does not belong to author!',
           );
 
+        // ⚠️ Check if coupon already exists for this book
+        const existingBookCoupon = await prisma.coupon.findFirst({
+          where: { modelType: CouponModel.book, bookId, isActive: true },
+        });
+        if (existingBookCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'A coupon already exists for this book! Cannot create promo.',
+          );
+
         // Check active promo for this book
         const existingBookPromo = await prisma.promoCode.findFirst({
           where: { ...referenceWhere, modelType: PromoCodeModel.book, bookId },
@@ -106,6 +117,15 @@ const insertIntoDB = async (payload: IPromoCode) => {
         });
         if (!course)
           throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found !');
+
+        const existingCourseCoupon = await prisma.coupon.findFirst({
+          where: { modelType: CouponModel.course, courseId, isActive: true },
+        });
+        if (existingCourseCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'A coupon already exists for this course! Cannot create promo.',
+          );
 
         // Check active promo for this course
         const existingCoursePromo = await prisma.promoCode.findFirst({
@@ -135,6 +155,15 @@ const insertIntoDB = async (payload: IPromoCode) => {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             'Event not found or does not belong to author!',
+          );
+
+        const existingEventCoupon = await prisma.coupon.findFirst({
+          where: { modelType: CouponModel.event, eventId, isActive: true },
+        });
+        if (existingEventCoupon)
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            'A coupon already exists for this event! Cannot create promo.',
           );
 
         // Check active promo for this event

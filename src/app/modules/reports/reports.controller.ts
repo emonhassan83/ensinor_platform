@@ -89,7 +89,8 @@ const courseCompletionReports = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Company completion reports retrieval successfully!',
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
@@ -106,7 +107,8 @@ const quizReports = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Company quiz reports retrieval successfully!',
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
@@ -123,7 +125,8 @@ const attendanceReports = catchAsync(async (req, res) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Company attendance reports retrieval successfully!',
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
