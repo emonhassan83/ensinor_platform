@@ -8,6 +8,8 @@ import { newsletterScheduleCorn } from './app/modules/newsletter/newsletter.util
 import { cleanupCouponsAndPromos } from './app/modules/orders/orders.utils';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
+const PORT = Number(process.env.PORT) || 5000;
+const HOST = process.env.IP || '0.0.0.0';
 
 const main = async () => {
   try {
@@ -18,7 +20,7 @@ const main = async () => {
     newsletterScheduleCorn();
     cleanupCouponsAndPromos();
 
-    server = app.listen(Number(config.port), config.ip as string, () => {
+    server = app.listen(PORT, HOST, () => {
       console.log(
         `⚡️[server]: Server is running at http://${config.ip}:${config.port}`,
       );
