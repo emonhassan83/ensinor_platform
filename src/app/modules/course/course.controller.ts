@@ -47,8 +47,24 @@ const getAllPlatformCourses = catchAsync(async (req, res) => {
 });
 
 const getCombineCourses = catchAsync(async (req, res) => {
-  const filters = pick(req.query, courseFilterableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+    // Normalize boolean & numeric query params here
+  const normalizedQuery: any = {};
+  
+  
+  Object.keys(req.query).forEach(key => {
+    const value = req.query[key];
+
+    // convert "true"/"false" into boolean
+    if (value === 'true') normalizedQuery[key] = true;
+    else if (value === 'false') normalizedQuery[key] = false;
+    // convert numbers
+    else if (!isNaN(Number(value))) normalizedQuery[key] = Number(value);
+    // otherwise keep string
+    else normalizedQuery[key] = value;
+  });
+  
+  const filters = pick(normalizedQuery, courseFilterableFields);
+  const options = pick(normalizedQuery, ['limit', 'page', 'sortBy', 'sortOrder']);
 
   const result = await CourseService.getCombineCoursesFromDB(filters, options, {
     userId: req.user?.userId,

@@ -6,4 +6,5 @@ export const courseFilterableFields = [
   'level',
   'language',
   'status',
+  'isFreeCourse'
 ];

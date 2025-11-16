@@ -296,6 +296,7 @@ const getCombineCoursesFromDB = async (
         [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
     });
+
     bundleConditions.push({
       OR: [
         { title: { contains: searchTerm, mode: 'insensitive' } },
@@ -304,13 +305,31 @@ const getCombineCoursesFromDB = async (
     });
   }
 
-  // --- Dynamic filters ---
+  // ====== DYNAMIC FILTERS (UPDATED) ======
   if (Object.keys(filterData).length > 0) {
     const extraFilters = {
-      AND: Object.keys(filterData).map(key => ({
-        [key]: { equals: (filterData as any)[key] },
-      })),
+      AND: Object.keys(filterData).map(key => {
+        const value = (filterData as any)[key];
+
+        // 🔹 Boolean filter handling (true/false)
+        if (
+          typeof value === 'boolean' ||
+          value === 'true' ||
+          value === 'false'
+        ) {
+          return { [key]: value === true || value === 'true' };
+        }
+
+        // 🔹 Numeric values
+        if (!isNaN(Number(value))) {
+          return { [key]: { equals: Number(value) } };
+        }
+
+        // 🔹 Default equals for string
+        return { [key]: { equals: value } };
+      }),
     };
+
     andConditions.push(extraFilters);
     bundleConditions.push(extraFilters);
   }
@@ -355,6 +374,7 @@ const getCombineCoursesFromDB = async (
         },
       },
     }),
+
     prisma.courseBundle.findMany({
       where: whereBundle,
       orderBy:
@@ -380,7 +400,7 @@ const getCombineCoursesFromDB = async (
     }),
   ]);
 
-  // ====== MERGE COUPON & PROMO ======
+  // ====== MERGE ======
   const combined = [
     ...courses.map(c => {
       const coupon = c.coupon?.[0];
@@ -415,6 +435,7 @@ const getCombineCoursesFromDB = async (
         discountPrice,
       };
     }),
+
     ...bundles.map(b => ({
       ...b,
       type: 'bundle',
@@ -439,9 +460,10 @@ const getCombineCoursesFromDB = async (
   const total = combined.length;
   const start = (page - 1) * limit;
   const end = start + limit;
+
   const paginated = combined.slice(start, end);
 
-  // ====== WISHLIST INTEGRATION ======
+  // ====== WISHLIST ======
   let wishlistIds: Set<string> = new Set();
   if (filterBy?.userId) {
     const wishlists = await prisma.wishlist.findMany({
@@ -454,10 +476,12 @@ const getCombineCoursesFromDB = async (
       },
       select: { courseId: true, courseBundleId: true },
     });
-    wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
+    wishlistIds = new Set(
+      wishlists.map(w => w.courseId || w.courseBundleId!)
+    );
   }
 
-  // ====== ENROLLED LOGS INTEGRATION ======
+  // ====== ENROLLED ======
   let enrolledCourseIds = new Set<string>();
   let enrolledBundleIds = new Set<string>();
 
@@ -475,7 +499,7 @@ const getCombineCoursesFromDB = async (
     );
   }
 
-  // ====== FINAL DATA ======
+  // ====== FINAL RESPONSE ======
   const finalData = paginated.map(item => ({
     ...item,
     isWishlist: wishlistIds.has(item.id),

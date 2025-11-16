@@ -6,10 +6,16 @@ import { CompanyType, UserStatus } from '@prisma/client';
 // ----------------------
 const registerAUser = z.object({
   body: z.object({
-    password: z.string({ required_error: 'Password is required!' }),
-    confirmPassword: z.string({
-      required_error: 'Confirm password is required!',
-    }),
+    password: z
+      .string({ required_error: 'Password is required!' })
+      .min(6, { message: 'Password must be at least 6 characters' })
+      .max(16, { message: 'Password cannot be more than 16 characters' }),
+    confirmPassword: z
+      .string({
+        required_error: 'Confirm password is required!',
+      })
+      .min(6, { message: 'Password must be at least 6 characters' })
+      .max(16, { message: 'Password cannot be more than 16 characters' }),
     user: z.object({
       name: z.string({ required_error: 'Name is required!' }),
       email: z.string().email('Invalid email address'),
