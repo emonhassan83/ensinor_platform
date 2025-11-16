@@ -7,10 +7,10 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
-    course: z.array(
+    courseIds: z.array(
       z
-        .string({ required_error: 'Author is required' })
-        .uuid('author must be a valid UUID'),
+        .string({ required_error: 'Course is required' })
+        .uuid('course must be a valid UUID'),
     ),
     title: z.string({ required_error: 'Title course bundle is required!' }),
     description: z.string({ required_error: 'Description is required!' }),
