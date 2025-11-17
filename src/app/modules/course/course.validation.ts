@@ -18,6 +18,7 @@ const createValidationSchema = z.object({
       required_error: 'Short description is required!',
     }),
     category: z.string({ required_error: 'Category is required!' }),
+    topics: z.array(z.string({ required_error: 'Topics is required!' })),
     level: z.string({ required_error: 'Course level is required!' }),
     language: z.string({ required_error: 'Course language is required!' }),
     deadline: z.string({ required_error: 'Course deadline is required!' }),
@@ -74,7 +75,7 @@ const changedStatusValidationSchema = z.object({
 
 const assignCourseValidationSchema = z.object({
   body: z.object({
-     authorId: z
+    authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
   }),

@@ -510,6 +510,7 @@ model Course {
   platform         PlatformType  @default(admin)
   type             CourseType    @default(external)
   category         String
+  topics           String[]
   level            CourseLevel
   language         String
   deadline         String?
