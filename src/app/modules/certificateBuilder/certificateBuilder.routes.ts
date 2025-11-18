@@ -4,12 +4,23 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CertificateRequestValidation } from './certificateBuilder.validation';
+import multer, { memoryStorage } from 'multer';
+import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
+const storage = memoryStorage();
+const upload = multer({ storage });
 
 router.post(
   '/',
-  auth(UserRole.student, UserRole.employee),
+  auth(
+    UserRole.instructor,
+    UserRole.business_instructors,
+    UserRole.company_admin,
+    UserRole.super_admin,
+  ),
+  upload.single('image'),
+  parseData(),
   validateRequest(CertificateRequestValidation.createValidationSchema),
   CertificateBuilderController.insertIntoDB,
 );
@@ -25,31 +36,21 @@ router.get(
   CertificateBuilderController.getByAuthorIdFromDB,
 );
 
-router.get(
-  '/:id',
-  auth(
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.company_admin,
-    UserRole.super_admin,
-  ),
-  CertificateBuilderController.getByIdFromDB,
-);
-
 router.put(
-  '/:id',
+  '/update-certificate-builder',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  validateRequest(CertificateRequestValidation.updateValidationSchema),
+  upload.single('image'),
+  parseData(),
   CertificateBuilderController.updateIntoDB,
 );
 
 router.delete(
-  '/:id',
+  '/delete-certificate-builder',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,
@@ -59,4 +60,4 @@ router.delete(
   CertificateBuilderController.deleteFromDB,
 );
 
-export const CertificateRequestRoutes = router;
+export const CertificateBuilderRoutes = router;

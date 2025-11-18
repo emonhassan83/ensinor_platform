@@ -1,5 +1,3 @@
-import { CertificateRequestStatus } from "@prisma/client";
-
 export type ICertificateFilterRequest = {
   searchTerm?: string | undefined;
   company?: string | undefined;

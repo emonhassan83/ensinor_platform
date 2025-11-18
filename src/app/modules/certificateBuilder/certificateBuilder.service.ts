@@ -9,8 +9,9 @@ import { certificateBuilderSearchAbleFields } from './certificateBuilder.constan
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
+import { uploadToS3 } from '../../utils/s3';
 
-const insertIntoDB = async (payload: ICertificateBuilder) => {
+const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
   const { authorId } = payload;
 
   const user = await prisma.user.findFirst({
@@ -34,6 +35,14 @@ const insertIntoDB = async (payload: ICertificateBuilder) => {
     },
   });
   if (existingBuilder) return existingBuilder;
+
+  // 🔹 Upload logo (if file provided)
+  if (file) {
+    payload.logo = (await uploadToS3({
+      file,
+      fileName: `images/certificate-builder/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
 
   // Create certificate request
   const result = await prisma.certificateBuilder.create({
@@ -129,9 +138,9 @@ const getAllFromDB = async (
   };
 };
 
-const getByIdFromDB = async (id: string): Promise<any> => {
-  const result = await prisma.certificateBuilder.findUnique({
-    where: { id, isDeleted: false },
+const getByIdFromDB = async (authorId: string): Promise<any> => {
+  const result = await prisma.certificateBuilder.findFirst({
+    where: { authorId: authorId, isDeleted: false },
     include: {
       author: {
         select: {
@@ -139,7 +148,6 @@ const getByIdFromDB = async (id: string): Promise<any> => {
           name: true,
           email: true,
           photoUrl: true,
-          role: true,
         },
       },
     },
@@ -155,18 +163,27 @@ const getByIdFromDB = async (id: string): Promise<any> => {
 };
 
 const updateIntoDB = async (
-  id: string,
+  authorId: string,
   payload: Partial<CertificateBuilder>,
+  file: any,
 ): Promise<CertificateBuilder> => {
   const certificateBuilder = await prisma.certificateBuilder.findFirst({
-    where: { id },
+    where: { authorId },
   });
   if (!certificateBuilder || certificateBuilder?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Certificate builder not found!');
   }
 
+  // 🔹 Upload logo (if file provided)
+  if (file) {
+    payload.logo = (await uploadToS3({
+      file,
+      fileName: `images/certificate-builder/logo/${Math.floor(100000 + Math.random() * 900000)}`,
+    })) as string;
+  }
+
   const result = await prisma.certificateBuilder.update({
-    where: { id },
+    where: { id: certificateBuilder.id },
     data: payload,
   });
   if (!result) {
@@ -179,16 +196,16 @@ const updateIntoDB = async (
   return result;
 };
 
-const deleteFromDB = async (id: string): Promise<CertificateBuilder> => {
+const deleteFromDB = async (authorId: string): Promise<CertificateBuilder> => {
   const certificateBuilder = await prisma.certificateBuilder.findFirst({
-    where: { id },
+    where: { authorId },
   });
   if (!certificateBuilder || certificateBuilder?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Certificate builder not found!');
   }
 
   const result = await prisma.certificateBuilder.update({
-    where: { id },
+    where: { id: certificateBuilder.id },
     data: {
       isDeleted: true,
     },

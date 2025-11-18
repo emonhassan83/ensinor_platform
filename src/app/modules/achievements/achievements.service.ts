@@ -32,7 +32,7 @@ const myAchievementsIntoDB = async (userId: string) => {
 
   // 5️⃣ Count earned certificates
   const certificateCount = await prisma.certificate.count({
-    where: { userId, isCompleted: true },
+    where: { userId },
   });
 
   // 6️⃣ Calculate streak days (based on unique `courseLogs` days)

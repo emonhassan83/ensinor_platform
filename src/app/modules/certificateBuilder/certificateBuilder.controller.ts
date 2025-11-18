@@ -4,7 +4,7 @@ import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await CertificateBuilderService.insertIntoDB(req.body);
+  const result = await CertificateBuilderService.insertIntoDB(req.body, req.file);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -14,7 +14,7 @@ const insertIntoDB = catchAsync(async (req, res) => {
 });
 
 const getByAuthorIdFromDB = catchAsync(async (req, res) => {
-  const result = await CertificateBuilderService.getByIdFromDB(req.params.id);
+  const result = await CertificateBuilderService.getByIdFromDB(req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -23,20 +23,11 @@ const getByAuthorIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByIdFromDB = catchAsync(async (req, res) => {
-  const result = await CertificateBuilderService.getByIdFromDB(req.params.id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Certificate Builder data fetched by id!',
-    data: result,
-  });
-});
-
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CertificateBuilderService.updateIntoDB(
-    req.params.id,
+    req.user!.userId,
     req.body,
+    req.file
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -47,7 +38,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
 });
 
 const deleteFromDB = catchAsync(async (req, res) => {
-  const result = await CertificateBuilderService.deleteFromDB(req.params.id);
+  const result = await CertificateBuilderService.deleteFromDB(req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -59,7 +50,6 @@ const deleteFromDB = catchAsync(async (req, res) => {
 export const CertificateBuilderController = {
   insertIntoDB,
   getByAuthorIdFromDB,
-  getByIdFromDB,
   updateIntoDB,
   deleteFromDB,
 };

@@ -509,7 +509,7 @@ model Course {
   platform         PlatformType  @default(admin)
   type             CourseType    @default(external)
   category         String
-  topics           String[]
+  topics           String[]      @default([])
   level            CourseLevel
   language         String
   deadline         String?
@@ -917,7 +917,7 @@ model CertificateBuilder {
   authorId  String
   company   String?
   logo      String?
-  isDeleted Boolean @default(false)
+  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -262,33 +262,6 @@ const updateIntoDB = async (
   return result;
 };
 
-const certificateCompletedIntoDB = async (id: string): Promise<Certificate> => {
-  const certificate = await prisma.certificate.findUnique({
-    where: { id },
-    include: {
-      user: true,
-    },
-  });
-  if (!certificate) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Certificate not found!');
-  }
-
-  const result = await prisma.certificate.update({
-    where: { id },
-    data: {
-      isCompleted: true,
-    },
-  });
-  if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Certificate not completed!');
-  }
-
-  // sent notify to certificate user
-  await sendCertificateNotifyToUser(certificate.user, certificate);
-
-  return result;
-};
-
 const deleteFromDB = async (id: string): Promise<Certificate> => {
   const certificate = await prisma.certificate.findUniqueOrThrow({
     where: { id },
@@ -312,6 +285,5 @@ export const CertificateService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
-  certificateCompletedIntoDB,
   deleteFromDB,
 };

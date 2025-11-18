@@ -1,4 +1,3 @@
-import { CertificateRequestStatus } from '@prisma/client';
 import { z } from 'zod';
 
 // Create validation

@@ -18,7 +18,9 @@ const createValidationSchema = z.object({
       required_error: 'Short description is required!',
     }),
     category: z.string({ required_error: 'Category is required!' }),
-    topics: z.array(z.string({ required_error: 'Topics is required!' })),
+    topics: z
+      .array(z.string({ required_error: 'Topics is required!' }))
+      .optional(),
     level: z.string({ required_error: 'Course level is required!' }),
     language: z.string({ required_error: 'Course language is required!' }),
     deadline: z.string({ required_error: 'Course deadline is required!' }),
@@ -43,6 +45,9 @@ const updateValidationSchema = z.object({
       .string({ required_error: 'Short description is required!' })
       .optional(),
     category: z.string({ required_error: 'Category is required!' }).optional(),
+    topics: z
+      .array(z.string({ required_error: 'Topics is required!' }))
+      .optional(),
     level: z.string({ required_error: 'Course level is required!' }).optional(),
     language: z
       .string({ required_error: 'Course language is required!' })

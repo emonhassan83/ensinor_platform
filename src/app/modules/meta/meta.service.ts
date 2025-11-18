@@ -491,7 +491,10 @@ const getInstructorEarningOverview = async (authorId: string, year: number) => {
   return earningOverview;
 };
 
-const getCoInstructorEarningOverview = async (coInstructorId: string, year: number) => {
+const getCoInstructorEarningOverview = async (
+  coInstructorId: string,
+  year: number,
+) => {
   const now = new Date();
   const currentYear = now.getFullYear();
   const isCurrentYear = year === currentYear;
@@ -560,9 +563,7 @@ const websiteBannerMeta = async () => {
   const avgRating = reviewAgg._avg.rating || 0;
 
   // 7. Total certificates achieved
-  const totalCertificates = await prisma.certificate.count({
-    where: { isCompleted: true },
-  });
+  const totalCertificates = await prisma.certificate.count();
 
   // 8. Total enrolled course completed user count
   const completedUsers = await prisma.enrolledCourse.groupBy({
@@ -1323,7 +1324,7 @@ const studentMetaData = async (user: any) => {
       category: ec.course.category,
       thumbnail: ec.course.thumbnail,
       completionRate: ec.completedRate,
-      learningTime: ec.learningTime
+      learningTime: ec.learningTime,
     }));
 
   const totalCompletedCourseCount = completedCourses.length;
@@ -1337,7 +1338,7 @@ const studentMetaData = async (user: any) => {
       category: ec.course.category,
       thumbnail: ec.course.thumbnail,
       completionRate: ec.completedRate,
-      learningTime: ec.learningTime
+      learningTime: ec.learningTime,
     }));
 
   const totalInProgressCourseCount = inProgressCourses.length;

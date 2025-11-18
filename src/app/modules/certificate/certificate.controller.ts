@@ -73,18 +73,6 @@ const updateIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const certificateCompletedIntoDB = catchAsync(async (req, res) => {
-  const result = await CertificateService.certificateCompletedIntoDB(
-    req.params.id,
-  );
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Certificate creation completed!',
-    data: result,
-  });
-});
-
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CertificateService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -101,6 +89,5 @@ export const CertificateController = {
   getByMyCertificateFromDB,
   getByIdFromDB,
   updateIntoDB,
-  certificateCompletedIntoDB,
   deleteFromDB,
 };
