@@ -1498,6 +1498,7 @@ const getByIdFromDB = async (id: string) => {
           description: true,
           lectures: true,
           courseContent: true,
+          resource: true,
           quiz: true,
           assignment: true,
         },

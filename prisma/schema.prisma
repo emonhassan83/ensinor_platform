@@ -109,8 +109,6 @@ model User {
   companyBusinessInstructor  BusinessInstructor[]   @relation("companyAuthor")
   companyEmployee            Employee[]             @relation("companyUser")
   quiz                       Quiz[]
-  studentRequest             CertificateRequest[]   @relation("studentRequest")
-  authorRequest              CertificateRequest[]   @relation("authorRequest")
   resource                   Resource[]
   coInstructorsInvited       CoInstructor[]         @relation("InvitedByRelation")
   coInstructorRoles          CoInstructor[]         @relation("CoInstructorRelation")
@@ -125,6 +123,7 @@ model User {
   achievement                Achievement?
   achievementLogs            AchievementLogs[]
   enrolledLogs               EnrolledLogs[]
+  certificateBuilders        CertificateBuilder[]
 
   @@map("users")
 }
@@ -537,27 +536,26 @@ model Course {
   courseBundleCourses CourseBundleCourses[]
   bundles             CourseBundle[]        @relation("BundleCourses")
 
-  courseContent      CourseContent[]
-  quiz               Quiz[]
-  certificateRequest CertificateRequest[]
-  enrolledCourse     EnrolledCourse[]
-  certificate        Certificate[]
-  gradingSystem      GradingSystem[]
-  affiliateLink      AffiliateLink[]
-  meetingAssignment  MeetingAssignment[]
-  coupon             Coupon[]
-  promoCode          PromoCode[]
-  review             Review[]
-  wishlist           Wishlist[]
-  resource           Resource[]
-  coInstructor       CoInstructor[]
-  assignment         Assignment[]
-  chat               Chat[]
-  cart               Cart[]
-  orderItem          OrderItem[]
-  courseLogs         CourseLogs[]
-  achievementLogs    AchievementLogs[]
-  enrolledLogs       EnrolledLogs[]
+  courseContent     CourseContent[]
+  quiz              Quiz[]
+  enrolledCourse    EnrolledCourse[]
+  certificate       Certificate[]
+  gradingSystem     GradingSystem[]
+  affiliateLink     AffiliateLink[]
+  meetingAssignment MeetingAssignment[]
+  coupon            Coupon[]
+  promoCode         PromoCode[]
+  review            Review[]
+  wishlist          Wishlist[]
+  resource          Resource[]
+  coInstructor      CoInstructor[]
+  assignment        Assignment[]
+  chat              Chat[]
+  cart              Cart[]
+  orderItem         OrderItem[]
+  courseLogs        CourseLogs[]
+  achievementLogs   AchievementLogs[]
+  enrolledLogs      EnrolledLogs[]
 
   @@map("courses")
 }
@@ -834,13 +832,13 @@ model EnrolledCourse {
 }
 
 model EnrolledLogs {
-  id        String   @id @default(uuid())
+  id        String                @id @default(uuid())
   userId    String
   modelType EnrolledLogsModelType
   courseId  String?
   bundleId  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
 
   user         User          @relation(fields: [userId], references: [id])
   course       Course?       @relation(fields: [courseId], references: [id])
@@ -914,41 +912,39 @@ model AssignmentSubmission {
   @@map("assignment_submissions")
 }
 
-model CertificateRequest {
-  id        String                   @id @default(uuid())
-  userId    String // FK to User (course author)
-  authorId  String // FK to User (student requesting)
-  courseId  String
-  status    CertificateRequestStatus @default(pending)
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+model CertificateBuilder {
+  id        String   @id @default(uuid())
+  authorId  String
+  company   String?
+  logo      String?
+  isDeleted Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  author User   @relation("authorRequest", fields: [authorId], references: [id])
-  user   User   @relation("studentRequest", fields: [userId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
+  author User @relation(fields: [authorId], references: [id])
 
-  @@map("certificate_requests")
+  @@map("certificate_builder")
 }
 
 model Certificate {
-  id           String   @id @default(uuid())
-  authorId     String
-  userId       String
-  courseId     String
-  company      String?
-  logo         String?
-  student      String?
-  courseName   String?
-  instructor   String?
-  studyHour    Float    @default(0.0)
-  topics       String[] @default([])
-  completeDate String?
-  reference    String?
-  signature    String?
-  isCompleted  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String       @id @default(uuid())
+  authorId       String
+  userId         String
+  courseId       String
+  platform       PlatformType @default(admin)
+  company        String?
+  logo           String?
+  student        String?
+  courseName     String?
+  instructor     String?
+  insDesignation String?
+  studyHour      Float
+  topics         String[]     @default([])
+  completeDate   String?
+  reference      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   course Course @relation(fields: [courseId], references: [id])
   author User   @relation("AuthorCertificate", fields: [authorId], references: [id])

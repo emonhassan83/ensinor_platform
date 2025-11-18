@@ -119,7 +119,7 @@ const getByCompanyFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'My Courses data fetched!',
+    message: 'My company courses data fetched!',
     meta: result.meta,
     data: result.data,
   });

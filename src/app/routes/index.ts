@@ -28,7 +28,7 @@ import { QuizRoutes } from '../modules/quiz/quiz.routes';
 import { QuestionRoutes } from '../modules/question/question.routes';
 import { QuizAttemptRoutes } from '../modules/quizAttempt/quizAttempt.routes';
 import { EnrolledCourseRoutes } from '../modules/enrolledCourse/enrolledCourse.routes';
-import { CertificateRequestRoutes } from '../modules/certificateRequest/certificateRequest.routes';
+import { CertificateBuilderRoutes } from '../modules/certificateBuilder/certificateBuilder.routes';
 import { CertificateRoutes } from '../modules/certificate/certificate.routes';
 import { EventRoutes } from '../modules/event/event.routes';
 import { EventScheduleRoutes } from '../modules/eventSchedule/eventSchedule.routes';
@@ -165,8 +165,8 @@ const moduleRoutes = [
     route: AssignmentSubmissionRoutes,
   },
   {
-    path: '/certificate-requests',
-    route: CertificateRequestRoutes,
+    path: '/certificate-builder',
+    route: CertificateBuilderRoutes,
   },
   {
     path: '/certificate',

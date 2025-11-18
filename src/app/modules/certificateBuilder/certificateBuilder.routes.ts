@@ -1,9 +1,9 @@
 import express from 'express';
-import { CertificateRequestController } from './certificateRequest.controller';
+import { CertificateBuilderController } from './certificateBuilder.controller';
 import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
-import { CertificateRequestValidation } from './certificateRequest.validation';
+import { CertificateRequestValidation } from './certificateBuilder.validation';
 
 const router = express.Router();
 
@@ -11,24 +11,18 @@ router.post(
   '/',
   auth(UserRole.student, UserRole.employee),
   validateRequest(CertificateRequestValidation.createValidationSchema),
-  CertificateRequestController.insertIntoDB,
+  CertificateBuilderController.insertIntoDB,
 );
 
 router.get(
-  '/user/my-requests',
-  auth(UserRole.student, UserRole.employee),
-  CertificateRequestController.getByUserIdFromDB,
-);
-
-router.get(
-  '/author/my-requests',
+  '/my-certificate-builder',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  CertificateRequestController.getByAuthorIdFromDB,
+  CertificateBuilderController.getByAuthorIdFromDB,
 );
 
 router.get(
@@ -39,11 +33,11 @@ router.get(
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  CertificateRequestController.getByIdFromDB,
+  CertificateBuilderController.getByIdFromDB,
 );
 
-router.patch(
-  '/status/:id',
+router.put(
+  '/:id',
   auth(
     UserRole.instructor,
     UserRole.business_instructors,
@@ -51,7 +45,7 @@ router.patch(
     UserRole.super_admin,
   ),
   validateRequest(CertificateRequestValidation.updateValidationSchema),
-  CertificateRequestController.updateIntoDB,
+  CertificateBuilderController.updateIntoDB,
 );
 
 router.delete(
@@ -62,7 +56,7 @@ router.delete(
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  CertificateRequestController.deleteFromDB,
+  CertificateBuilderController.deleteFromDB,
 );
 
 export const CertificateRequestRoutes = router;
