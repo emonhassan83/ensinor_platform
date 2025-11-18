@@ -827,6 +827,7 @@ model EnrolledCourse {
   // Many-to-many relation with CourseContent
   watchedLectures CourseContent[] @relation("CourseLectureWatched")
   courseLogs      CourseLogs[]
+  certificates    Certificate[]
 
   @@map("enrolled_courses")
 }
@@ -928,27 +929,29 @@ model CertificateBuilder {
 }
 
 model Certificate {
-  id             String       @id @default(uuid())
-  authorId       String
-  userId         String
-  courseId       String
-  platform       PlatformType @default(admin)
-  company        String?
-  logo           String?
-  student        String?
-  courseName     String?
-  instructor     String?
-  insDesignation String?
-  studyHour      Float
-  topics         String[]     @default([])
-  completeDate   String?
-  reference      String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(uuid())
+  authorId         String
+  userId           String
+  enrolledCourseId String
+  courseId         String
+  platform         PlatformType @default(admin)
+  company          String?
+  logo             String?
+  student          String?
+  courseName       String?
+  instructor       String?
+  insDesignation   String?
+  studyHour        Float
+  topics           String[]     @default([])
+  completeDate     String?
+  reference        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  course Course @relation(fields: [courseId], references: [id])
-  author User   @relation("AuthorCertificate", fields: [authorId], references: [id])
-  user   User   @relation("UserCertificate", fields: [userId], references: [id])
+  course         Course         @relation(fields: [courseId], references: [id])
+  author         User           @relation("AuthorCertificate", fields: [authorId], references: [id])
+  user           User           @relation("UserCertificate", fields: [userId], references: [id])
+  enrolledCourse EnrolledCourse @relation(fields: [enrolledCourseId], references: [id])
 
   @@map("certificates")
 }

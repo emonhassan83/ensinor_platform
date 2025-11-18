@@ -6,7 +6,7 @@ import sendResponse from '../../utils/sendResponse';
 import { certificateFilterableFields } from './certificate.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await CertificateService.insertIntoDB(req.body, req.files);
+  const result = await CertificateService.insertIntoDB(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -62,8 +62,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CertificateService.updateIntoDB(
     req.params.id,
-    req.body,
-    req.files,
+    req.body
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -4,12 +4,8 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CertificateValidation } from './certificate.validation';
-import multer, { memoryStorage } from 'multer';
-import parseData from '../../middlewares/parseData';
 
 const router = express.Router();
-const storage = memoryStorage();
-const upload = multer({ storage });
 
 router.post(
   '/',
@@ -19,30 +15,14 @@ router.post(
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  upload.fields([
-    { name: 'logo', maxCount: 1 },
-    { name: 'signature', maxCount: 1 },
-  ]),
-  parseData(),
   validateRequest(CertificateValidation.createValidationSchema),
   CertificateController.insertIntoDB,
 );
 
 router.get(
-  '/user/my-certificate',
+  '/my-certificate',
   auth(UserRole.student, UserRole.employee),
   CertificateController.getByMyCertificateFromDB,
-);
-
-router.get(
-  '/author/my-certificate',
-  auth(
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.company_admin,
-    UserRole.super_admin,
-  ),
-  CertificateController.getByAuthorIdFromDB,
 );
 
 router.get(
@@ -64,11 +44,6 @@ router.put(
     UserRole.company_admin,
     UserRole.super_admin,
   ),
-  upload.fields([
-    { name: 'logo', maxCount: 1 },
-    { name: 'signature', maxCount: 1 },
-  ]),
-  parseData(),
   validateRequest(CertificateValidation.updateValidationSchema),
   CertificateController.updateIntoDB,
 );

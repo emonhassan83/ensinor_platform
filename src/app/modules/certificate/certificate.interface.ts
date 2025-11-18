@@ -8,6 +8,7 @@ export type ICertificateFilterRequest = {
 
 export type ICertificate = {
   userId: string;
+  enrolledCourseId: string;
   authorId: string;
   courseId: string;
   company: string;
