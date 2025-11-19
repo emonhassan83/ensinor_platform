@@ -43,6 +43,16 @@ const getByMyCertificateFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getByEnrolledId = catchAsync(async (req, res) => {
+  const result = await CertificateService.getByEnrolledIdFromDB(req.params.enrolledId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Certificate data fetched by id!',
+    data: result,
+  });
+});
+
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await CertificateService.getByIdFromDB(req.params.id);
   sendResponse(res, {
@@ -77,6 +87,7 @@ export const CertificateController = {
   insertIntoDB,
   validateByReference,
   getByMyCertificateFromDB,
+  getByEnrolledId,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

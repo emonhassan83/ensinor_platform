@@ -224,6 +224,29 @@ const getAllFromDB = async (
   };
 };
 
+const getByEnrolledIdFromDB = async (enrolledId: string): Promise<Certificate | null> => {
+  const result = await prisma.certificate.findFirst({
+    where: { enrolledCourseId: enrolledId },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      course: true,
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Certificate not found!');
+  }
+
+  return result;
+};
+
 const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
   const result = await prisma.certificate.findUnique({
     where: { id },
@@ -307,6 +330,7 @@ export const CertificateService = {
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,
+  getByEnrolledIdFromDB,
   validateByReference,
   updateIntoDB,
   deleteFromDB,

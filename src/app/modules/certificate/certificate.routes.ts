@@ -14,6 +14,12 @@ router.post(
   CertificateController.insertIntoDB,
 );
 
+router.get(
+  '/enrolled-course/:enrolledId',
+  auth(UserRole.student, UserRole.employee),
+  CertificateController.getByEnrolledId,
+);
+
 router.get('/validate/:refId', CertificateController.validateByReference);
 
 router.get(
