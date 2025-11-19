@@ -932,7 +932,7 @@ model Certificate {
   id               String       @id @default(uuid())
   authorId         String
   userId           String
-  enrolledCourseId String
+  enrolledCourseId String?
   courseId         String
   platform         PlatformType @default(admin)
   company          String?
@@ -951,7 +951,7 @@ model Certificate {
   course         Course         @relation(fields: [courseId], references: [id])
   author         User           @relation("AuthorCertificate", fields: [authorId], references: [id])
   user           User           @relation("UserCertificate", fields: [userId], references: [id])
-  enrolledCourse EnrolledCourse @relation(fields: [enrolledCourseId], references: [id])
+  enrolledCourse EnrolledCourse? @relation(fields: [enrolledCourseId], references: [id])
 
   @@map("certificates")
 }

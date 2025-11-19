@@ -9,11 +9,12 @@ import { certificateSearchAbleFields } from './certificate.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
+import { generateEnrollmentId } from '../../utils/generateEnrollmentId';
 
 const insertIntoDB = async (payload: ICertificate) => {
   const { userId, enrolledCourseId } = payload;
 
-  // 1. Fetch user (student)
+  // 1️⃣ Validate Student
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
@@ -21,46 +22,114 @@ const insertIntoDB = async (payload: ICertificate) => {
       status: UserStatus.active,
     },
   });
-  if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Student not found!');
-  }
+  if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'Student not found!');
 
-  // 2. Validate enrollment
+  // 2️⃣ Validate Enrollment + Fetch Full Course
   const enrollment = await prisma.enrolledCourse.findFirst({
     where: { id: enrolledCourseId, userId, isDeleted: false },
-    include: { course: true },
+    include: {
+      author: true, // Course Author (User table)
+      course: { include: { author: true } },
+    },
   });
-  if (!enrollment) {
+
+  if (!enrollment)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'User is not enrolled in this course!',
     );
-  }
 
-  // 3. Check if course is completed
-  if (!enrollment.isComplete) {
+  if (!enrollment.isComplete)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Cannot create certificate. Course is not completed!',
     );
-  }
 
-  // 4. Check for existing certificate (prevent duplicate)
+  // 3️⃣ Prevent Duplicate
   const existingCertificate = await prisma.certificate.findFirst({
     where: { userId, enrolledCourseId },
   });
   if (existingCertificate) return existingCertificate;
 
-  // 5. Auto-assign authorId from course instructorId
-  payload.authorId = enrollment.course.authorId;
+  // Extract useful data
+  const course = enrollment.course;
+  const courseAuthorId = course.authorId;
 
-  // 6. Create certificate
+  // 4️⃣ Auto-assign: authorId, courseId, platform
+  payload.authorId = courseAuthorId;
+  payload.courseId = course.id;
+  payload.platform = enrollment.platform;
+
+  // 5️⃣ Auto-assign studyHour from learningTime (minutes → hours)
+  payload.studyHour = Number((enrollment.learningTime / 60).toFixed(2));
+
+  // 6️⃣ Auto-assign topics
+  payload.topics = course.topics || [];
+
+  // 7️⃣ Auto-assign completeDate
+  payload.completeDate = new Date().toISOString();
+
+  const courseCategory = course.category;
+  // 8️⃣ Auto-generate unique reference: Ensinor-xxxxx
+  payload.reference = generateEnrollmentId(
+    courseCategory,
+    user.name || 'student',
+  );
+
+  // 9️⃣ Find CertificateBuilder for this Author (Course Author)
+  const builder = await prisma.certificateBuilder.findFirst({
+    where: { authorId: courseAuthorId },
+  });
+  if (builder) {
+    payload.company = builder.company ?? '';
+    payload.logo = builder.logo ?? '';
+  } else {
+    payload.company = '';
+    payload.logo = '';
+  }
+
+  // 🔟 Resolve Instructor & Designation
+  let instructorName = null;
+  let insDesignation = null;
+
+  // Check multiple role tables that belong to instructor (User)
+  const instructorUser = await prisma.user.findFirst({
+    where: { id: courseAuthorId },
+    include: {
+      superAdmin: true,
+      companyAdmin: true,
+      businessInstructor: true,
+      instructor: true,
+    },
+  });
+
+  if (instructorUser) {
+    instructorName = instructorUser.name;
+
+    if (instructorUser.superAdmin) {
+      insDesignation = null;
+    } else if (instructorUser.companyAdmin) {
+      insDesignation = null;
+    } else if (instructorUser.businessInstructor) {
+      insDesignation = instructorUser.businessInstructor.designation || null;
+    } else if (instructorUser.instructor) {
+      insDesignation = instructorUser.instructor.designation || null;
+    }
+  }
+
+  payload.instructor = instructorName ?? '';
+  (payload as any).insDesignation = insDesignation ?? '';
+
+  // 1️⃣1️⃣ Auto-assign student (Name from User)
+  payload.student = user.name;
+
+  // 1️⃣2️⃣ Create Certificate
   const result = await prisma.certificate.create({
     data: payload,
   });
-  if (!result) {
+
+  if (!result)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate creation failed!');
-  }
 
   return result;
 };
@@ -178,9 +247,25 @@ const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
   return result;
 };
 
+const validateByReference = async (
+  refId: string,
+): Promise<Certificate | null> => {
+  const result = await prisma.certificate.findFirst({
+    where: { reference: refId },
+  });
+  if (!result) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      "The validation number is not valid. Didn't found certificate",
+    );
+  }
+
+  return result;
+};
+
 const updateIntoDB = async (
   id: string,
-  payload: Partial<ICertificate>
+  payload: Partial<ICertificate>,
 ): Promise<Certificate> => {
   const certificate = await prisma.certificate.findUnique({
     where: { id },
@@ -222,6 +307,7 @@ export const CertificateService = {
   insertIntoDB,
   getAllFromDB,
   getByIdFromDB,
+  validateByReference,
   updateIntoDB,
   deleteFromDB,
 };

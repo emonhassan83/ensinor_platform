@@ -1,3 +1,5 @@
+import { PlatformType } from "@prisma/client";
+
 export type ICertificateFilterRequest = {
   searchTerm?: string | undefined;
   company?: string | undefined;
@@ -11,8 +13,9 @@ export type ICertificate = {
   enrolledCourseId: string;
   authorId: string;
   courseId: string;
-  company: string;
-  logo: string;
+  platform: PlatformType
+  company?: string;
+  logo?: string;
   student: string;
   courseName: string;
   instructor: string;

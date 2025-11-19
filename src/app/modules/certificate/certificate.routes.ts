@@ -9,15 +9,12 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.company_admin,
-    UserRole.super_admin,
-  ),
+  auth(UserRole.student, UserRole.employee),
   validateRequest(CertificateValidation.createValidationSchema),
   CertificateController.insertIntoDB,
 );
+
+router.get('/validate/:refId', CertificateController.validateByReference);
 
 router.get(
   '/my-certificate',
@@ -25,16 +22,7 @@ router.get(
   CertificateController.getByMyCertificateFromDB,
 );
 
-router.get(
-  '/:id',
-  auth(
-    UserRole.instructor,
-    UserRole.business_instructors,
-    UserRole.company_admin,
-    UserRole.super_admin,
-  ),
-  CertificateController.getByIdFromDB,
-);
+router.get('/:id', CertificateController.getByIdFromDB);
 
 router.put(
   '/:id',

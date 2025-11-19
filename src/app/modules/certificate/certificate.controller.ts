@@ -15,20 +15,14 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByAuthorIdFromDB = catchAsync(async (req, res) => {
-  const filters = pick(req.query, certificateFilterableFields);
-  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-
-  const result = await CertificateService.getAllFromDB(filters, options, {
-    authorId: req.user!.userId,
-  });
+const validateByReference = catchAsync(async (req, res) => {
+  const result = await CertificateService.validateByReference(req.params.refId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Certificate by authorId data fetched!',
-    meta: result.meta,
-    data: result.data,
+    message: 'Certificate validate successfully!',
+    data: result,
   });
 });
 
@@ -60,10 +54,7 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await CertificateService.updateIntoDB(
-    req.params.id,
-    req.body
-  );
+  const result = await CertificateService.updateIntoDB(req.params.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -84,7 +75,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const CertificateController = {
   insertIntoDB,
-  getByAuthorIdFromDB,
+  validateByReference,
   getByMyCertificateFromDB,
   getByIdFromDB,
   updateIntoDB,
