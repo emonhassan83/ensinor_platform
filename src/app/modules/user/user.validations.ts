@@ -100,12 +100,12 @@ const createInstructor = z.object({
       name: z.string({ required_error: 'Name is required!' }),
       email: z.string().email('Invalid email address'),
       contactNo: z.string({ required_error: 'Contact number is required!' }),
-      bio: z.string({ required_error: 'Biography is required!' }),
+      bio: z.string({ required_error: 'Biography is required!' }).optional(),
     }),
     instructor: z.object({
-      designation: z.string({ required_error: 'Designation is required!' }),
-      university: z.string({ required_error: 'University is required!' }),
-      experience: z.number({ required_error: 'Experience is required!' }),
+      designation: z.string({ required_error: 'Designation is required!' }).optional(),
+      university: z.string({ required_error: 'University is required!' }).optional(),
+      experience: z.number({ required_error: 'Experience is required!' }).optional(),
     }),
   }),
 });
@@ -121,21 +121,21 @@ const createStudent = z.object({
       contactNo: z.string({ required_error: 'Contact number is required!' }),
       bio: z.string({
         required_error: 'Student bio is required!',
-      }),
+      }).optional(),
       dateOfBirth: z.string({
         required_error: 'Student date of birth is required!',
-      }),
+      }).optional(),
       country: z.string({
         required_error: 'Student country is required!',
-      }),
+      }).optional(),
     }),
     student: z.object({
       interests: z
         .array(z.string())
-        .nonempty('At least one interest is required.'),
+        .nonempty('At least one interest is required.').optional(),
       subjects: z.string({
         required_error: 'Student subjects is required!',
-      }),
+      }).optional(),
     }),
   }),
 });

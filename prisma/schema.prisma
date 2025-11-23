@@ -914,13 +914,14 @@ model AssignmentSubmission {
 }
 
 model CertificateBuilder {
-  id        String   @id @default(uuid())
-  authorId  String
-  company   String?
-  logo      String?
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  authorId        String
+  company         String?
+  logo            String?
+  isVisibleTopics Boolean  @default(true)
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relations
   author User @relation(fields: [authorId], references: [id])
@@ -948,9 +949,9 @@ model Certificate {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  course         Course         @relation(fields: [courseId], references: [id])
-  author         User           @relation("AuthorCertificate", fields: [authorId], references: [id])
-  user           User           @relation("UserCertificate", fields: [userId], references: [id])
+  course         Course          @relation(fields: [courseId], references: [id])
+  author         User            @relation("AuthorCertificate", fields: [authorId], references: [id])
+  user           User            @relation("UserCertificate", fields: [userId], references: [id])
   enrolledCourse EnrolledCourse? @relation(fields: [enrolledCourseId], references: [id])
 
   @@map("certificates")

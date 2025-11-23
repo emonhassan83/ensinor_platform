@@ -80,6 +80,15 @@ const insertIntoDB = async (payload: ICertificate) => {
   const builder = await prisma.certificateBuilder.findFirst({
     where: { authorId: courseAuthorId },
   });
+
+  
+// 6️⃣ Handle topics based on isVisibleTopics
+if (builder && builder.isVisibleTopics === false) {
+  payload.topics = []; // forcefully remove topics
+} else {
+  payload.topics = course.topics || [];
+}
+
   if (builder) {
     payload.company = builder.company ?? '';
     payload.logo = builder.logo ?? '';

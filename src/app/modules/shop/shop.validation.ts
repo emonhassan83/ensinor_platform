@@ -9,7 +9,8 @@ const createValidationSchema = z.object({
       .uuid('author must be a valid UUID'),
     companyId: z
       .string({ required_error: 'Company is required' })
-      .uuid('company must be a valid UUID').optional(),
+      .uuid('company must be a valid UUID')
+      .optional(),
     platform: z.nativeEnum(PlatformType),
     title: z.string({ required_error: 'Title is required!' }),
     description: z.string({ required_error: 'Description is required!' }),
@@ -19,8 +20,9 @@ const createValidationSchema = z.object({
       .number({ required_error: 'Price is required!' })
       .int('Price must be an integer')
       .nonnegative('Price must be a positive number'),
-    file: z.string({ required_error: 'File is required!' }).optional(),
-    publishedDate: z.string({ required_error: 'Published Date is required!' }),
+    publishedDate: z
+      .string({ required_error: 'Published Date is required!' })
+      .optional(),
     language: z.string({ required_error: 'language is required!' }),
   }),
 });
@@ -39,7 +41,9 @@ const updateValidationSchema = z.object({
       .int('Price must be an integer')
       .nonnegative('Price must be a positive number')
       .optional(),
-    file: z.string({ required_error: 'File is required!' }).optional(),
+    publishedDate: z
+      .string({ required_error: 'Published Date is required!' })
+      .optional(),
     language: z.string({ required_error: 'Language is required!' }).optional(),
   }),
 });
