@@ -2,41 +2,64 @@ import { CourseContent, Prisma } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
-  ICourseContent,
+  ICourseLesson,
   ICourseContentFilterRequest,
+  ICourseSection,
 } from './courseContent.interface';
 import { courseContentSearchAbleFields } from './courseContent.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
-import { uploadToS3 } from '../../utils/s3';
 import httpStatus from 'http-status';
 
-const insertIntoDB = async (payload: ICourseContent, file: any) => {
-  const { courseId } = payload;
+const insertIntoDB = async (payload: ICourseSection, authorId: string) => {
+  const { courseId, lesson } = payload;
 
   const course = await prisma.course.findFirst({
-    where: { id: courseId, isDeleted: false },
+    where: { id: courseId, authorId, isDeleted: false },
   });
   if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
-  // upload to image
-  if (file) {
-    payload.video = (await uploadToS3({
-      file,
-      fileName: `videos/courses/content/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
+  const result = await prisma.courseContent.create({
+    data: payload,
+  });
+  if (!result) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Course lesson creation failed!',
+    );
+  }
+
+  // Insert new content
+  await prisma.course.update({
+    where: { id: payload.courseId },
+    data: {
+      lectures: { increment: 1 },
+      duration: { increment: payload.duration },
+    },
+  });
+
+  return result;
+};
+
+const addLessonIntoDB = async (payload: ICourseLesson, authorId: string) => {
+  const { sectionId } = payload;
+
+  const course = await prisma.course.findFirst({
+    where: { id: courseId, authorId, isDeleted: false },
+  });
+  if (!course) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
   const result = await prisma.courseContent.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Course content creation failed!',
+      'Course lesson creation failed!',
     );
   }
 
@@ -134,21 +157,12 @@ const getByIdFromDB = async (id: string): Promise<CourseContent | null> => {
 const updateIntoDB = async (
   id: string,
   payload: Partial<ICourseContent>,
-  file: any,
 ): Promise<CourseContent> => {
   const content = await prisma.courseContent.findUnique({
     where: { id },
   });
   if (!content) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course content not found!');
-  }
-
-  // upload to image
-  if (file) {
-    payload.video = (await uploadToS3({
-      file,
-      fileName: `videos/courses/content/${Math.floor(100000 + Math.random() * 900000)}`,
-    })) as string;
   }
 
   const result = await prisma.courseContent.update({
@@ -202,6 +216,7 @@ const deleteFromDB = async (id: string): Promise<CourseContent> => {
 
 export const CourseContentService = {
   insertIntoDB,
+  addLessonIntoDB,
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,

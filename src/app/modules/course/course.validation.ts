@@ -7,33 +7,37 @@ const createValidationSchema = z.object({
     authorId: z
       .string({ required_error: 'Author is required' })
       .uuid('author must be a valid UUID'),
-    companyId: z
-      .string({ required_error: 'instructor is required' })
-      .uuid('instructor must be a valid UUID')
-      .optional(),
     title: z.string({ required_error: 'Title is required!' }),
     type: z.nativeEnum(CourseType).optional(),
     platform: z.nativeEnum(PlatformType),
+    description: z.string({
+      required_error: 'Course description is required!',
+    }),
     shortDescription: z.string({
       required_error: 'Short description is required!',
     }),
     category: z.string({ required_error: 'Category is required!' }),
-    topics: z
-      .array(z.string({ required_error: 'Topics is required!' }))
-      .optional(),
+    topics: z.array(z.string({ required_error: 'Topics is required!' })),
     level: z.string({ required_error: 'Course level is required!' }),
     language: z.string({ required_error: 'Course language is required!' }),
-    deadline: z.string({ required_error: 'Course deadline is required!' }),
+    audience: z.array(
+      z.string({ required_error: 'Course audience is required!' }),
+    ),
+    objectives: z.array(
+      z.string({ required_error: 'Course objectives is required!' }),
+    ),
+    prerequisites: z.string({
+      required_error: 'Course prerequisites is required!',
+    }),
     price: z
       .number({ required_error: 'Price is required!' })
       .int('Price must be an integer')
       .nonnegative('Price must be a positive number'),
-    description: z.string({
-      required_error: 'Course description is required!',
-    }),
-    hasCertificate: z.boolean({
-      required_error: 'Course hasCertificate is required!',
-    }),
+    hasCertificate: z
+      .boolean({
+        required_error: 'Course hasCertificate is required!',
+      })
+      .optional(),
   }),
 });
 
@@ -52,8 +56,14 @@ const updateValidationSchema = z.object({
     language: z
       .string({ required_error: 'Course language is required!' })
       .optional(),
-    deadline: z
-      .string({ required_error: 'Course deadline is required!' })
+    audience: z
+      .array(z.string({ required_error: 'Course audience is required!' }))
+      .optional(),
+    objectives: z
+      .array(z.string({ required_error: 'Course objectives is required!' }))
+      .optional(),
+    prerequisites: z
+      .string({ required_error: 'Course prerequisites is required!' })
       .optional(),
     price: z
       .number({ required_error: 'Price is required!' })
@@ -62,9 +72,6 @@ const updateValidationSchema = z.object({
       .optional(),
     description: z
       .string({ required_error: 'Course description is required!' })
-      .optional(),
-    thumbnail: z
-      .string({ required_error: 'Course thumbnail is required!' })
       .optional(),
     hasCertificate: z
       .boolean({ required_error: 'Course hasCertificate is required!' })

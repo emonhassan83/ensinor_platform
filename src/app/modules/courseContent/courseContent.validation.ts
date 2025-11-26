@@ -1,37 +1,73 @@
 import { z } from 'zod';
 
-// Create validation
-const createValidationSchema = z.object({
+/* -------------------------
+   LESSON VALIDATION
+-------------------------- */
+
+// Create Lesson Schema
+const lessonSchema = z.object({
+  sectionId: z
+    .string({ required_error: 'Course section is required' })
+    .uuid('course section must be a valid UUID'),
+  serial: z.string({ required_error: 'Lesson serial is required!' }),
+  title: z.string({ required_error: 'Lesson title is required!' }),
+  description: z.string({
+    required_error: 'Lesson description is required!',
+  }),
+  type: z.string({ required_error: 'Lesson type is required!' }),
+  media: z.string({ required_error: 'Course lesson media is required!' }),
+  duration: z
+    .number({
+      required_error: 'Course content duration is required!',
+    })
+    .optional(),
+});
+
+// Wrap for request validation
+const createLessonValidationSchema = z.object({
+  body: lessonSchema,
+});
+
+// Update Lesson Schema
+const updateLessonValidationSchema = z.object({
+  body: lessonSchema.partial(),
+});
+
+/* -------------------------
+   SECTION VALIDATION
+-------------------------- */
+
+const createSectionValidationSchema = z.object({
   body: z.object({
     courseId: z
       .string({ required_error: 'Course is required' })
       .uuid('course must be a valid UUID'),
-    title: z.string({ required_error: 'Title is required!' }),
-    video: z
-      .string({ required_error: 'Course content video is required!' })
-      .optional(),
-    duration: z.number({
-      required_error: 'Course content duration is required!',
-    }),
-  }),
-});
-
-// Update validation
-const updateValidationSchema = z.object({
-  body: z.object({
-    title: z.string({ required_error: 'Title is required!' }).optional(),
-    video: z
-      .string({ required_error: 'Course content video is required!' })
-      .optional(),
-    duration: z
-      .number({
-        required_error: 'Course content duration is required!',
+    title: z.string({ required_error: 'Section title is required!' }),
+    description: z
+      .string({
+        required_error: 'Course section description is required!',
       })
       .optional(),
+
+    // FIXED: lesson array should use lessonSchema, NOT the whole request validator
+    lesson: z.array(lessonSchema),
   }),
 });
 
+const updateSectionValidationSchema = z.object({
+  body: z.object({
+    title: z.string().optional(),
+    description: z.number().optional(),
+  }),
+});
+
+/* -------------------------
+   EXPORT
+-------------------------- */
+
 export const CourseContentValidation = {
-  createValidationSchema,
-  updateValidationSchema,
+  createSectionValidationSchema,
+  updateSectionValidationSchema,
+  createLessonValidationSchema,
+  updateLessonValidationSchema,
 };

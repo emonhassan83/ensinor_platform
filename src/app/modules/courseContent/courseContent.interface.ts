@@ -1,11 +1,23 @@
+import { ContentType } from "@prisma/client";
+
 export type ICourseContentFilterRequest = {
   searchTerm?: string | undefined;
   title?: string | undefined;
 };
 
-export type ICourseContent = {
+export type ICourseLesson = {
+  sectionId: string;
+  serial: number;
+  title: string;
+  description?: string;
+  type: ContentType;
+  media: string;
+  duration?: number;
+};
+
+export type ICourseSection = {
   courseId: string;
   title: string;
-  video: string;
-  duration: number;
+  description: string;
+  lesson: ICourseLesson[];
 };

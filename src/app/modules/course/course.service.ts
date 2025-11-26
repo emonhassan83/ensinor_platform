@@ -577,7 +577,6 @@ const getAllFromDB = async (
       category: true,
       level: true,
       language: true,
-      deadline: true,
       price: true,
       description: true,
       thumbnail: true,
@@ -605,6 +604,9 @@ const getAllFromDB = async (
         take: 1,
         select: { code: true, discount: true, expireAt: true },
       },
+      author: {
+        select: { id: true, name: true, email: true, photoUrl: true },
+      }
     },
   });
 
@@ -1011,6 +1013,31 @@ const assignACourseIntoDB = async (
   return updatedCourse;
 };
 
+const publishACourseIntoDB = async (
+  id: string,
+  authorId: string,
+): Promise<Course> => {
+    // 1. Fetch course
+    const course = await prisma.course.findUnique({
+      where: { id, authorId, isDeleted: false },
+    });
+    if (!course) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+    }
+
+    // 2. Update course publish status
+    const result = await prisma.course.update({
+      where: { id },
+      data: { isPublished: true },
+    });
+    if (!result) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Course publish status not updated!');
+    }
+
+    return result;
+  
+};
+
 const deleteFromDB = async (id: string): Promise<Course> => {
   const course = await prisma.course.findUniqueOrThrow({
     where: { id, isDeleted: false },
@@ -1045,5 +1072,6 @@ export const CourseService = {
   updateIntoDB,
   changeStatusIntoDB,
   assignACourseIntoDB,
+  publishACourseIntoDB,
   deleteFromDB,
 };

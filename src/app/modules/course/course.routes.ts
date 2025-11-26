@@ -104,6 +104,19 @@ router.patch(
 );
 
 router.patch(
+  '/published/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  checkCompanyAdminSubscription(),
+  validateRequest(CourseValidation.updateValidationSchema),
+  CourseController.publishACourse,
+);
+
+router.patch(
   '/status/:id',
   auth(UserRole.super_admin, UserRole.company_admin),
   checkCompanyAdminSubscription(),

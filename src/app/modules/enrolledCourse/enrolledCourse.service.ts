@@ -1456,8 +1456,7 @@ const myEnrolledCoursesQuiz = async (userId: string) => {
       serial_id,
       marks: quiz.marks,
       totalQuestions: quiz.questions,
-      timeLimit: quiz.time,
-      deadline: quiz.deadline,
+      timeLimit: quiz.timeLimit,
       totalAttend: quiz.totalAttempt,
       status,
       marksObtained,
@@ -1497,7 +1496,11 @@ const getByIdFromDB = async (id: string) => {
           thumbnail: true,
           description: true,
           lectures: true,
-          courseContent: true,
+          courseSections: {
+            include: {
+                courseContents: true
+            }
+          },
           resource: true,
           quiz: true,
           assignment: true,

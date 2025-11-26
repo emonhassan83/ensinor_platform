@@ -6,7 +6,19 @@ import sendResponse from '../../utils/sendResponse';
 import { courseContentFilterableFields } from './courseContent.constant';
 
 const insertIntoDB = catchAsync(async (req, res) => {
-  const result = await CourseContentService.insertIntoDB(req.body, req.file);
+  const result = await CourseContentService.insertIntoDB(req.body, req.user!.userId);
+  
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course content insert successfully!',
+    data: result,
+  });
+});
+
+const addLessonIntoDB = catchAsync(async (req, res) => {
+  const result = await CourseContentService.insertIntoDB(req.body, req.user!.userId);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -30,12 +42,12 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
   });
 });
 
-const getByIdFromDB = catchAsync(async (req, res) => {
+const updateLessonFromDB = catchAsync(async (req, res) => {
   const result = await CourseContentService.getByIdFromDB(req.params.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Course content data fetched by id!',
+    message: 'Course lesson data updated!',
     data: result,
   });
 });
@@ -43,13 +55,22 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 const updateIntoDB = catchAsync(async (req, res) => {
   const result = await CourseContentService.updateIntoDB(
     req.params.id,
-    req.body,
-    req.file,
+    req.body
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Course content data updated!',
+    message: 'Course section data updated!',
+    data: result,
+  });
+});
+
+const deleteLessonFromDB = catchAsync(async (req, res) => {
+  const result = await CourseContentService.deleteFromDB(req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course lesson data deleted!',
     data: result,
   });
 });
@@ -59,15 +80,17 @@ const deleteFromDB = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Course content data deleted!',
+    message: 'Course section data deleted!',
     data: result,
   });
 });
 
 export const CourseContentController = {
   insertIntoDB,
+  addLessonIntoDB,
   getByCourseIdFromDB,
-  getByIdFromDB,
+  updateLessonFromDB,
   updateIntoDB,
+  deleteLessonFromDB,
   deleteFromDB,
 };

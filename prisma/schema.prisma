@@ -505,16 +505,18 @@ model Course {
   authorId         String
   companyId        String?
   title            String
+  description      String
   shortDescription String
   platform         PlatformType  @default(admin)
   type             CourseType    @default(external)
+  audience         String[]      @default([])
+  objectives       String[]      @default([])
+  prerequisites    String
   category         String
   topics           String[]      @default([])
   level            CourseLevel
   language         String
-  deadline         String?
   price            Float
-  description      String
   thumbnail        String?
   lectures         Int           @default(0)
   duration         Int           @default(0)
@@ -525,6 +527,7 @@ model Course {
   status           CoursesStatus @default(pending)
   avgRating        Float         @default(0.0)
   ratingCount      Int           @default(0)
+  isPublished      Boolean       @default(false)
   isDeleted        Boolean       @default(false)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -535,45 +538,61 @@ model Course {
   // Many-to-many with CourseBundle via join table
   courseBundleCourses CourseBundleCourses[]
   bundles             CourseBundle[]        @relation("BundleCourses")
-
-  courseContent     CourseContent[]
-  quiz              Quiz[]
-  enrolledCourse    EnrolledCourse[]
-  certificate       Certificate[]
-  gradingSystem     GradingSystem[]
-  affiliateLink     AffiliateLink[]
-  meetingAssignment MeetingAssignment[]
-  coupon            Coupon[]
-  promoCode         PromoCode[]
-  review            Review[]
-  wishlist          Wishlist[]
-  resource          Resource[]
-  coInstructor      CoInstructor[]
-  assignment        Assignment[]
-  chat              Chat[]
-  cart              Cart[]
-  orderItem         OrderItem[]
-  courseLogs        CourseLogs[]
-  achievementLogs   AchievementLogs[]
-  enrolledLogs      EnrolledLogs[]
+  quiz                Quiz[]
+  enrolledCourse      EnrolledCourse[]
+  certificate         Certificate[]
+  gradingSystem       GradingSystem[]
+  affiliateLink       AffiliateLink[]
+  meetingAssignment   MeetingAssignment[]
+  coupon              Coupon[]
+  promoCode           PromoCode[]
+  review              Review[]
+  wishlist            Wishlist[]
+  resource            Resource[]
+  coInstructor        CoInstructor[]
+  assignment          Assignment[]
+  chat                Chat[]
+  cart                Cart[]
+  orderItem           OrderItem[]
+  courseLogs          CourseLogs[]
+  achievementLogs     AchievementLogs[]
+  enrolledLogs        EnrolledLogs[]
+  courseSections      CourseSection[]
 
   @@map("courses")
 }
 
-model CourseContent {
-  id        String   @id @default(uuid())
-  courseId  String
-  title     String
-  video     String
-  duration  Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model CourseSection {
+  id          String   @id @default(uuid())
+  courseId    String
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  course    Course           @relation(fields: [courseId], references: [id])
+  course         Course         @relation(fields: [courseId], references: [id])
+  courseContents CourseLesson[]
+
+  @@map("course_sections")
+}
+
+model CourseLesson {
+  id          String      @id @default(uuid())
+  serial      Int
+  sectionId   String
+  title       String
+  description String?
+  type        ContentType @default(video)
+  media       String
+  duration    Float?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  section   CourseSection    @relation(fields: [sectionId], references: [id])
   // Many-to-many relation with EnrolledCourse
   watchedBy EnrolledCourse[] @relation("CourseLectureWatched")
 
-  @@map("course_contents")
+  @@map("course_lessons")
 }
 
 model CourseBundle {
@@ -709,8 +728,12 @@ model Quiz {
   id           String   @id @default(uuid())
   authorId     String
   courseId     String
-  deadline     String?
-  time         Int      @default(0)
+  title        String
+  type         QuizType
+  lesson       Int?
+  passingScore Int
+  attemptAllow Int
+  timeLimit    Int?     @default(0) // in minutes
   marks        Int      @default(0)
   questions    Int      @default(0)
   totalAttempt Int      @default(0)
@@ -728,12 +751,16 @@ model Quiz {
 }
 
 model Question {
-  id        String   @id @default(uuid())
-  quizId    String
-  name      String
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String       @id @default(uuid())
+  quizId         String
+  name           String
+  type           QuestionType
+  point          Int
+  expectedAnswer String[]     @default([])
+  feedback       String
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   // Relations
   quiz       Quiz         @relation(fields: [quizId], references: [id])
@@ -825,7 +852,7 @@ model EnrolledCourse {
   course Course @relation(fields: [courseId], references: [id])
 
   // Many-to-many relation with CourseContent
-  watchedLectures CourseContent[] @relation("CourseLectureWatched")
+  watchedLectures CourseLesson[] @relation("CourseLectureWatched")
   courseLogs      CourseLogs[]
   certificates    Certificate[]
 
@@ -863,18 +890,20 @@ model CourseLogs {
 }
 
 model Assignment {
-  id          String    @id @default(uuid())
+  id          String         @id @default(uuid())
   authorId    String // Company Admin or Business Instructor
   courseId    String
   title       String
+  type        AssignmentType @default(final)
+  lesson      Int?
   description String?
   fileUrl     String? // e.g., PDF/DOC/ZIP link
   marks       Int
   deadline    DateTime?
-  attempt     Int       @default(0)
-  isDeleted   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  attempt     Int            @default(0)
+  isDeleted   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   // Relations
   author User   @relation(fields: [authorId], references: [id])
@@ -1964,4 +1993,29 @@ enum ResourceModelType {
 enum ChatRole {
   admin
   member
+}
+
+enum ContentType {
+  video
+  article
+  presentation
+  document
+  audio
+}
+
+enum QuizType {
+  lesson
+  final
+}
+
+enum AssignmentType {
+  lesson
+  final
+}
+
+enum QuestionType {
+  single_choice
+  multiple_choice
+  true_false
+  short_answer
 }

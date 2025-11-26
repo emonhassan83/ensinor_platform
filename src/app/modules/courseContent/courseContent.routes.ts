@@ -4,13 +4,9 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CourseContentValidation } from './courseContent.validation';
-import parseData from '../../middlewares/parseData';
-import multer, { memoryStorage } from 'multer';
 import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
-const storage = memoryStorage();
-const upload = multer({ storage });
 
 router.post(
   '/',
@@ -21,15 +17,37 @@ router.post(
     UserRole.instructor,
   ),
   checkCompanyAdminSubscription(),
-  upload.single('content'),
-  parseData(),
-  validateRequest(CourseContentValidation.createValidationSchema),
+  validateRequest(CourseContentValidation.createSectionValidationSchema),
   CourseContentController.insertIntoDB,
+);
+
+router.post(
+  '/add-lesson',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  checkCompanyAdminSubscription(),
+  validateRequest(CourseContentValidation.createLessonValidationSchema),
+  CourseContentController.addLessonIntoDB,
 );
 
 router.get('/course/:courseId', CourseContentController.getByCourseIdFromDB);
 
-router.get('/:id', CourseContentController.getByIdFromDB);
+router.put(
+  '/lesson/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  checkCompanyAdminSubscription(),
+  validateRequest(CourseContentValidation.updateLessonValidationSchema),
+  CourseContentController.updateLessonFromDB,
+);
 
 router.put(
   '/:id',
@@ -40,10 +58,20 @@ router.put(
     UserRole.instructor,
   ),
   checkCompanyAdminSubscription(),
-  upload.single('content'),
-  parseData(),
-  validateRequest(CourseContentValidation.updateValidationSchema),
+  validateRequest(CourseContentValidation.updateSectionValidationSchema),
   CourseContentController.updateIntoDB,
+);
+
+router.delete(
+  '/lesson/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  checkCompanyAdminSubscription(),
+  CourseContentController.deleteLessonFromDB,
 );
 
 router.delete(

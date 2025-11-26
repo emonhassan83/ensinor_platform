@@ -5,7 +5,6 @@ import pick from '../../utils/pick';
 import sendResponse from '../../utils/sendResponse';
 import { courseFilterableFields } from './course.constant';
 import { CourseType, PlatformType } from '@prisma/client';
-import { platform } from 'os';
 
 const insertIntoDB = catchAsync(async (req, res) => {
   const result = await CourseService.insertIntoDB(req.body, req.file);
@@ -213,6 +212,19 @@ const assignACourse = catchAsync(async (req, res) => {
   });
 });
 
+const publishACourse = catchAsync(async (req, res) => {
+  const result = await CourseService.publishACourseIntoDB(
+    req.params.id,
+    req.user!.userId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Course published successfully!',
+    data: result,
+  });
+});
+
 const deleteFromDB = catchAsync(async (req, res) => {
   const result = await CourseService.deleteFromDB(req.params.id);
   sendResponse(res, {
@@ -236,6 +248,7 @@ export const CourseController = {
   getByIdFromDB,
   updateIntoDB,
   changeStatusIntoDB,
+  publishACourse,
   assignACourse,
   deleteFromDB,
 };
