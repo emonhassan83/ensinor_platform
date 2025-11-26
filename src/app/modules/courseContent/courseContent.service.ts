@@ -1,4 +1,9 @@
-import { CourseContent, Prisma } from '@prisma/client';
+import {
+  CourseContent,
+  CourseLesson,
+  CourseSection,
+  Prisma,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -21,7 +26,7 @@ const insertIntoDB = async (payload: ICourseSection, authorId: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
   }
 
-  const result = await prisma.courseContent.create({
+  const result = await prisma.courseSection.create({
     data: payload,
   });
   if (!result) {
@@ -46,14 +51,19 @@ const insertIntoDB = async (payload: ICourseSection, authorId: string) => {
 const addLessonIntoDB = async (payload: ICourseLesson, authorId: string) => {
   const { sectionId } = payload;
 
-  const course = await prisma.course.findFirst({
-    where: { id: courseId, authorId, isDeleted: false },
+  const courseSection = await prisma.courseSection.findFirst({
+    where: { id: sectionId },
+    include: {
+      course: {
+        select: { id: true },
+      },
+    },
   });
-  if (!course) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+  if (!courseSection) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
   }
 
-  const result = await prisma.courseContent.create({
+  const result = await prisma.courseLesson.create({
     data: payload,
   });
   if (!result) {
@@ -65,7 +75,7 @@ const addLessonIntoDB = async (payload: ICourseLesson, authorId: string) => {
 
   // Insert new content
   await prisma.course.update({
-    where: { id: payload.courseId },
+    where: { id: courseSection.course.id },
     data: {
       lectures: { increment: 1 },
       duration: { increment: payload.duration },
@@ -83,7 +93,7 @@ const getAllFromDB = async (
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
-  const andConditions: Prisma.CourseContentWhereInput[] = [{ courseId }];
+  const andConditions: Prisma.CourseSectionWhereInput[] = [{ courseId }];
 
   // Search across Package and nested User fields
   if (searchTerm) {
@@ -108,11 +118,11 @@ const getAllFromDB = async (
     });
   }
 
-  const whereConditions: Prisma.CourseContentWhereInput = {
+  const whereConditions: Prisma.CourseSectionWhereInput = {
     AND: andConditions,
   };
 
-  const result = await prisma.courseContent.findMany({
+  const result = await prisma.courseSection.findMany({
     where: whereConditions,
     skip,
     take: limit,
@@ -124,9 +134,12 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      courseContents: true,
+    },
   });
 
-  const total = await prisma.courseContent.count({
+  const total = await prisma.courseSection.count({
     where: whereConditions,
   });
 
@@ -156,28 +169,55 @@ const getByIdFromDB = async (id: string): Promise<CourseContent | null> => {
 
 const updateIntoDB = async (
   id: string,
-  payload: Partial<ICourseContent>,
-): Promise<CourseContent> => {
-  const content = await prisma.courseContent.findUnique({
+  payload: Partial<ICourseSection>,
+): Promise<CourseSection> => {
+  const content = await prisma.courseSection.findUnique({
     where: { id },
   });
   if (!content) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
   }
 
-  const result = await prisma.courseContent.update({
+  const result = await prisma.courseSection.update({
     where: { id },
     data: payload,
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not updated!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course section not updated!');
+  }
+
+  return result;
+};
+
+const updateLessonIntoDB = async (
+  id: string,
+  payload: Partial<ICourseLesson>,
+): Promise<CourseLesson> => {
+  const content = await prisma.courseLesson.findUnique({
+    where: { id },
+    include: { section: { include: { course: { select: { id: true } } } } },
+  });
+  if (!content) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course lesson not found!');
+  }
+
+  const result = await prisma.courseLesson.update({
+    where: { id },
+    data: payload,
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course lesson not updated!');
   }
 
   // if duration updated, adjust difference
-  if (payload.duration && payload.duration !== content.duration) {
+  if (
+    payload.duration &&
+    content.duration &&
+    payload.duration !== content.duration
+  ) {
     const diff = payload.duration - content.duration;
     await prisma.course.update({
-      where: { id: content.courseId },
+      where: { id: content.section.course.id },
       data: {
         duration: { increment: diff },
       },
@@ -188,18 +228,18 @@ const updateIntoDB = async (
 };
 
 const deleteFromDB = async (id: string): Promise<CourseContent> => {
-  const content = await prisma.courseContent.findUniqueOrThrow({
+  const content = await prisma.courseSection.findUniqueOrThrow({
     where: { id },
   });
   if (!content) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
   }
 
-  const result = await prisma.courseContent.delete({
+  const result = await prisma.courseSection.delete({
     where: { id },
   });
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Course content not deleted!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course section not deleted!');
   }
 
   // decrement lectures and subtract duration
@@ -220,5 +260,6 @@ export const CourseContentService = {
   getAllFromDB,
   getByIdFromDB,
   updateIntoDB,
+  updateLessonIntoDB,
   deleteFromDB,
 };

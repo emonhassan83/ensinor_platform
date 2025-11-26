@@ -195,7 +195,9 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 };
 
 const getPopularCoursesFromDB = async () => {
-  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.CourseWhereInput[] = [
+    { isDeleted: false, isPublished: true, status: CoursesStatus.approved },
+  ];
 
   const whereConditions: Prisma.CourseWhereInput = {
     AND: andConditions,
@@ -275,6 +277,7 @@ const getCombineCoursesFromDB = async (
   const andConditions: Prisma.CourseWhereInput[] = [
     {
       isDeleted: false,
+      isPublished: true,
       status: CoursesStatus.approved,
       type: CourseType.external,
     },
@@ -476,9 +479,7 @@ const getCombineCoursesFromDB = async (
       },
       select: { courseId: true, courseBundleId: true },
     });
-    wishlistIds = new Set(
-      wishlists.map(w => w.courseId || w.courseBundleId!)
-    );
+    wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
   }
 
   // ====== ENROLLED ======
@@ -529,7 +530,9 @@ const getAllFromDB = async (
   const { searchTerm, ...filterData } = params;
 
   // ====== WHERE CONDITIONS ======
-  const andConditions: Prisma.CourseWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.CourseWhereInput[] = [
+    { isDeleted: false, isPublished: true },
+  ];
 
   // Filter by authorId or companyId
   if (filterBy.authorId) andConditions.push({ authorId: filterBy.authorId });
@@ -606,7 +609,7 @@ const getAllFromDB = async (
       },
       author: {
         select: { id: true, name: true, email: true, photoUrl: true },
-      }
+      },
     },
   });
 
@@ -773,8 +776,8 @@ const getByIdFromDB = async (
       author: {
         select: { id: true, name: true, email: true, photoUrl: true },
       },
-      courseContent: {
-        select: { id: true, title: true, video: true, duration: true },
+      courseSections: {
+        include: { courseContents: true },
       },
       resource: true,
       assignment: true,
@@ -910,11 +913,11 @@ const changeStatusIntoDB = async (
       });
 
       const hasGroup = existingChats.some(c => c.type === ChatType.group);
-      const hasAnnouncement = existingChats.some(
-        c => c.type === ChatType.announcement,
-      );
+      // const hasAnnouncement = existingChats.some(
+      //   c => c.type === ChatType.announcement,
+      // );
 
-      // 3a. Discussion Chat
+      // 3. Discussion Chat
       if (!hasGroup) {
         await prismaTx.chat.create({
           data: {
@@ -932,18 +935,18 @@ const changeStatusIntoDB = async (
         });
       }
 
-      // 3b. Announcement Chat
-      if (!hasAnnouncement) {
-        await prismaTx.chat.create({
-          data: {
-            type: ChatType.announcement,
-            groupName: `${course.title} Announcement`,
-            groupImage: course.thumbnail || null,
-            courseId: course.id,
-            isReadOnly: true,
-          },
-        });
-      }
+      // // 3b. Announcement Chat
+      // if (!hasAnnouncement) {
+      //   await prismaTx.chat.create({
+      //     data: {
+      //       type: ChatType.announcement,
+      //       groupName: `${course.title} Announcement`,
+      //       groupImage: course.thumbnail || null,
+      //       courseId: course.id,
+      //       isReadOnly: true,
+      //     },
+      //   });
+      // }
     }
 
     // 4. Send notify to instructor
@@ -1017,25 +1020,27 @@ const publishACourseIntoDB = async (
   id: string,
   authorId: string,
 ): Promise<Course> => {
-    // 1. Fetch course
-    const course = await prisma.course.findUnique({
-      where: { id, authorId, isDeleted: false },
-    });
-    if (!course) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
-    }
+  // 1. Fetch course
+  const course = await prisma.course.findUnique({
+    where: { id, authorId, isDeleted: false },
+  });
+  if (!course) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
+  }
 
-    // 2. Update course publish status
-    const result = await prisma.course.update({
-      where: { id },
-      data: { isPublished: true },
-    });
-    if (!result) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Course publish status not updated!');
-    }
+  // 2. Update course publish status
+  const result = await prisma.course.update({
+    where: { id },
+    data: { isPublished: true },
+  });
+  if (!result) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Course publish status not updated!',
+    );
+  }
 
-    return result;
-  
+  return result;
 };
 
 const deleteFromDB = async (id: string): Promise<Course> => {

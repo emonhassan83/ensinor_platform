@@ -1558,7 +1558,7 @@ const watchLectureIntoDB = async (payload: {
     where: { id: enrolledCourseId },
     include: {
       watchedLectures: true,
-      course: { include: { courseContent: true } },
+      course: { include: { courseSections: { include: { courseContents: true } } } },
       courseLogs: true,
     },
   });
@@ -1568,14 +1568,14 @@ const watchLectureIntoDB = async (payload: {
   }
 
   // Fetch lecture info
-  const lecture = await prisma.courseContent.findUnique({
+  const lecture = await prisma.courseLesson.findUnique({
     where: { id: lectureId },
   });
   if (!lecture) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Lecture not found!');
   }
 
-  const totalLectures = enrolledCourse.course.courseContent.length;
+  const totalLectures = enrolledCourse.course.courseSections.reduce((acc, section) => acc + section.courseContents.length, 0);
 
   const alreadyWatched = enrolledCourse.watchedLectures.some(
     l => l.id === lectureId,
@@ -1594,7 +1594,7 @@ const watchLectureIntoDB = async (payload: {
       lectureWatched: alreadyWatched ? undefined : { increment: 1 },
       learningTime: alreadyWatched
         ? undefined
-        : { increment: Math.ceil(lecture.duration) },
+        : { increment: Math.ceil(lecture.duration || 0) },
       lastActivity: new Date(),
       courseStartTime: isFirstLecture ? new Date() : undefined,
     },
