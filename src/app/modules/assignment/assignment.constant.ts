@@ -1,3 +1,3 @@
 export const assignmentSearchAbleFields = ['title'];
 
-export const assignmentFilterableFields = ['searchTerm', 'deadline'];
+export const assignmentFilterableFields = ['searchTerm', 'type'];

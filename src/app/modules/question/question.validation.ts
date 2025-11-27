@@ -15,7 +15,7 @@ const optionCreateSchema = z.object({
         optionText: z
           .string({ required_error: 'optionText is required' })
           .min(1, 'optionText cannot be empty'),
-        isCorrect: z.boolean({ required_error: 'isCorrect is required' })
+        isCorrect: z.boolean({ required_error: 'isCorrect is required' }),
       }),
     ),
   }),
@@ -47,7 +47,17 @@ const createValidationSchema = z.object({
         required_error: 'Quiz id id required !',
       })
       .uuid({ message: 'Invalid UUID' }),
-    name: z.string({ required_error: 'Question name is required' }).min(1),
+    name: z.string({ required_error: 'Question name is required' }),
+    type: z.string({ required_error: 'Question type is required' }),
+    point: z.string({ required_error: 'Question point is required' }),
+    expectedAnswer: z
+      .array(
+        z
+          .string({ required_error: 'Question expected answer is required' })
+          .min(1),
+      )
+      .optional(),
+    feedback: z.string({ required_error: 'Question feedback is required' }),
     options: z
       .array(optionCreate, {
         required_error: 'Options are required',
@@ -60,6 +70,20 @@ const createValidationSchema = z.object({
 const updateValidationSchema = z.object({
   body: z.object({
     name: z.string({ required_error: 'Quiz name is required!' }).optional(),
+    type: z.string({ required_error: 'Question type is required' }).optional(),
+    point: z
+      .string({ required_error: 'Question point is required' })
+      .optional(),
+    expectedAnswer: z
+      .array(
+        z
+          .string({ required_error: 'Question expected answer is required' })
+          .min(1),
+      )
+      .optional(),
+    feedback: z
+      .string({ required_error: 'Question feedback is required' })
+      .optional(),
     options: z
       .array(optionCreateSchema, {
         required_error: 'Options are required',

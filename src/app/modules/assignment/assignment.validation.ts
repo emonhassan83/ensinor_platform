@@ -10,6 +10,8 @@ const createValidationSchema = z.object({
       .string({ required_error: 'Course is required' })
       .uuid('course must be a valid UUID'),
     title: z.string({ required_error: 'Assignment title is required!' }),
+    type: z.string({ required_error: 'Assignment type is required!' }),
+    lesson: z.string({ required_error: 'Assignment lesson is required!' }).optional(),
     description: z.string({
       required_error: 'Assignment description is required!',
     }),

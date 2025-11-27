@@ -12,7 +12,8 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuestion) => {
-  const { quizId, name, options } = payload;
+  const { quizId, name, type, point, expectedAnswer, feedback, options } =
+    payload;
 
   // 1. Validate quiz existence
   const quiz = await prisma.quiz.findUnique({
@@ -42,6 +43,10 @@ const insertIntoDB = async (payload: IQuestion) => {
     data: {
       quizId,
       name,
+      type,
+      point,
+      expectedAnswer,
+      feedback,
       options: {
         create: options.map((opt: IQuestionOption) => ({
           optionLevel: opt.optionLevel,
@@ -65,8 +70,7 @@ const insertIntoDB = async (payload: IQuestion) => {
     where: { id: quizId },
     data: {
       questions: { increment: 1 },
-      marks: { increment: 1 },
-      time: { increment: 1 },
+      marks: { increment: point },
     },
   });
 
@@ -230,6 +234,10 @@ const updateIntoDB = async (
     data: {
       quizId: payload.quizId,
       name: payload.name,
+      type: payload.type,
+      point: payload.point,
+      expectedAnswer: payload.expectedAnswer,
+      feedback: payload.feedback,
     },
   });
 
@@ -291,8 +299,7 @@ const deleteFromDB = async (id: string): Promise<Question> => {
     where: { id: question.quizId },
     data: {
       questions: { decrement: 1 },
-      marks: { decrement: 1 },
-      time: { decrement: 1 },
+      marks: { decrement: question.point },
     },
   });
 

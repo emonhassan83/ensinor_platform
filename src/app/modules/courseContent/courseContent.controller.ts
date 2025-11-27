@@ -17,7 +17,7 @@ const insertIntoDB = catchAsync(async (req, res) => {
 });
 
 const addLessonIntoDB = catchAsync(async (req, res) => {
-  const result = await CourseContentService.insertIntoDB(req.body, req.user!.userId);
+  const result = await CourseContentService.addLessonIntoDB(req.body);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -43,7 +43,7 @@ const getByCourseIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateLessonFromDB = catchAsync(async (req, res) => {
-  const result = await CourseContentService.getByIdFromDB(req.params.id);
+  const result = await CourseContentService.updateLessonIntoDB(req.params.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -66,7 +66,7 @@ const updateIntoDB = catchAsync(async (req, res) => {
 });
 
 const deleteLessonFromDB = catchAsync(async (req, res) => {
-  const result = await CourseContentService.deleteFromDB(req.params.id);
+  const result = await CourseContentService.deleteLessonIntoDB(req.params.id);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
