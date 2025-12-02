@@ -812,13 +812,14 @@ model QuizAttempt {
 }
 
 model QuizAnswer {
-  id         String   @id @default(uuid())
-  attemptId  String
-  questionId String
-  optionId   String
-  isCorrect  Boolean
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  attemptId   String
+  questionId  String
+  optionId    String
+  shortAnswer String?
+  isCorrect   Boolean
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   attempt  QuizAttempt @relation(fields: [attemptId], references: [id])
   question Question    @relation(fields: [questionId], references: [id])

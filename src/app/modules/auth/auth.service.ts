@@ -53,6 +53,7 @@ const socialLogin = async (
           photoUrl: payload.photoUrl,
           isDeleted: false,
           registerWith: platform,
+          status: UserStatus.active,
           verification: {
             update: { otp: '', expiresAt: new Date(), status: true },
           },
@@ -90,6 +91,7 @@ const socialLogin = async (
       email: payload.email!,
       photoUrl: payload.photoUrl,
       registerWith: platform,
+      status: UserStatus.active,
       verification: {
         create: { otp: '', expiresAt: new Date(), status: true },
       },

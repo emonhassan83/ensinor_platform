@@ -29,11 +29,37 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt user not found!');
   }
 
-  // 3. Check if user already has an attempt for this quiz
-  const existingAttempt = await prisma.quizAttempt.findFirst({
-    where: { quizId, userId, isDeleted: false },
+  // 3. Check if user has an Incomplete attempt
+  const existingIncompleteAttempt = await prisma.quizAttempt.findFirst({
+    where: {
+      quizId,
+      userId,
+      isCompleted: false,
+      isDeleted: false,
+    },
   });
-  if (existingAttempt) return existingAttempt;
+
+  // If there is an incomplete attempt → return it directly
+  if (existingIncompleteAttempt) return existingIncompleteAttempt;
+
+  /* ---------------------------------------------------
+     If no incomplete attempt exists, apply attempt limit
+     --------------------------------------------------- */
+  const completedAttempts = await prisma.quizAttempt.count({
+    where: {
+      quizId,
+      userId,
+      isCompleted: true,
+      isDeleted: false,
+    },
+  });
+
+  if (completedAttempts >= quiz.attemptAllow) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `You have reached the maximum attempt limit (${quiz.attemptAllow}).`,
+    );
+  }
 
   const result = await prisma.quizAttempt.create({
     data: {
