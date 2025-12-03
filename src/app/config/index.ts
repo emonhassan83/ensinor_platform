@@ -46,5 +46,10 @@ export default {
     client_id: process.env.ZOOM_CLIENT_ID,
     client_secret: process.env.ZOOM_CLIENT_SECRET,
     redirect_url: process.env.ZOOM_REDIRECT_URI
+  },
+  linkedIn: {
+    client_id: process.env.LINKEDIN_CLIENT_ID,
+    client_secret: process.env.LINKEDIN_CLIENT_SECRET,
+    redirect_url: process.env.LINKEDIN_REDIRECT_URI
   }
 }

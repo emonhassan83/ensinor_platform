@@ -42,8 +42,8 @@ const googleZodValidationSchema = z.object({
 
 const linkedinZodValidationSchema = z.object({
   body: z.object({
-    token: z.string({
-      required_error: 'token is required!',
+    code: z.string({
+      required_error: 'code is required!',
     }),
   }),
 })

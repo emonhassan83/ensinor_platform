@@ -5,9 +5,9 @@ import { JwtPayload } from 'jsonwebtoken';
 import emailSender from '../../utils/emailSender';
 import {
   authNotify,
-  // authNotifyAdmin,
   createToken,
   generateTokens,
+  getLinkedInUser,
   TExpiresIn,
   verifyToken,
 } from './auth.utils';
@@ -188,8 +188,27 @@ const loginUser = async (payload: TLoginUser) => {
 const registerWithGoogle = (payload: SocialLoginPayload) =>
   socialLogin(payload, RegisterWith.google);
 
-const registerWithLinkedIn = (payload: SocialLoginPayload) =>
-  socialLogin(payload, RegisterWith.linkedIn);
+const registerWithLinkedIn = async (payload: { code: string; fcmToken?: string }) => {
+  const { code, fcmToken } = payload;
+  if (!code) {
+    throw new Error('Authorization code is required');
+  }
+
+  // 1️. Fetch LinkedIn user data
+  const linkedInData = await getLinkedInUser(code);
+
+  // 2️. Map LinkedIn data to your app payload
+  const socialPayload: SocialLoginPayload = {
+    name: `${linkedInData.profile.firstName} ${linkedInData.profile.lastName}`,
+    email: linkedInData.email,
+    photoUrl: linkedInData.profile.profilePicture,
+  };
+
+  // 3️. Call your existing socialLogin function
+  const result = await socialLogin(socialPayload, RegisterWith.linkedIn);
+
+  return result;
+};
 
 const registerWithFacebook = (payload: SocialLoginPayload) =>
   socialLogin(payload, RegisterWith.facebook);
