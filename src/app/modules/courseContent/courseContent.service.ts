@@ -11,10 +11,13 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 
-const insertIntoDB = async (payload: ICourseSection, authorId: string) => {
-  const { courseId, lesson } = payload;
+const insertIntoDB = async (
+  payload: { courseId: string; section: ICourseSection[] },
+  authorId: string,
+) => {
+  const { courseId, section } = payload;
 
-  // Validate that the course belongs to the author
+  // Validate course belongs to author
   const course = await prisma.course.findFirst({
     where: { id: courseId, authorId, isDeleted: false },
   });
@@ -24,64 +27,67 @@ const insertIntoDB = async (payload: ICourseSection, authorId: string) => {
   }
 
   return await prisma.$transaction(async tx => {
-    // STEP 1: Create Section
-    const createdSection = await tx.courseSection.create({
-      data: {
-        courseId: payload.courseId,
-        title: payload.title,
-        description: payload.description,
-      },
-    });
+    let totalLectures = 0;
+    let totalDuration = 0;
+    const createdSections: {
+      section: ICourseSection;
+      lessons: ICourseLesson[];
+    }[] = [];
 
-    // No section? Fail gracefully
-    if (!createdSection) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Section creation failed!');
-    }
+    // Loop through each section in payload
+    for (const sec of section) {
+      // STEP 1: Create Section
+      const createdSection = await tx.courseSection.create({
+        data: {
+          courseId,
+          title: sec.title,
+          description: sec.description,
+        },
+      });
 
-    // STEP 2: Prepare Lesson Data
-    const lessonsToCreate = lesson.map(item => ({
-      sectionId: createdSection.id, // force injecting sectionId
-      serial: Number(item.serial),
-      title: item.title,
-      description: item.description,
-      type: item.type,
-      media: item.media,
-      duration: item.duration ?? 0,
-    }));
+      if (!createdSection) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Section creation failed!');
+      }
 
-    // STEP 3: Create all lessons
-    const createdLessons = await tx.courseLesson.createMany({
-      data: lessonsToCreate,
-    });
+      // STEP 2: Prepare lessons for this section
+      const lessonsToCreate = sec.lesson.map(item => ({
+        sectionId: createdSection.id,
+        serial: item.serial,
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        media: item.media,
+        duration: item.duration ?? 0,
+      }));
 
-    if (!createdLessons) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Course lessons creation failed!',
+      // STEP 3: Create all lessons
+      await tx.courseLesson.createMany({
+        data: lessonsToCreate,
+      });
+
+      // STEP 4: Track totals
+      totalLectures += lessonsToCreate.length;
+      totalDuration += lessonsToCreate.reduce(
+        (sum, l) => sum + (l.duration || 0),
+        0,
       );
+
+      createdSections.push({
+        section: { ...sec, courseId },
+        lessons: lessonsToCreate,
+      });
     }
 
-    // STEP 4: Calculate total duration & lecture count
-    const totalLessonDuration = lessonsToCreate.reduce(
-      (sum, l) => sum + (l.duration || 0),
-      0,
-    );
-
-    const totalLectures = lessonsToCreate.length;
-
-    // STEP 5: Update parent course (increment duration & lectures)
+    // STEP 5: Update parent course with total lectures & duration
     await tx.course.update({
-      where: { id: payload.courseId },
+      where: { id: courseId },
       data: {
         lectures: { increment: totalLectures },
-        duration: { increment: totalLessonDuration },
+        duration: { increment: totalDuration },
       },
     });
 
-    return {
-      section: createdSection,
-      lessons: lessonsToCreate,
-    };
+    return createdSections;
   });
 };
 
