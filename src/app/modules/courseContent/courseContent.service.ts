@@ -12,10 +12,10 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (
-  payload: { courseId: string; section: ICourseSection[] },
+  payload: { courseId: string; sections: ICourseSection[] },
   authorId: string,
 ) => {
-  const { courseId, section } = payload;
+  const { courseId, sections } = payload;
 
   // Validate course belongs to author
   const course = await prisma.course.findFirst({
@@ -35,7 +35,7 @@ const insertIntoDB = async (
     }[] = [];
 
     // Loop through each section in payload
-    for (const sec of section) {
+    for (const sec of sections) {
       // STEP 1: Create Section
       const createdSection = await tx.courseSection.create({
         data: {

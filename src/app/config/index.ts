@@ -51,5 +51,9 @@ export default {
     client_id: process.env.LINKEDIN_CLIENT_ID,
     client_secret: process.env.LINKEDIN_CLIENT_SECRET,
     redirect_url: process.env.LINKEDIN_REDIRECT_URI
+  },
+  facebook: {
+    app_id: process.env.FACEBOOK_APPID,
+    app_secret: process.env.FACEBOOK_APPSECRET
   }
 }

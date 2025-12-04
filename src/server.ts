@@ -16,6 +16,7 @@ const main = async () => {
     // default task added
     seeder.seedAdmin();
     seeder.seedContents();
+    seeder.seedInitialChats();
     scheduleExpiredUserCleanup();
     newsletterScheduleCorn();
     cleanupCouponsAndPromos();

@@ -15,7 +15,7 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  validateRequest(QuestionValidation.createValidationSchema),
+  // validateRequest(QuestionValidation.createValidationSchema),
   QuestionController.insertIntoDB,
 );
 

@@ -23,22 +23,27 @@ const insertIntoDB = async (payload: IQuestion) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz not found!');
   }
 
-  // 2. Validate options
-  if (!options || options.length === 0) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'At least one option is required!',
-    );
-  }
-  const hasCorrect = options.some(opt => opt.isCorrect);
-  if (!hasCorrect) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'At least one correct option is required!',
-    );
+  // 2. Conditional option validation
+  const optionBasedTypes = ['mcq', 'multiple_select', 'true_false'];
+
+  if (optionBasedTypes.includes(type)) {
+    if (!options || options.length == 0) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'At least two option is required for this question type!',
+      );
+    }
+
+    const hasCorrect = options.some(opt => opt.isCorrect);
+    if (!hasCorrect) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'At least one correct option is required!',
+      );
+    }
   }
 
-  // 3. Create question with options
+  // 3. Create question
   const result = await prisma.question.create({
     data: {
       quizId,
@@ -47,13 +52,17 @@ const insertIntoDB = async (payload: IQuestion) => {
       point,
       expectedAnswer,
       feedback,
-      options: {
-        create: options.map((opt: IQuestionOption) => ({
-          optionLevel: opt.optionLevel,
-          optionText: opt.optionText,
-          isCorrect: opt.isCorrect,
-        })),
-      },
+
+      options:
+        optionBasedTypes.includes(type) && options
+          ? {
+              create: options.map((opt: IQuestionOption) => ({
+                optionLevel: opt.optionLevel,
+                optionText: opt.optionText,
+                isCorrect: opt.isCorrect,
+              })),
+            }
+          : undefined,
     },
     include: { options: true },
   });

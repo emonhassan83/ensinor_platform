@@ -1,4 +1,4 @@
-import { RegisterWith, UserRole, UserStatus } from '@prisma/client';
+import { RegisterWith, UserRole, UserStatus, ChatType, ChatStatus } from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
 import { findAdmin } from '../utils/findAdmin';
@@ -70,7 +70,96 @@ const seedContents = async () => {
   }
 };
 
+const seedInitialChats = async () => {
+  console.log('\n📨 Checking initial chat setup...');
+
+  // Prevent duplication: only seed if announcement chat does NOT exist.
+  const announcementExists = await prisma.chat.findFirst({
+    where: { type: ChatType.announcement },
+  });
+
+  if (announcementExists) {
+    console.log('ℹ️ Initial chats already exist. Skipping chat seeding...');
+    return;
+  }
+
+  console.log('🚀 Seeding initial chats...');
+
+  // Fetch users by roles
+  const admins = await prisma.user.findMany({
+    where: { role: UserRole.company_admin, isDeleted: false },
+  });
+
+  const instructors = await prisma.user.findMany({
+    where: { role: UserRole.instructor, isDeleted: false },
+  });
+
+  const students = await prisma.user.findMany({
+    where: { role: UserRole.student, isDeleted: false },
+  });
+
+  /* ======================================================
+      1️⃣ Company Announcement Chat
+     ====================================================== */
+  const announcementChat = await prisma.chat.create({
+    data: {
+      type: ChatType.announcement,
+      groupName: 'Company Announcements',
+      isReadOnly: true,
+      status: ChatStatus.accepted,
+      participants: {
+        create: admins.map(admin => ({
+          userId: admin.id,
+        })),
+      },
+    },
+  });
+
+  /* ======================================================
+      2️⃣ Instructor Group Chat
+     ====================================================== */
+  const instructorGroupChat = await prisma.chat.create({
+    data: {
+      type: ChatType.group,
+      groupName: 'Instructor Announcements',
+      isReadOnly: false,
+      status: ChatStatus.accepted,
+      participants: {
+        create: instructors.map(instructor => ({
+          userId: instructor.id,
+        })),
+      },
+    },
+  });
+
+  /* ======================================================
+      3️⃣ Student Group Chat
+     ====================================================== */
+  const studentGroupChat = await prisma.chat.create({
+    data: {
+      type: ChatType.group,
+      groupName: 'Student Lounge',
+      isReadOnly: false,
+      status: ChatStatus.accepted,
+      participants: {
+        create: students.map(student => ({
+          userId: student.id,
+        })),
+      },
+    },
+  });
+
+  console.log('\n✅ Initial Chats Seeded Successfully!');
+  console.table({
+    announcementChat: announcementChat.id,
+    instructorGroupChat: instructorGroupChat.id,
+    studentGroupChat: studentGroupChat.id,
+  });
+};
+
+
 export const seeder = {
   seedAdmin,
   seedContents,
+  seedInitialChats
 };

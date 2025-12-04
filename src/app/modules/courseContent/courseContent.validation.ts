@@ -46,7 +46,7 @@ const sectionSchema = z.object({
 const createSectionValidationSchema = z.object({
   body: z.object({
     courseId: z.string().uuid({ message: 'Course must be a valid UUID' }),
-    section: z.array(sectionSchema),
+    sections: z.array(sectionSchema),
   }),
 });
 

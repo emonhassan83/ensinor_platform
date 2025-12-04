@@ -16,8 +16,8 @@ const optionCreateSchema = z.object({
           .string({ required_error: 'optionText is required' })
           .min(1, 'optionText cannot be empty'),
         isCorrect: z.boolean({ required_error: 'isCorrect is required' }),
-      }),
-    ),
+      })
+    ).optional(),
   }),
 });
 
@@ -29,7 +29,7 @@ const optionCreate = z.object({
     .string({ required_error: 'optionText is required' })
     .min(1, 'optionText cannot be empty'),
   isCorrect: z.boolean({ required_error: 'isCorrect is required' }),
-});
+}).optional();
 
 const optionUpdateSchema = z.object({
   body: z.object({
@@ -49,7 +49,7 @@ const createValidationSchema = z.object({
       .uuid({ message: 'Invalid UUID' }),
     name: z.string({ required_error: 'Question name is required' }),
     type: z.string({ required_error: 'Question type is required' }),
-    point: z.string({ required_error: 'Question point is required' }),
+    point: z.number({ required_error: 'Question point is required' }),
     expectedAnswer: z
       .array(
         z
@@ -62,8 +62,8 @@ const createValidationSchema = z.object({
       .array(optionCreate, {
         required_error: 'Options are required',
       })
-      .min(1, 'At least one option is required'),
-  }),
+      .min(2, 'At least two option is required'),
+  }).optional(),
 });
 
 // Update validation
@@ -72,7 +72,7 @@ const updateValidationSchema = z.object({
     name: z.string({ required_error: 'Quiz name is required!' }).optional(),
     type: z.string({ required_error: 'Question type is required' }).optional(),
     point: z
-      .string({ required_error: 'Question point is required' })
+      .number({ required_error: 'Question point is required' })
       .optional(),
     expectedAnswer: z
       .array(
@@ -88,7 +88,7 @@ const updateValidationSchema = z.object({
       .array(optionCreateSchema, {
         required_error: 'Options are required',
       })
-      .min(1, 'At least one option is required')
+      .min(2, 'At least two option is required')
       .optional(),
   }),
 });
