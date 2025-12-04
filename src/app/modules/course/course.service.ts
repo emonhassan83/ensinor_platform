@@ -906,16 +906,13 @@ const changeStatusIntoDB = async (
       const existingChats = await prismaTx.chat.findMany({
         where: {
           courseId: course.id,
-          type: { in: [ChatType.group, ChatType.announcement] },
+          type: { in: [ChatType.group] },
           isDeleted: false,
         },
         select: { type: true },
       });
 
       const hasGroup = existingChats.some(c => c.type === ChatType.group);
-      // const hasAnnouncement = existingChats.some(
-      //   c => c.type === ChatType.announcement,
-      // );
 
       // 3. Discussion Chat
       if (!hasGroup) {
@@ -934,19 +931,6 @@ const changeStatusIntoDB = async (
           },
         });
       }
-
-      // // 3b. Announcement Chat
-      // if (!hasAnnouncement) {
-      //   await prismaTx.chat.create({
-      //     data: {
-      //       type: ChatType.announcement,
-      //       groupName: `${course.title} Announcement`,
-      //       groupImage: course.thumbnail || null,
-      //       courseId: course.id,
-      //       isReadOnly: true,
-      //     },
-      //   });
-      // }
     }
 
     // 4. Send notify to instructor
