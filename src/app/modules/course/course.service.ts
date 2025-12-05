@@ -793,11 +793,20 @@ const getByIdFromDB = async (
         take: 1,
         select: { code: true, discount: true, expireAt: true },
       },
+      quiz: {
+        include: {
+          questionsList: {
+            include: {
+              options: true,
+            }
+          }
+        }
+      }
     },
   });
 
   if (!result) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Course not found!');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Single Course not found!');
   }
 
   // ====== Check enrollment only if userId is provided ======

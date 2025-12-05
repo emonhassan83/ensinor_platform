@@ -1498,11 +1498,19 @@ const getByIdFromDB = async (id: string) => {
           lectures: true,
           courseSections: {
             include: {
-                courseContents: true
-            }
+              courseContents: true,
+            },
           },
           resource: true,
-          quiz: true,
+          quiz: {
+            include: {
+              questionsList: {
+                include: {
+                  options: true,
+                },
+              },
+            },
+          },
           assignment: true,
         },
       },
@@ -1558,7 +1566,9 @@ const watchLectureIntoDB = async (payload: {
     where: { id: enrolledCourseId },
     include: {
       watchedLectures: true,
-      course: { include: { courseSections: { include: { courseContents: true } } } },
+      course: {
+        include: { courseSections: { include: { courseContents: true } } },
+      },
       courseLogs: true,
     },
   });
@@ -1575,7 +1585,10 @@ const watchLectureIntoDB = async (payload: {
     throw new ApiError(httpStatus.NOT_FOUND, 'Lecture not found!');
   }
 
-  const totalLectures = enrolledCourse.course.courseSections.reduce((acc, section) => acc + section.courseContents.length, 0);
+  const totalLectures = enrolledCourse.course.courseSections.reduce(
+    (acc, section) => acc + section.courseContents.length,
+    0,
+  );
 
   const alreadyWatched = enrolledCourse.watchedLectures.some(
     l => l.id === lectureId,
