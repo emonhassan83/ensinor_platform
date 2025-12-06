@@ -19,6 +19,9 @@ const getAllFromDB = async (
   const andConditions: Prisma.EmployeeWhereInput[] = [
     {
       authorId: userId,
+      user: {
+        isDeleted: false,
+      }
     },
   ];
 

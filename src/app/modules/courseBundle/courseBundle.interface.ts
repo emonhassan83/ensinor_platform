@@ -12,7 +12,7 @@ export type ICourseBundle = {
   platform: PlatformType
   title: string;
   description: string;
-  course: string[];
+  courseIds: string[];
   category: string;
   level: CourseLevel;
   language: string;

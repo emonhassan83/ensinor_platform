@@ -21,7 +21,10 @@ import httpStatus from 'http-status';
 
 // ---------------- Insert ----------------
 const insertIntoDB = async (payload: ICourseBundle, file: any) => {
-  const { authorId, course: courseIds, discount = 0, ...bundleData } = payload;
+    const { authorId, courseIds, discount = 0, ...bundleData } = payload;
+  if (!courseIds || !Array.isArray(courseIds) || courseIds.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Course IDs are required!');
+  }
 
   const author = await prisma.user.findFirst({
     where: {
@@ -59,7 +62,7 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     where: {
       id: { in: courseIds },
       // instructorId: authorId,
-      status: CoursesStatus.approved,
+      // status: CoursesStatus.approved,
       isDeleted: false,
     },
     select: {
@@ -77,7 +80,8 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       'One or more courses do not belong to this author!',
     );
   }
-
+  console.log({courses});
+  
   // Assign companyId if any course has it
   const companyIds = courses
     .map(c => c.companyId)
