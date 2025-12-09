@@ -29,7 +29,7 @@ const insertIntoDB = async (payload: ICertificate) => {
     where: { id: enrolledCourseId, userId, isDeleted: false },
     include: {
       author: true, // Course Author (User table)
-      course: { include: { author: true } },
+      course: { include: { author: true, companies: true } },
     },
   });
 
@@ -69,25 +69,28 @@ const insertIntoDB = async (payload: ICertificate) => {
   // 7️⃣ Auto-assign completeDate
   payload.completeDate = new Date().toISOString();
 
-  const courseCategory = course.category;
-  // 8️⃣ Auto-generate unique reference: Ensinor-xxxxx
-  payload.reference = generateEnrollmentId(
-    courseCategory,
-    user.name || 'student',
-  );
+  // 8️⃣ Auto-generate unique reference ID
+  let prefix = 'EN'; // default
+
+  // If platform === company AND company exists
+  if (course.platform === 'company' && course.companies?.name) {
+    prefix = course.companies.name.substring(0, 2).toUpperCase();
+  }
+
+  // Use new dynamic generator
+  payload.reference = generateEnrollmentId(prefix);
 
   // 9️⃣ Find CertificateBuilder for this Author (Course Author)
   const builder = await prisma.certificateBuilder.findFirst({
     where: { authorId: courseAuthorId },
   });
 
-  
-// 6️⃣ Handle topics based on isVisibleTopics
-if (builder && builder.isVisibleTopics === false) {
-  payload.topics = []; // forcefully remove topics
-} else {
-  payload.topics = course.topics || [];
-}
+  // 6️⃣ Handle topics based on isVisibleTopics
+  if (builder && builder.isVisibleTopics === false) {
+    payload.topics = []; // forcefully remove topics
+  } else {
+    payload.topics = course.topics || [];
+  }
 
   if (builder) {
     payload.company = builder.company ?? '';
@@ -233,7 +236,9 @@ const getAllFromDB = async (
   };
 };
 
-const getByEnrolledIdFromDB = async (enrolledId: string): Promise<Certificate | null> => {
+const getByEnrolledIdFromDB = async (
+  enrolledId: string,
+): Promise<Certificate | null> => {
   const result = await prisma.certificate.findFirst({
     where: { enrolledCourseId: enrolledId },
     include: {

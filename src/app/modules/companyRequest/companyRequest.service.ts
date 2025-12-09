@@ -21,6 +21,7 @@ import {
   sendCompanyApprovalEmail,
   sendCompanyDenialEmail,
 } from '../../utils/email/sentCompanyStatusEmail';
+import { joinInitialAnnouncementChat } from '../../utils/joinInitialAnnouncementChat';
 
 const insertIntoDB = async (payload: ICompanyRequest) => {
   // check previous status validation
@@ -196,6 +197,9 @@ const updateIntoDB = async (
 
       // Send approval email with credentials
       await sendCompanyApprovalEmail(user.email, user.name, password);
+
+      // Auto-join company announcements chat
+      await joinInitialAnnouncementChat(user.id, UserRole.company_admin);
 
       return updatedRequest;
     });

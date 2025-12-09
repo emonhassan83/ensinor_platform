@@ -3,9 +3,8 @@ import app from './app';
 import config from './app/config';
 import initializeSocketIO from './socket';
 import { seeder } from './app/seeder/seed';
-import { scheduleExpiredUserCleanup } from './app/utils/cleanupExpiredUsers';
+import { initializeCleanupJobs } from './app/utils/initializeCleanupJobs';
 import { newsletterScheduleCorn } from './app/modules/newsletter/newsletter.utils';
-import { cleanupCouponsAndPromos } from './app/modules/orders/orders.utils';
 let server: Server;
 export const io = initializeSocketIO(createServer(app));
 const PORT = Number(process.env.PORT) || 5000;
@@ -17,9 +16,8 @@ const main = async () => {
     seeder.seedAdmin();
     seeder.seedContents();
     seeder.seedInitialChats();
-    scheduleExpiredUserCleanup();
+    initializeCleanupJobs();
     newsletterScheduleCorn();
-    cleanupCouponsAndPromos();
 
     server = app.listen(PORT, HOST, () => {
       console.log(

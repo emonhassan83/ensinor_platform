@@ -36,6 +36,7 @@ import {
 } from '../../utils/email/sentInstructorEmail';
 import { sendStudentInvitationEmail } from '../../utils/email/sentStudentInvitation';
 import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
+import { joinInitialAnnouncementChat } from '../../utils/joinInitialAnnouncementChat';
 
 // TODO: here when register a user then created a student table as well
 const registerAUser = async (
@@ -53,8 +54,6 @@ const registerAUser = async (
     where: { email: user.email },
     include: { verification: true },
   });
-  console.log({existingUser});
-  
   if (existingUser) {
     if (existingUser.isDeleted) {
       return prisma.user.update({
@@ -114,6 +113,9 @@ const registerAUser = async (
       },
     });
 
+    // Auto-join student announcements chat
+    await joinInitialAnnouncementChat(newUser.id, UserRole.student);
+
     // Create corresponding Student record automatically
     await tx.student.create({
       data: {
@@ -170,6 +172,9 @@ const invitationCompanyAdmin = async (
 
     // 4️⃣ Send email with credentials
     await sendCompanyApprovalEmail(user.email, user.name, password);
+
+    // Auto-join company announcements chat
+    await joinInitialAnnouncementChat(user.id, UserRole.company_admin);
 
     return user;
   });
@@ -453,6 +458,9 @@ const createInstructor = async (
     // sent admin tp invitee notify
     await sendInstructorRequestNotification(user, 'instructor');
 
+    // Auto-join company announcements chat
+    await joinInitialAnnouncementChat(user.id, UserRole.instructor);
+
     return user;
   });
 
@@ -521,6 +529,9 @@ const invitationInstructor = async (
 
     // 4️⃣ Send email with credentials
     await sendInstructorInvitationEmail(user.email, user.name, password);
+
+    // Auto-join company instructor chat
+    await joinInitialAnnouncementChat(user.id, UserRole.instructor);
 
     return user;
   });
@@ -593,6 +604,9 @@ const createStudent = async (
 
     // 4️⃣ Send email with credentials
     await sendStudentInvitationEmail(user.email, user.name, password);
+
+    // Auto-join company announcements chat
+    await joinInitialAnnouncementChat(user.id, UserRole.student);
 
     return user;
   });

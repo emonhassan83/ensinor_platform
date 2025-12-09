@@ -656,6 +656,7 @@ const getAllFilterDataFromDB = async () => {
   // === Course filters ===
   const courseWhere: Prisma.CourseWhereInput = {
     status: CoursesStatus.approved,
+    isPublished: true,
     isDeleted: false,
   };
 
@@ -771,7 +772,7 @@ const getByIdFromDB = async (
   filterBy?: { userId?: string },
 ): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
-    where: { id, isDeleted: false },
+    where: { id, isPublished: true, isDeleted: false },
     include: {
       author: {
         select: { id: true, name: true, email: true, photoUrl: true },
@@ -889,7 +890,7 @@ const changeStatusIntoDB = async (
   return await prisma.$transaction(async prismaTx => {
     // 1. Fetch course
     const course = await prismaTx.course.findUnique({
-      where: { id, isDeleted: false },
+      where: { id, isPublished: true, isDeleted: false },
     });
     if (!course) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');
@@ -988,7 +989,7 @@ const assignACourseIntoDB = async (
   }
 
   const existingCourse = await prisma.course.findFirst({
-    where: { id, isDeleted: false },
+    where: { id, isPublished: true, status: CoursesStatus.approved, isDeleted: false },
   });
   if (!existingCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found.');

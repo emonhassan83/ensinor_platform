@@ -1,4 +1,11 @@
-import { RegisterWith, UserRole, UserStatus, ChatType, ChatStatus, ChatRole } from '@prisma/client';
+import {
+  RegisterWith,
+  UserRole,
+  UserStatus,
+  ChatType,
+  ChatStatus,
+  ChatRole,
+} from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
 import { findAdmin } from '../utils/findAdmin';
@@ -85,7 +92,7 @@ const seedInitialChats = async () => {
 
   console.log('🚀 Seeding initial chats...');
 
-   const superAdmin = await prisma.user.findFirst({
+  const superAdmin = await prisma.user.findFirst({
     where: { role: UserRole.super_admin, isDeleted: false },
   });
 
@@ -185,11 +192,10 @@ const seedInitialChats = async () => {
     instructorGroupChat: instructorGroupChat.id,
     studentGroupChat: studentGroupChat.id,
   });
-};
-
+}
 
 export const seeder = {
   seedAdmin,
   seedContents,
-  seedInitialChats
+  seedInitialChats,
 };

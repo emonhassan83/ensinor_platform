@@ -62,7 +62,8 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     where: {
       id: { in: courseIds },
       // instructorId: authorId,
-      // status: CoursesStatus.approved,
+      status: CoursesStatus.approved,
+      isPublished: true,
       isDeleted: false,
     },
     select: {
