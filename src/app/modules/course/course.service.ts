@@ -772,7 +772,7 @@ const getByIdFromDB = async (
   filterBy?: { userId?: string },
 ): Promise<Course | null> => {
   const result = await prisma.course.findUnique({
-    where: { id, isPublished: true, isDeleted: false },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: { id: true, name: true, email: true, photoUrl: true },

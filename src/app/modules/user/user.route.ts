@@ -63,7 +63,7 @@ router.post(
 
 router.patch(
   '/status/:id',
-  auth(UserRole.super_admin),
+  auth(UserRole.super_admin, UserRole.company_admin),
   validateRequest(UserValidation.changeProfileStatus),
   UserController.changeProfileStatus,
 );

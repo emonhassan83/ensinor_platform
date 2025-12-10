@@ -9,6 +9,7 @@ let server: Server;
 export const io = initializeSocketIO(createServer(app));
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = process.env.IP || '0.0.0.0';
+import colors from 'colors';
 
 const main = async () => {
   try {
@@ -20,15 +21,20 @@ const main = async () => {
     newsletterScheduleCorn();
 
     server = app.listen(PORT, HOST, () => {
-      console.log(
-        `⚡️[server]: Server is running at http://${config.ip}:${config.port}`,
+     console.log(
+        colors.italic.green.bold(
+          `💫 Simple Server Listening on  http://${config?.ip}:${config.port} `,
+        ),
       );
-    });
+    })
 
-    io.listen(Number(config.socket_port));
+    io.listen(Number(config.socket_port))
     console.log(
-      `⚡️[socket]: Socket is running at http://${config.ip}:${config.socket_port}`,
+      colors.yellow.bold(
+        `⚡Socket.io running on  http://${config.ip}:${config.socket_port}`,
+      ),
     );
+
     // @ts-ignore
     global.socketio = io;
   } catch (error) {

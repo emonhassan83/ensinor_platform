@@ -16,10 +16,10 @@ const createValidationSchema = z.object({
     }),
     type: z.string({
       required_error: 'CV education result type is required!',
-    }),
+    }).optional(),
     result: z.string({
       required_error: 'CV education result is required!',
-    }),
+    }).optional(),
     startTime: z.string({
       required_error: 'CV education startTime is required!',
     }),

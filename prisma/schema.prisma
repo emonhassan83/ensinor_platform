@@ -1388,10 +1388,10 @@ model Education {
   institution String
   degree      String
   location    String
-  result      String
+  result      String?
   startTime   String
   endTime     String
-  type        String // eg. GPA or CGPA
+  type        String? // eg. GPA or CGPA
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
