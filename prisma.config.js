@@ -1,3 +1,5 @@
+require('dotenv').config(); // Load .env
+
 module.exports = {
   datasources: {
     db: {
