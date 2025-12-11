@@ -1,10 +1,7 @@
-// prisma.config.js at /root/ensinor_platform/
-require('dotenv').config(); // ensure DATABASE_URL is loaded
-
 module.exports = {
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
+      url: "postgresql://postgres:123456@localhost:5432/ensinor?schema=public"
+    }
+  }
 };
