@@ -53,7 +53,7 @@ const createSectionValidationSchema = z.object({
 const updateSectionValidationSchema = z.object({
   body: z.object({
     title: z.string().optional(),
-    description: z.number().optional(),
+    description: z.string().optional(),
   }),
 });
 

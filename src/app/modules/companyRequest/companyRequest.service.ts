@@ -195,11 +195,15 @@ const updateIntoDB = async (
         },
       });
 
+      // Auto-join company announcements chat
+      await joinInitialAnnouncementChat(
+        user.id,
+        UserRole.company_admin,
+        transactionClient,
+      );
+      
       // Send approval email with credentials
       await sendCompanyApprovalEmail(user.email, user.name, password);
-
-      // Auto-join company announcements chat
-      await joinInitialAnnouncementChat(user.id, UserRole.company_admin);
 
       return updatedRequest;
     });

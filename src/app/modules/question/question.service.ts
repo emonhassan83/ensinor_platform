@@ -1,4 +1,4 @@
-import { Prisma, Question } from '@prisma/client';
+import { Prisma, Question, QuestionType } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -12,59 +12,106 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 
 const insertIntoDB = async (payload: IQuestion) => {
-  const { quizId, name, type, point, expectedAnswer, feedback, options } =
-    payload;
+  const {
+    quizId,
+    name,
+    type,
+    point,
+    expectedAnswer = [],
+    feedback,
+    options = [],
+  } = payload;
 
-  // 1. Validate quiz existence
-  const quiz = await prisma.quiz.findUnique({
-    where: { id: quizId, isDeleted: false },
+  /* ------------------------------------------------
+     1️⃣ Validate Quiz
+  ------------------------------------------------ */
+  const quiz = await prisma.quiz.findFirst({
+    where: {
+      id: quizId,
+      isDeleted: false,
+    },
   });
+
   if (!quiz) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Quiz not found!');
   }
 
-  // 2. Conditional option validation
-  const optionBasedTypes = ['mcq', 'multiple_select', 'true_false'];
+  /* ------------------------------------------------
+     2️⃣ Question Type Rules
+  ------------------------------------------------ */
+  const optionBasedTypes: QuestionType[] = [
+    QuestionType.single_choice,
+    QuestionType.multiple_choice,
+    QuestionType.true_false,
+  ];
 
   if (optionBasedTypes.includes(type)) {
-    if (!options || options.length == 0) {
+    if (!options || options.length < 2) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'At least two option is required for this question type!',
+        'At least two options are required for this question type!',
       );
     }
 
-    const hasCorrect = options.some(opt => opt.isCorrect);
-    if (!hasCorrect) {
+    const correctCount = options.filter(opt => opt.isCorrect).length;
+
+    if (correctCount === 0) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'At least one correct option is required!',
       );
     }
+
+    if (type === QuestionType.single_choice && correctCount !== 1) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Single choice question must have exactly one correct option!',
+      );
+    }
   }
 
-  // 3. Create question
-  const result = await prisma.question.create({
-    data: {
-      quizId,
-      name,
-      type,
-      point,
-      expectedAnswer,
-      feedback,
+  if (type === QuestionType.short_answer && expectedAnswer.length === 0) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Expected answer is required for short answer questions!',
+    );
+  }
 
-      options:
-        optionBasedTypes.includes(type) && options
+  /* ------------------------------------------------
+     3️⃣ Create Question + Options (Atomic)
+  ------------------------------------------------ */
+  const result = await prisma.$transaction(async tx => {
+    const question = await tx.question.create({
+      data: {
+        quizId,
+        name,
+        type,
+        point,
+        expectedAnswer,
+        feedback,
+        options: optionBasedTypes.includes(type)
           ? {
-              create: options.map((opt: IQuestionOption) => ({
+              create: options.map(opt => ({
                 optionLevel: opt.optionLevel,
                 optionText: opt.optionText,
                 isCorrect: opt.isCorrect,
               })),
             }
           : undefined,
-    },
-    include: { options: true },
+      },
+      include: { options: true },
+    });
+
+    // Update quiz stats
+    await tx.quiz.update({
+      where: { id: quizId },
+      data: {
+        questions: { increment: 1 },
+        marks: { increment: point },
+      },
+    });
+
+    return question;
   });
 
   if (!result) {
@@ -73,15 +120,6 @@ const insertIntoDB = async (payload: IQuestion) => {
       'Quiz question creation failed!',
     );
   }
-
-  // 4. Update quiz (increment by 1)
-  await prisma.quiz.update({
-    where: { id: quizId },
-    data: {
-      questions: { increment: 1 },
-      marks: { increment: point },
-    },
-  });
 
   return result;
 };

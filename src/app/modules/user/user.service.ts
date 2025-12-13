@@ -114,7 +114,7 @@ const registerAUser = async (
     });
 
     // Auto-join student announcements chat
-    await joinInitialAnnouncementChat(newUser.id, UserRole.student);
+    await joinInitialAnnouncementChat(newUser.id, UserRole.student, tx);
 
     // Create corresponding Student record automatically
     await tx.student.create({
@@ -173,8 +173,12 @@ const invitationCompanyAdmin = async (
     // 4️⃣ Send email with credentials
     await sendCompanyApprovalEmail(user.email, user.name, password);
 
-    // Auto-join company announcements chat
-    await joinInitialAnnouncementChat(user.id, UserRole.company_admin);
+    // 4️⃣ Auto-join company announcements chat (SAFE)
+    await joinInitialAnnouncementChat(
+      user.id,
+      UserRole.company_admin,
+      transactionClient,
+    );
 
     return user;
   });
@@ -452,14 +456,18 @@ const createInstructor = async (
       },
     });
 
+    // Auto-join company announcements chat
+    await joinInitialAnnouncementChat(
+      user.id,
+      UserRole.instructor,
+      transactionClient,
+    );
+
     // 4️⃣ Send email with credentials
     await sendInstructorRequestEmail(user.email, user.name, password);
 
     // sent admin tp invitee notify
     await sendInstructorRequestNotification(user, 'instructor');
-
-    // Auto-join company announcements chat
-    await joinInitialAnnouncementChat(user.id, UserRole.instructor);
 
     return user;
   });
@@ -527,11 +535,15 @@ const invitationInstructor = async (
       },
     });
 
+    // Auto-join company instructor chat
+    await joinInitialAnnouncementChat(
+      user.id,
+      UserRole.instructor,
+      transactionClient,
+    );
+
     // 4️⃣ Send email with credentials
     await sendInstructorInvitationEmail(user.email, user.name, password);
-
-    // Auto-join company instructor chat
-    await joinInitialAnnouncementChat(user.id, UserRole.instructor);
 
     return user;
   });
@@ -602,11 +614,15 @@ const createStudent = async (
       },
     });
 
+    // ✅ FIX: pass transaction client
+    await joinInitialAnnouncementChat(
+      user.id,
+      UserRole.student,
+      transactionClient,
+    );
+
     // 4️⃣ Send email with credentials
     await sendStudentInvitationEmail(user.email, user.name, password);
-
-    // Auto-join company announcements chat
-    await joinInitialAnnouncementChat(user.id, UserRole.student);
 
     return user;
   });
@@ -734,6 +750,9 @@ const geUserById = async (userId: string) => {
   });
 
   const isActiveSubscription = !!activeSubscription;
+  const subscriptionType = activeSubscription
+    ? activeSubscription.type
+    : null;
 
   let profileData;
 
@@ -779,6 +798,7 @@ const geUserById = async (userId: string) => {
     ...profileData,
     ...userData,
     isActiveSubscription,
+    subscriptionType
   };
 };
 
