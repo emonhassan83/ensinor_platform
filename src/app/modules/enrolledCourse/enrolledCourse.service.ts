@@ -1472,9 +1472,16 @@ const myEnrolledCoursesQuiz = async (userId: string) => {
   };
 };
 
-const getByIdFromDB = async (id: string) => {
-  const enrolledCourse = await prisma.enrolledCourse.findUnique({
-    where: { id, isDeleted: false },
+const getByIdFromDB = async (id: string, userId: string) => {
+  /* --------------------------------------------
+     1️⃣ Fetch Enrolled Course
+  --------------------------------------------- */
+  const enrolledCourse = await prisma.enrolledCourse.findFirst({
+    where: {
+      id,
+      userId,
+      isDeleted: false,
+    },
     include: {
       author: {
         select: {
@@ -1485,29 +1492,20 @@ const getByIdFromDB = async (id: string) => {
         },
       },
       watchedLectures: {
-        select: {
-          id: true,
-        },
+        select: { id: true },
       },
       course: {
-        select: {
-          id: true,
-          shortDescription: true,
-          thumbnail: true,
-          description: true,
-          lectures: true,
+        include: {
           courseSections: {
             include: {
-              courseContents: true,
+              courseContents: true, // lessons
             },
           },
           resource: true,
           quiz: {
             include: {
               questionsList: {
-                include: {
-                  options: true,
-                },
+                include: { options: true },
               },
             },
           },
@@ -1518,18 +1516,109 @@ const getByIdFromDB = async (id: string) => {
   });
 
   if (!enrolledCourse) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Enroll course not found!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Oops! Enrolled course not found!',
+    );
   }
 
-  // ✅ Count watched lectures
+  /* --------------------------------------------
+     2️⃣ Build Watched Lecture Lookup
+  --------------------------------------------- */
+  const watchedLectureSet = new Set(
+    enrolledCourse.watchedLectures.map(l => l.id),
+  );
+
+  /* --------------------------------------------
+     3️⃣ Fetch Completed Quiz Attempts
+  --------------------------------------------- */
+  const quizAttempts = await prisma.quizAttempt.findMany({
+    where: {
+      userId,
+      quiz: {
+        courseId: enrolledCourse.courseId,
+      },
+      isCompleted: true,
+      isDeleted: false,
+    },
+    select: {
+      quizId: true,
+    },
+  });
+
+  const completedQuizSet = new Set(
+    quizAttempts.map(attempt => attempt.quizId),
+  );
+
+  /* --------------------------------------------
+     4️⃣ Fetch Assignment Submissions
+  --------------------------------------------- */
+  const assignmentSubmissions =
+    await prisma.assignmentSubmission.findMany({
+      where: {
+        userId,
+        assignment: {
+          courseId: enrolledCourse.courseId,
+        },
+        isDeleted: false,
+      },
+      select: {
+        assignmentId: true,
+      },
+    });
+
+  const completedAssignmentSet = new Set(
+    assignmentSubmissions.map(sub => sub.assignmentId),
+  );
+
+  /* --------------------------------------------
+     5️⃣ Inject isCompleted → Lectures
+  --------------------------------------------- */
+  const courseSectionsWithStatus =
+    enrolledCourse.course.courseSections.map(section => ({
+      ...section,
+      courseContents: section.courseContents.map(content => ({
+        ...content,
+        isCompleted: watchedLectureSet.has(content.id),
+      })),
+    }));
+
+  /* --------------------------------------------
+     6️⃣ Inject isCompleted → Quizzes
+  --------------------------------------------- */
+  const quizzesWithStatus = enrolledCourse.course.quiz.map(quiz => ({
+    ...quiz,
+    isCompleted: completedQuizSet.has(quiz.id),
+  }));
+
+  /* --------------------------------------------
+     7️⃣ Inject isCompleted → Assignments
+  --------------------------------------------- */
+  const assignmentsWithStatus =
+    enrolledCourse.course.assignment.map(assignment => ({
+      ...assignment,
+      isCompleted: completedAssignmentSet.has(assignment.id),
+    }));
+
+  /* --------------------------------------------
+     8️⃣ Count Watched Lectures
+  --------------------------------------------- */
   const lectureWatched = enrolledCourse.watchedLectures.length;
 
-  // ✅ Return everything except watchedLectures array
+  /* --------------------------------------------
+     9️⃣ Final Response
+  --------------------------------------------- */
   const { watchedLectures, ...rest } = enrolledCourse;
 
   return {
     ...rest,
     lectureWatched,
+    course: {
+      ...rest.course,
+      courseSections: courseSectionsWithStatus,
+      quiz: quizzesWithStatus,
+      assignment: assignmentsWithStatus,
+    },
   };
 };
 
