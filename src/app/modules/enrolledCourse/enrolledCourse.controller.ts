@@ -146,7 +146,7 @@ const getStudentByAuthorCourse = catchAsync(async (req, res) => {
 });
 
 const getByIdFromDB = catchAsync(async (req, res) => {
-  const result = await EnrolledCourseService.getByIdFromDB(req.params.id);
+  const result = await EnrolledCourseService.getByIdFromDB(req.params.id, req.user!.userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
