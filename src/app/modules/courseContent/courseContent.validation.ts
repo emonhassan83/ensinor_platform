@@ -13,7 +13,7 @@ const lessonSchema = z.object({
   title: z.string({ required_error: 'Lesson title is required!' }),
   description: z.string({
     required_error: 'Lesson description is required!',
-  }),
+  }).optional(),
 type: z.enum(['video', 'article', 'presentation', 'document', 'audio']),
   media: z.string({ required_error: 'Course lesson media is required!' }),
   duration: z
