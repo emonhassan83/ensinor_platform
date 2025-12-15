@@ -1,4 +1,5 @@
 import {
+  CompanyType,
   CouponModel,
   Prisma,
   PromoCode,
@@ -13,6 +14,39 @@ import { promoCodeSearchAbleFields } from './promoCode.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
+
+// utils/companyCheck.ts
+export const checkCompanyRestriction = async (author: any, feature: string) => {
+  // Only for company_admin or business_instructors
+  if (
+    ![UserRole.company_admin, UserRole.business_instructors].includes(
+      author.role,
+    )
+  )
+    return;
+
+  const company =
+    author.role === UserRole.company_admin
+      ? author.companyAdmin?.company
+      : author.businessInstructor?.company;
+
+  if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+  if (!company.isActive)
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Your company is not active now!',
+    );
+
+  // Block NGO (or add more types here if needed)
+  if (company.industryType === CompanyType.ngo) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      `NGO company admins or business instructors cannot create ${feature}!`,
+    );
+  }
+
+  return company;
+};
 
 const insertIntoDB = async (payload: IPromoCode) => {
   const {
@@ -30,8 +64,23 @@ const insertIntoDB = async (payload: IPromoCode) => {
   // 1️⃣ Check author exists
   const author = await prisma.user.findUnique({
     where: { id: authorId, status: UserStatus.active, isDeleted: false },
+    include: {
+      companyAdmin: {
+        select: {
+          company: { select: { id: true, industryType: true, isActive: true } },
+        },
+      },
+      businessInstructor: {
+        select: {
+          company: { select: { id: true, industryType: true, isActive: true } },
+        },
+      },
+    },
   });
   if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+
+  // 1a️⃣ Check company restriction
+  await checkCompanyRestriction(author, 'promo code');
 
   // set global promo if author super admin
   payload.isGlobal = author.role === UserRole.super_admin;

@@ -1,6 +1,7 @@
 import {
   Book,
   BookStatus,
+  CompanyType,
   PlatformType,
   Prisma,
   SubscriptionStatus,
@@ -24,32 +25,23 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 
   // 🔹 1. Validate author user
   const author = await prisma.user.findFirst({
-    where: {
-      id: authorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
+    where: { id: authorId, status: UserStatus.active, isDeleted: false },
     include: {
-      companyAdmin: { select: { company: { select: { id: true } } } },
-      businessInstructor: { select: { company: { select: { id: true } } } },
+      companyAdmin: { select: { company: { select: { id: true, industryType: true, isActive: true } } } },
+      businessInstructor: { select: { company: { select: { id: true, industryType: true, isActive: true } } } },
       subscription: true,
     },
   });
-  if (!author) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
-  }
+  if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
 
-  let company: any = null;
-  let companyAuthor: any = null;
-
-  // 2️. If author is an instructor → check subscription
+  // 2. If author is an instructor → check subscription
   if (author.role === UserRole.instructor) {
     const activeSubscription = author.subscription.find(
       sub =>
         sub.status === SubscriptionStatus.active &&
-        sub.isExpired === false &&
-        sub.isDeleted === false &&
-        new Date(sub.expiredAt) > new Date(),
+        !sub.isExpired &&
+        !sub.isDeleted &&
+        new Date(sub.expiredAt) > new Date()
     );
     if (!activeSubscription) {
       throw new ApiError(
@@ -59,94 +51,69 @@ const insertIntoDB = async (payload: IShop, files: any) => {
     }
   }
 
-  // 🔹 3. If platform = company → validate company & company admin
+  let company: any = null;
+  let companyAuthor: any = null;
+
+  // 3. Platform = company → validate company & author role
   if (platform === PlatformType.company) {
-    if (
-      author.role !== UserRole.company_admin &&
-      author.role !== UserRole.business_instructors
-    ) {
+    if (![UserRole.company_admin, UserRole.business_instructors].includes(author.role as any)) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Only company admin or business instructor can add shop data in company platform!',
       );
     }
 
-    if (author.role === UserRole.company_admin) {
-      payload.companyId = author.companyAdmin?.company!.id;
-    }
-    if (author.role === UserRole.business_instructors) {
-      payload.companyId = author.businessInstructor?.company!.id;
-    }
+    payload.companyId =
+      author.role === UserRole.company_admin
+        ? author.companyAdmin?.company?.id
+        : author.businessInstructor?.company?.id;
 
     // 4. Validate company
     company = await prisma.company.findFirst({
       where: { id: payload.companyId, isDeleted: false },
-      include: {
-        author: {
-          select: {
-            user: {
-              select: {
-                id: true,
-              },
-            },
-          },
-        },
-      },
+      include: { author: { select: { user: { select: { id: true } } } } },
     });
+    if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active now!');
 
-    if (!company) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-    }
-    if (company.isActive === false) {
+    // ❌ Restrict NGO company
+    if (company.industryType === CompanyType.ngo) {
       throw new ApiError(
-        httpStatus.NOT_FOUND,
-        'Your company is not active now!',
+        httpStatus.FORBIDDEN,
+        'NGO company admins or business instructors cannot add shop/book data!',
       );
     }
 
+    // 5. Get company admin
     companyAuthor = await prisma.user.findFirst({
-      where: {
-        id: company.author.user.id,
-        role: UserRole.company_admin,
-        status: UserStatus.active,
-        isDeleted: false,
-      },
+      where: { id: company.author.user.id, role: UserRole.company_admin, status: UserStatus.active, isDeleted: false },
     });
-    if (!companyAuthor) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
-    }
+    if (!companyAuthor) throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
   }
 
-  // 5. upload thumbnail and file
+  // 6. Upload files
   if (files) {
     const { thumbnail, file } = files as UploadedFiles;
 
     if (thumbnail?.length) {
-      const uploadedThumbnail = await uploadToS3({
+      payload.thumbnail = await uploadToS3({
         file: thumbnail[0],
         fileName: `images/shop/thumbnail/${Math.floor(100000 + Math.random() * 900000)}`,
-      });
-      payload.thumbnail = uploadedThumbnail as string;
+      }) as string;
     }
-
     if (file?.length) {
-      const uploadedFile = await uploadToS3({
+      payload.file = await uploadToS3({
         file: file[0],
         fileName: `images/shop/files/${Math.floor(100000 + Math.random() * 900000)}`,
-      });
-      payload.file = uploadedFile as string;
+      }) as string;
     }
   }
 
-  //🔹 6. Create record
-  const result = await prisma.book.create({
-    data: payload,
-  });
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
-  }
+  // 7. Create record
+  const result = await prisma.book.create({ data: payload });
+  if (!result) throw new ApiError(httpStatus.BAD_REQUEST, 'Shop book creation failed!');
 
-  // 🔹 7. Send notification
+  // 8. Send notification
   if (platform === PlatformType.admin) {
     const admin = await findAdmin();
     if (!admin) throw new Error('Super admin not found!');
@@ -159,7 +126,9 @@ const insertIntoDB = async (payload: IShop, files: any) => {
 };
 
 const getTrendingBooks = async () => {
-  const andConditions: Prisma.BookWhereInput[] = [{ status: BookStatus.published, isDeleted: false }];
+  const andConditions: Prisma.BookWhereInput[] = [
+    { status: BookStatus.published, isDeleted: false },
+  ];
   const whereConditions: Prisma.BookWhereInput = {
     AND: andConditions,
   };
@@ -357,7 +326,7 @@ const getAllCategoryFromDB = async () => {
     count: item._count.category,
   }));
 
-   // 🌐 2️⃣ Get unique languages + count (same logic as category)
+  // 🌐 2️⃣ Get unique languages + count (same logic as category)
   const languageResult = await prisma.book.groupBy({
     by: ['language'],
     where: whereConditions,

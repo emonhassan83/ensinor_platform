@@ -1,4 +1,10 @@
-import { CertificateBuilder, Prisma, UserStatus } from '@prisma/client';
+import {
+  CertificateBuilder,
+  CompanyType,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -14,29 +20,68 @@ import { uploadToS3 } from '../../utils/s3';
 const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
   const { authorId } = payload;
 
+  // 1️⃣ Validate author user
   const user = await prisma.user.findFirst({
-    where: {
-      id: authorId,
-      status: UserStatus.active,
-      isDeleted: false,
+    where: { id: authorId, status: UserStatus.active, isDeleted: false },
+    include: {
+      companyAdmin: {
+        select: {
+          company: { select: { id: true, industryType: true, isActive: true } },
+        },
+      },
+      businessInstructor: {
+        select: {
+          company: { select: { id: true, industryType: true, isActive: true } },
+        },
+      },
     },
   });
-  if (!user) {
+  if (!user)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Certificate builder author not found!',
     );
+
+  let company: any = null;
+
+  // 2️⃣ If author is a company admin or business instructor → check company type
+  if (
+    [UserRole.company_admin, UserRole.business_instructors].includes(
+      user.role as any,
+    )
+  ) {
+    company =
+      user.role === UserRole.company_admin
+        ? user.companyAdmin?.company
+        : user.businessInstructor?.company;
+
+    if (!company)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    if (!company.isActive)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Your company is not active now!',
+      );
+
+    // ❌ Restrict NGO/SME from creating certificate builder
+    if (
+      company.industryType === CompanyType.ngo ||
+      company.industryType === CompanyType.sme
+    ) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'NGO or SME company admins or business instructors cannot create certificate builders!',
+      );
+    }
   }
 
-  // Check if a pending certificate request already exists
+  // 3️⃣ Check if a pending certificate builder already exists
   const existingBuilder = await prisma.certificateBuilder.findFirst({
-    where: {
-      authorId,
-    },
+    where: { authorId },
   });
   if (existingBuilder) return existingBuilder;
 
-  // 🔹 Upload logo (if file provided)
+  // 4️⃣ Upload logo (if file provided)
   if (file) {
     payload.logo = (await uploadToS3({
       file,
@@ -44,16 +89,13 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
     })) as string;
   }
 
-  // Create certificate request
-  const result = await prisma.certificateBuilder.create({
-    data: payload,
-  });
-  if (!result) {
+  // 5️⃣ Create certificate request
+  const result = await prisma.certificateBuilder.create({ data: payload });
+  if (!result)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       'Certificate request creation failed!',
     );
-  }
 
   return result;
 };

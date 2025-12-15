@@ -3,8 +3,10 @@ import {
   AffiliateLink,
   AffiliateModel,
   BookStatus,
+  CompanyType,
   CoursesStatus,
   Prisma,
+  UserRole,
   UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
@@ -20,20 +22,39 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import config from '../../config';
 
+export const checkAffiliateRestriction = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId, status: UserStatus.active, isDeleted: false },
+    include: {
+      companyAdmin: { select: { company: { select: { industryType: true } } } },
+      businessInstructor: { select: { company: { select: { industryType: true } } } },
+    },
+  });
+
+  if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+
+  // Block if NGO, SME, or company admin/business instructor
+  const companyType =
+    user.role === UserRole.company_admin ? user.companyAdmin?.company?.industryType
+      : user.role === UserRole.business_instructors ? user.businessInstructor?.company?.industryType
+      : null;
+
+  if ([CompanyType.ngo, CompanyType.sme].includes(companyType as "ngo" | "sme")) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Affiliate accounts and links cannot be created by NGO, SME, or company-admin/business instructor!',
+    );
+  }
+
+  return user;
+};
+
+
 const createAffiliateAccount = async (payload: IAffiliateAccount) => {
   const { userId } = payload;
 
-  // Check if user exists
-  const user = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!user) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
-  }
+  // 1️⃣ Check restriction
+  const user = await checkAffiliateRestriction(userId);
 
   // Check if affiliate account already exists
   const existingAffiliate = await prisma.affiliate.findUnique({
@@ -90,145 +111,60 @@ const insertIntoDB = async (payload: IAffiliates) => {
     where: { id: affiliateId },
     include: { user: true },
   });
-  if (!affiliate) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate account not found!');
-  }
+  if (!affiliate) throw new ApiError(httpStatus.NOT_FOUND, 'Affiliate account not found!');
 
-  // 2️⃣ Validate model-specific reference + check duplicate affiliate link
+  // 1a️⃣ Restrict NGO/SME/company users
+  await checkAffiliateRestriction(affiliate.userId);
+
+  // 2️⃣ Validate model-specific reference + duplicate link
   switch (modelType) {
-    case AffiliateModel.book: {
-      if (!bookId) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Book ID is required for BOOK affiliate!',
-        );
-      }
-
-      const book = await prisma.book.findFirst({
-        where: { id: bookId, status: BookStatus.published, isDeleted: false },
-      });
+    case AffiliateModel.book:
+      if (!bookId) throw new ApiError(httpStatus.BAD_REQUEST, 'Book ID is required for BOOK affiliate!');
+      const book = await prisma.book.findFirst({ where: { id: bookId, status: BookStatus.published, isDeleted: false } });
       if (!book) throw new ApiError(httpStatus.BAD_REQUEST, 'Book not found!');
-
-      // ✅ Check if affiliate link already exists for this book
-      const existingBookAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.book, bookId },
-      });
-      if (existingBookAffiliate) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An affiliate link already exists for this book!',
-        );
+      if (await prisma.affiliateLink.findFirst({ where: { affiliateId, modelType: AffiliateModel.book, bookId } })) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'An affiliate link already exists for this book!');
       }
       break;
-    }
 
-    case AffiliateModel.course: {
-      if (!courseId) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Course ID is required for COURSE affiliate!',
-        );
-      }
-
-      const course = await prisma.course.findFirst({
-        where: {
-          id: courseId,
-          status: CoursesStatus.approved,
-          isDeleted: false,
-        },
-      });
-      if (!course) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
-      }
-
-      // ✅ Check if affiliate link already exists for this course
-      const existingCourseAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.course, courseId },
-      });
-      if (existingCourseAffiliate) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An affiliate link already exists for this course!',
-        );
+    case AffiliateModel.course:
+      if (!courseId) throw new ApiError(httpStatus.BAD_REQUEST, 'Course ID is required for COURSE affiliate!');
+      const course = await prisma.course.findFirst({ where: { id: courseId, status: CoursesStatus.approved, isDeleted: false } });
+      if (!course) throw new ApiError(httpStatus.BAD_REQUEST, 'Course not found!');
+      if (await prisma.affiliateLink.findFirst({ where: { affiliateId, modelType: AffiliateModel.course, courseId } })) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'An affiliate link already exists for this course!');
       }
       break;
-    }
 
-    case AffiliateModel.event: {
-      if (!eventId) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Event ID is required for EVENT affiliate!',
-        );
-      }
-
-      const event = await prisma.event.findFirst({
-        where: { id: eventId, isDeleted: false },
-      });
-      if (!event) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Event not found!');
-      }
-
-      // ✅ Check if affiliate link already exists for this event
-      const existingEventAffiliate = await prisma.affiliateLink.findFirst({
-        where: { affiliateId, modelType: AffiliateModel.event, eventId },
-      });
-      if (existingEventAffiliate) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'An affiliate link already exists for this event!',
-        );
+    case AffiliateModel.event:
+      if (!eventId) throw new ApiError(httpStatus.BAD_REQUEST, 'Event ID is required for EVENT affiliate!');
+      const event = await prisma.event.findFirst({ where: { id: eventId, isDeleted: false } });
+      if (!event) throw new ApiError(httpStatus.BAD_REQUEST, 'Event not found!');
+      if (await prisma.affiliateLink.findFirst({ where: { affiliateId, modelType: AffiliateModel.event, eventId } })) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'An affiliate link already exists for this event!');
       }
       break;
-    }
 
     default:
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Invalid affiliate model type!',
-      );
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid affiliate model type!');
   }
 
-  // 3️⃣ Check duplicate affiliate link globally (safety net)
-  const existingLink = await prisma.affiliateLink.findFirst({
-    where: {
-      affiliateId,
-      courseId,
-      bookId,
-      eventId,
-    },
-  });
-  if (existingLink) {
-    return existingLink;
-  }
-
-  // 4️⃣ Generate affiliate link dynamically
+  // 3️⃣ Generate affiliate link
   let affiliateLink = '';
-  if (courseId) {
-    affiliateLink = `${config.client_url}/courses/details/${courseId}?type=course&aff=${affiliateId}`;
-  } else if (bookId) {
-    affiliateLink = `${config.client_url}/shop/details/${bookId}?aff=${affiliateId}`;
-  } else if (eventId) {
-    affiliateLink = `${config.client_url}/events/details/${eventId}?aff=${affiliateId}`;
-  }
+  if (courseId) affiliateLink = `${config.client_url}/courses/details/${courseId}?type=course&aff=${affiliateId}`;
+  else if (bookId) affiliateLink = `${config.client_url}/shop/details/${bookId}?aff=${affiliateId}`;
+  else if (eventId) affiliateLink = `${config.client_url}/events/details/${eventId}?aff=${affiliateId}`;
 
-  // 5️⃣ Create new affiliate link
+  // 4️⃣ Create affiliate link
   const result = await prisma.affiliateLink.create({
-    data: {
-      ...payload,
-      link: affiliateLink,
-    },
+    data: { ...payload, link: affiliateLink },
   });
 
-  if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Affiliate link creation failed!',
-    );
-  }
+  if (!result) throw new ApiError(httpStatus.BAD_REQUEST, 'Affiliate link creation failed!');
 
   return result;
 };
+
 
 const getAllFromDB = async (
   params: IAffiliatesFilterRequest,
