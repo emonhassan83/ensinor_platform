@@ -1,4 +1,4 @@
-import { Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
+import { CompanyType, Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import {
@@ -37,6 +37,12 @@ import {
 import { sendStudentInvitationEmail } from '../../utils/email/sentStudentInvitation';
 import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvitation';
 import { joinInitialAnnouncementChat } from '../../utils/joinInitialAnnouncementChat';
+
+const INSTRUCTOR_LIMIT_BY_INDUSTRY: Record<CompanyType, number> = {
+  ngo: 2,
+  sme: 3,
+  enterprise: 5,
+};
 
 // TODO: here when register a user then created a student table as well
 const registerAUser = async (
@@ -209,10 +215,14 @@ const createBusinessInstructor = async (
   payload: IBusinessInstructor,
 ): Promise<IUserResponse> => {
   const { user, businessInstructor } = payload;
+
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
-  const company = await prisma.user.findFirst({
+  /* --------------------------------------------
+     1️⃣ Fetch Company + Industry Info
+  --------------------------------------------- */
+  const companyAdmin = await prisma.user.findFirst({
     where: {
       id: businessInstructor.authorId,
       role: UserRole.company_admin,
@@ -225,35 +235,61 @@ const createBusinessInstructor = async (
           company: {
             select: {
               id: true,
+              industryType: true,
+              instructor: true,
             },
           },
         },
       },
     },
   });
-  if (!company) {
+
+  if (!companyAdmin?.companyAdmin?.company) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
-      'Company admin not found or deleted!',
+      'Company admin or company not found!',
     );
   }
 
+  const company = companyAdmin.companyAdmin.company;
+
+  /* --------------------------------------------
+     2️⃣ Enforce Industry-based Instructor Limit
+  --------------------------------------------- */
+  const instructorLimit =
+    INSTRUCTOR_LIMIT_BY_INDUSTRY[company.industryType];
+
+  if (company.instructor >= instructorLimit) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      `Instructor limit exceeded. 
+       ${company.industryType.toUpperCase()} companies can invite up to ${instructorLimit} instructors.`,
+    );
+  }
+
+  /* --------------------------------------------
+     3️⃣ Email uniqueness check
+  --------------------------------------------- */
   const isExist = await prisma.user.findFirst({
     where: {
-      email: payload.user.email,
-      status: UserStatus.active,
+      email: user.email,
       isDeleted: false,
     },
   });
+
   if (isExist) {
     throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'This email already exist in this platform!',
+      httpStatus.CONFLICT,
+      'This email already exists on the platform!',
     );
   }
 
-  const result = await prisma.$transaction(async transactionClient => {
-    const userData = await transactionClient.user.create({
+  /* --------------------------------------------
+     4️⃣ Transaction: Create Instructor
+  --------------------------------------------- */
+  const result = await prisma.$transaction(async tx => {
+    // Create user
+    const userData = await tx.user.create({
       data: {
         name: user.name,
         email: user.email,
@@ -261,7 +297,6 @@ const createBusinessInstructor = async (
         role: UserRole.business_instructors,
         registerWith: RegisterWith.credentials,
         status: UserStatus.active,
-        // Create verification record at the same time
         verification: {
           create: {
             otp: '',
@@ -272,25 +307,26 @@ const createBusinessInstructor = async (
       },
     });
 
-    await transactionClient.businessInstructor.create({
+    // Create business instructor
+    await tx.businessInstructor.create({
       data: {
         userId: userData.id,
         authorId: businessInstructor.authorId,
-        companyId: company.companyAdmin!.company!.id,
+        companyId: company.id,
         designation: businessInstructor.designation,
       },
     });
 
-    // here updated company info
-    await prisma.company.update({
-      where: { id: company.companyAdmin!.company!.id },
+    // Update company counters
+    await tx.company.update({
+      where: { id: company.id },
       data: {
         instructor: { increment: 1 },
         size: { increment: 1 },
       },
     });
 
-    // 4️⃣ Send email with credentials
+    // Send invitation email
     await sendBusinessInstructorInvitation(
       userData.email,
       userData.name,
@@ -300,10 +336,14 @@ const createBusinessInstructor = async (
     return userData;
   });
 
-  // 4️⃣ Send notify to invitee
-  if (company && result) {
-    await sendInvitationNotification(company, result.id, 'business-instructor');
-  }
+  /* --------------------------------------------
+     5️⃣ Send Notification
+  --------------------------------------------- */
+  await sendInvitationNotification(
+    companyAdmin,
+    result.id,
+    'business-instructor',
+  );
 
   return result;
 };

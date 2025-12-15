@@ -2,6 +2,7 @@ import {
   ChatRole,
   ChatType,
   Company,
+  CompanyType,
   Course,
   CoursesStatus,
   CourseType,
@@ -32,7 +33,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   let companyAuthor: User | null = null;
   let company: Company | null = null;
 
-  // 🔹 CASE: Platform = Company
+ // 🔹 CASE: Platform = Company
   if (platform === PlatformType.company) {
     const actor = await prisma.user.findFirst({
       where: {
@@ -92,6 +93,20 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Your company not found!');
     if (!company.isActive)
       throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
+
+    /* --------------------------------------------
+       🔴 NGO PAID COURSE BLOCK
+    --------------------------------------------- */
+    if (
+      company.industryType === CompanyType.ngo &&
+      typeof payload.price === 'number' &&
+      payload.price > 0
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'NGO companies are not allowed to create paid courses. Please upload free course.',
+      );
+    }
 
     // 🔹 Check company subscription
     const activeSubscription = actor.subscription[0];

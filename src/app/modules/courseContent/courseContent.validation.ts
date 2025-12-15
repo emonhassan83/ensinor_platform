@@ -15,13 +15,8 @@ const lessonSchema = z.object({
     required_error: 'Lesson description is required!',
   }).optional(),
 type: z.enum(['video', 'article', 'presentation', 'document', 'audio']),
-  media: z.string({ required_error: 'Course lesson media is required!' }),
-  duration: z
-    .number({
-      required_error: 'Course content duration is required!',
-    })
-    .optional(),
-});
+  media: z.string({ required_error: 'Course lesson media is required!' })
+}).partial();
 
 // Wrap for request validation
 const createLessonValidationSchema = z.object({
@@ -30,7 +25,7 @@ const createLessonValidationSchema = z.object({
 
 // Update Lesson Schema
 const updateLessonValidationSchema = z.object({
-  body: lessonSchema.partial(),
+  body: lessonSchema
 });
 
 /* -------------------------

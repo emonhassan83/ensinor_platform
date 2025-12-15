@@ -1,5 +1,6 @@
 import {
   CoInstructor,
+  CompanyType,
   CoursesStatus,
   Prisma,
   SubscriptionStatus,
@@ -32,6 +33,7 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     },
     include: {
       subscription: true,
+      businessInstructor: { include: { company: true } },
     },
   });
   if (!inviter) {
@@ -41,24 +43,23 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     );
   }
 
-    // 🧭 1.1 Validate instructor’s active subscription
+  // 🧭 1.1 Validate instructor’s active subscription
   if (inviter.role === UserRole.instructor) {
     const activeSubscription = inviter.subscription.find(
-      (sub) =>
+      sub =>
         sub.status === SubscriptionStatus.active &&
         sub.isExpired === false &&
         sub.isDeleted === false &&
-        new Date(sub.expiredAt) > new Date()
+        new Date(sub.expiredAt) > new Date(),
     );
 
     if (!activeSubscription) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'You need an active subscription to invite a co-instructor.'
+        'You need an active subscription to invite a co-instructor.',
       );
     }
   }
-
 
   // 2️⃣ Validate course
   const course = await prisma.course.findFirst({
@@ -109,14 +110,26 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     );
   }
 
-  // 5️⃣ Max 5 co-instructors per course
+  // 5️⃣ Determine max allowed co-instructors based on company type
+  let maxCoInstructors = 5; // default for enterprise
+  if (
+    inviter.role === UserRole.business_instructors &&
+    inviter.businessInstructor?.company
+  ) {
+    const companyType = inviter.businessInstructor.company.industryType;
+    if (companyType === CompanyType.ngo) maxCoInstructors = 2;
+    else if (companyType === CompanyType.sme) maxCoInstructors = 3;
+    else maxCoInstructors = 5; // enterprise
+  }
+
+  // 6️⃣ Count current co-instructors for this course
   const coInstructorCount = await prisma.coInstructor.count({
     where: { courseId, isDeleted: false },
   });
-  if (coInstructorCount >= 5) {
+  if (coInstructorCount >= maxCoInstructors) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Maximum 5 co-instructors allowed per course',
+      `Maximum ${maxCoInstructors} co-instructors allowed for this course based on your company type`,
     );
   }
 
@@ -335,7 +348,11 @@ const revokeAccess = async (id: string): Promise<CoInstructor> => {
   }
 
   // sent notification to invitee
-  await sendCoInstructorNotification(inviter, coInstructor.coInstructorId, 'revoke');
+  await sendCoInstructorNotification(
+    inviter,
+    coInstructor.coInstructorId,
+    'revoke',
+  );
 
   return result;
 };

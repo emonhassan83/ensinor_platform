@@ -1,4 +1,5 @@
 import {
+  CompanyType,
   CourseBundle,
   CoursesStatus,
   EnrolledLogsModelType,
@@ -21,33 +22,25 @@ import httpStatus from 'http-status';
 
 // ---------------- Insert ----------------
 const insertIntoDB = async (payload: ICourseBundle, file: any) => {
-    const { authorId, courseIds, discount = 0, ...bundleData } = payload;
+  const { authorId, courseIds, discount = 0, ...bundleData } = payload;
+  
   if (!courseIds || !Array.isArray(courseIds) || courseIds.length === 0) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Course IDs are required!');
   }
 
   const author = await prisma.user.findFirst({
-    where: {
-      id: authorId,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-    include: {
-      subscription: true,
-    },
+    where: { id: authorId, status: UserStatus.active, isDeleted: false },
+    include: { subscription: true, businessInstructor: { include: { company: true } } },
   });
-  if (!author) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found or inactive!');
-  }
+  if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found or inactive!');
 
   // If author is an instructor → check subscription
   if (author.role === UserRole.instructor) {
     const activeSubscription = author.subscription.find(
-      sub =>
-        sub.status === SubscriptionStatus.active &&
-        sub.isExpired === false &&
-        sub.isDeleted === false &&
-        new Date(sub.expiredAt) > new Date(),
+      sub => sub.status === SubscriptionStatus.active &&
+             sub.isExpired === false &&
+             sub.isDeleted === false &&
+             new Date(sub.expiredAt) > new Date()
     );
     if (!activeSubscription) {
       throw new ApiError(
@@ -57,70 +50,57 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     }
   }
 
-  // Validate Courses belong to this author
+  // Validate Courses exist and belong to the platform
   const courses = await prisma.course.findMany({
     where: {
       id: { in: courseIds },
-      // instructorId: authorId,
       status: CoursesStatus.approved,
       isPublished: true,
       isDeleted: false,
     },
-    select: {
-      id: true,
-      companyId: true,
-      platform: true,
-      price: true,
-      lectures: true,
-      duration: true,
-    },
+    select: { id: true, companyId: true, platform: true, price: true, lectures: true, duration: true },
   });
   if (courses.length !== courseIds.length) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'One or more courses do not belong to this author!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'One or more courses do not exist or are inactive!');
   }
-  console.log({courses});
-  
-  // Assign companyId if any course has it
-  const companyIds = courses
-    .map(c => c.companyId)
-    .filter((id): id is string => !!id);
 
+  // --- Check company restrictions ---
+  const companyIds = courses.map(c => c.companyId).filter((id): id is string => !!id);
   if (companyIds.length > 0) {
-    // Ensure all courses are from the same company
     const uniqueCompanyIds = [...new Set(companyIds)];
     if (uniqueCompanyIds.length > 1) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'All courses in a bundle must belong to the same company!');
+    }
+
+    const company = await prisma.company.findUnique({ where: { id: uniqueCompanyIds[0] } });
+    if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+
+    // ❌ Prevent NGO from creating bundle
+    if (company.industryType === CompanyType.ngo) {
       throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'All courses in a bundle must belong to the same company!',
+        httpStatus.FORBIDDEN,
+        'NGO company admins or business instructors cannot create bundle courses!',
       );
     }
 
-    bundleData.companyId = uniqueCompanyIds[0];
+    bundleData.companyId = company.id;
   }
 
   // Assign platform
   const platforms = [...new Set(courses.map(c => c.platform))];
   if (platforms.length > 1) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'All courses in a bundle must have the same platform!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'All courses in a bundle must have the same platform!');
   }
-  bundleData.platform = platforms[0]; // take the only platform
+  bundleData.platform = platforms[0];
 
-  // --- Calculate total price ---
+  // Calculate price, lectures, duration
   const totalCoursePrice = courses.reduce((sum, c) => sum + (c.price || 0), 0);
   const discountAmount = (totalCoursePrice * discount) / 100;
   const finalPrice = Math.max(totalCoursePrice - discountAmount, 0);
-
-  // --- Calculate total lectures & duration ---
   const totalLectures = courses.reduce((sum, c) => sum + (c.lectures || 0), 0);
   const totalDuration = courses.reduce((sum, c) => sum + (c.duration || 0), 0);
 
-  // upload to image
+  // Upload thumbnail
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -128,11 +108,7 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
     })) as string;
   }
 
-  // 🔹 Set free flag if price = 0
-  if (typeof payload.price === 'number' && payload.price === 0) {
-    payload.isFreeCourse = true;
-  }
-
+  // Create bundle
   const result = await prisma.courseBundle.create({
     data: {
       ...bundleData,
@@ -142,22 +118,17 @@ const insertIntoDB = async (payload: ICourseBundle, file: any) => {
       authorId,
       lectures: totalLectures,
       duration: totalDuration,
-      courseBundleCourses: {
-        create: courseIds.map(courseId => ({
-          course: { connect: { id: courseId } },
-        })),
-      },
+      courseBundleCourses: { create: courseIds.map(courseId => ({ course: { connect: { id: courseId } } })) },
     },
   });
 
   if (!result) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Course bundle creation failed!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Course bundle creation failed!');
   }
+
   return result;
 };
+
 
 const getAllFromDB = async (
   params: ICourseBundleFilterRequest,
