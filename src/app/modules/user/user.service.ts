@@ -43,6 +43,10 @@ const registerAUser = async (
   payload: IRegisterUser,
 ): Promise<IUserResponse> => {
   const { password, confirmPassword, user } = payload;
+
+  /* --------------------------------------------
+     1️⃣ Password validation
+  --------------------------------------------- */
   if (password !== confirmPassword) {
     throw new ApiError(
       httpStatus.CONFLICT,
@@ -50,33 +54,41 @@ const registerAUser = async (
     );
   }
 
+  /* --------------------------------------------
+     2️⃣ Existing user check
+  --------------------------------------------- */
   const existingUser = await prisma.user.findUnique({
     where: { email: user.email },
     include: { verification: true },
   });
+
   if (existingUser) {
+    const hashed = await hashedPassword(password);
+
+    // Re-activate deleted user
     if (existingUser.isDeleted) {
       return prisma.user.update({
         where: { email: user.email },
         data: {
           ...user,
-          password: await hashedPassword(password),
+          password: hashed,
           photoUrl: payload.photoUrl,
           isDeleted: false,
-          expireAt: new Date(Date.now() + 30 * 60 * 1000), // reset 30 min timer
+          expireAt: new Date(Date.now() + 30 * 60 * 1000),
           needsPasswordChange: false,
         },
       });
     }
 
+    // Re-send verification if not verified
     if (existingUser.verification && !existingUser.verification.status) {
       return prisma.user.update({
         where: { email: user.email },
         data: {
           ...user,
-          password: await hashedPassword(password),
+          password: hashed,
           photoUrl: payload.photoUrl,
-          expireAt: new Date(Date.now() + 30 * 60 * 1000), // reset 30 min timer
+          expireAt: new Date(Date.now() + 30 * 60 * 1000),
           needsPasswordChange: false,
         },
       });
@@ -88,35 +100,42 @@ const registerAUser = async (
     );
   }
 
-  const hashPassword = await hashedPassword(password);
+  /* --------------------------------------------
+     3️⃣ Create User (Transaction Safe)
+  --------------------------------------------- */
+  const hashedPasswordValue = await hashedPassword(password);
 
-  // transaction ensures both user + verification created
   const newUser = await prisma.$transaction(async tx => {
+    // ✅ Create user
     const userRecord = await tx.user.create({
       data: {
         name: user.name,
         email: user.email,
-        password: hashPassword,
+        password: hashedPasswordValue,
         photoUrl: payload.photoUrl,
         role: UserRole.student,
         registerWith: RegisterWith.credentials,
-        expireAt: new Date(Date.now() + 30 * 60 * 1000), // auto-delete marker
+        expireAt: new Date(Date.now() + 30 * 60 * 1000),
         needsPasswordChange: false,
         status: UserStatus.active,
         verification: {
           create: {
             otp: '',
-            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // OTP expiry 5 min
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
             status: false,
           },
         },
       },
     });
 
-    // Auto-join student announcements chat
-    await joinInitialAnnouncementChat(newUser.id, UserRole.student, tx);
+    // ✅ Auto-join announcement chat
+    await joinInitialAnnouncementChat(
+      userRecord.id,
+      UserRole.student,
+      tx,
+    );
 
-    // Create corresponding Student record automatically
+    // ✅ Create Student profile
     await tx.student.create({
       data: {
         userId: userRecord.id,
