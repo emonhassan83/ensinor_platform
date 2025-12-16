@@ -26,14 +26,56 @@ import { findAdmin } from '../../utils/findAdmin';
 import { sendNotifYToAdmin, sendNotifYToUser } from './course.utils';
 
 const insertIntoDB = async (payload: ICourse, file: any) => {
-  const { platform, authorId: inputAuthorId } = payload;
+  const { platform, authorId: inputAuthorId, price } = payload;
 
   let resolvedAuthorId: string = inputAuthorId;
   let resolvedCompanyId: string | undefined;
   let companyAuthor: User | null = null;
   let company: Company | null = null;
 
- // 🔹 CASE: Platform = Company
+  // CASE: PLATFORM = ADMIN (Instructor / User)
+  if (platform === PlatformType.admin) {
+    const author = await prisma.user.findFirst({
+      where: {
+        id: inputAuthorId,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+      include: {
+        subscription: {
+          where: {
+            status: SubscriptionStatus.active,
+            isExpired: false,
+            expiredAt: {
+              gt: new Date(),
+            },
+            isDeleted: false,
+          },
+        },
+      },
+    });
+
+    if (!author) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+    }
+
+    // 🔴 BLOCK PAID COURSE IF NO ACTIVE SUBSCRIPTION
+    if (
+      author.role === UserRole.instructor &&
+      typeof price === 'number' &&
+      price > 0 &&
+      author.subscription.length === 0
+    ) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'You must have an active subscription to create a paid course. Please create a free course or upgrade your plan.',
+      );
+    }
+
+    resolvedAuthorId = author.id;
+  }
+
+  // 🔹 CASE: Platform = Company
   if (platform === PlatformType.company) {
     const actor = await prisma.user.findFirst({
       where: {
@@ -814,10 +856,10 @@ const getByIdFromDB = async (
           questionsList: {
             include: {
               options: true,
-            }
-          }
-        }
-      }
+            },
+          },
+        },
+      },
     },
   });
 
@@ -1004,7 +1046,12 @@ const assignACourseIntoDB = async (
   }
 
   const existingCourse = await prisma.course.findFirst({
-    where: { id, isPublished: true, status: CoursesStatus.approved, isDeleted: false },
+    where: {
+      id,
+      isPublished: true,
+      status: CoursesStatus.approved,
+      isDeleted: false,
+    },
   });
   if (!existingCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found.');

@@ -1,4 +1,4 @@
-import { Certificate, Prisma, UserStatus } from '@prisma/client';
+import { Certificate, CompanyType, Prisma, SubscriptionStatus, SubscriptionType, UserRole, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -14,131 +14,179 @@ import { generateEnrollmentId } from '../../utils/generateEnrollmentId';
 const insertIntoDB = async (payload: ICertificate) => {
   const { userId, enrolledCourseId } = payload;
 
-  // 1️⃣ Validate Student
+  /* =====================================================
+     1️⃣ Validate Student
+  ===================================================== */
   const user = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      isDeleted: false,
-      status: UserStatus.active,
-    },
+    where: { id: userId, isDeleted: false, status: UserStatus.active },
   });
   if (!user) throw new ApiError(httpStatus.BAD_REQUEST, 'Student not found!');
 
-  // 2️⃣ Validate Enrollment + Fetch Full Course
+  /* =====================================================
+     2️⃣ Validate Enrollment + Course
+  ===================================================== */
   const enrollment = await prisma.enrolledCourse.findFirst({
     where: { id: enrolledCourseId, userId, isDeleted: false },
     include: {
-      author: true, // Course Author (User table)
-      course: { include: { author: true, companies: true } },
+      course: {
+        include: {
+          companies: true,
+          author: {
+            include: {
+              subscription: true,
+              instructor: true,
+              businessInstructor: { include: { company: true } },
+              companyAdmin: { include: { company: true } },
+              superAdmin: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (!enrollment)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'User is not enrolled in this course!',
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, 'User not enrolled in course!');
 
   if (!enrollment.isComplete)
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Cannot create certificate. Course is not completed!',
+      'Cannot create certificate. Course not completed!',
     );
 
-  // 3️⃣ Prevent Duplicate
-  const existingCertificate = await prisma.certificate.findFirst({
+  /* =====================================================
+     3️⃣ Prevent Duplicate
+  ===================================================== */
+  const exists = await prisma.certificate.findFirst({
     where: { userId, enrolledCourseId },
   });
-  if (existingCertificate) return existingCertificate;
+  if (exists) return exists;
 
-  // Extract useful data
   const course = enrollment.course;
-  const courseAuthorId = course.authorId;
+  const author = course.author;
 
-  // 4️⃣ Auto-assign: authorId, courseId, platform
-  payload.authorId = courseAuthorId;
+  /* =====================================================
+     4️⃣ Auto Assign Fields
+  ===================================================== */
+  payload.authorId = author.id;
   payload.courseId = course.id;
   payload.platform = enrollment.platform;
-
-  // 5️⃣ Auto-assign studyHour from learningTime (minutes → hours)
   payload.studyHour = Number((enrollment.learningTime / 60).toFixed(2));
-
-  // 6️⃣ Auto-assign topics
+  payload.completeDate = new Date().toISOString();
+  payload.student = user.name;
   payload.topics = course.topics || [];
 
-  // 7️⃣ Auto-assign completeDate
-  payload.completeDate = new Date().toISOString();
-
-  // 8️⃣ Auto-generate unique reference ID
-  let prefix = 'EN'; // default
-
-  // If platform === company AND company exists
+  let prefix = 'EN';
   if (course.platform === 'company' && course.companies?.name) {
     prefix = course.companies.name.substring(0, 2).toUpperCase();
   }
-
-  // Use new dynamic generator
   payload.reference = generateEnrollmentId(prefix);
 
-  // 9️⃣ Find CertificateBuilder for this Author (Course Author)
-  const builder = await prisma.certificateBuilder.findFirst({
-    where: { authorId: courseAuthorId },
-  });
+  /* =====================================================
+     🔐 CERTIFICATE BUILDER ACCESS CONTROL
+  ===================================================== */
+  let allowBuilder = true;
 
-  // 6️⃣ Handle topics based on isVisibleTopics
-  if (builder && builder.isVisibleTopics === false) {
-    payload.topics = []; // forcefully remove topics
-  } else {
-    payload.topics = course.topics || [];
+  // 🔹 Case 1: Normal Instructor
+  if (author.role === UserRole.instructor) {
+    const activeSub = author.subscription.find(
+      s =>
+        s.status === SubscriptionStatus.active &&
+        !s.isExpired &&
+        !s.isDeleted &&
+        new Date(s.expiredAt) > new Date(),
+    );
+
+    if (!activeSub || activeSub.type !== SubscriptionType.premium) {
+      allowBuilder = false;
+    }
+  }
+
+  // 🔹 Case 2: Business Instructor
+  if (author.role === UserRole.business_instructors) {
+    const company = author.businessInstructor?.company;
+
+    if (!company || company.industryType !== CompanyType.enterprise) {
+      allowBuilder = false;
+    }
+
+    const companySub = author.subscription.find(
+      s =>
+        s.status === SubscriptionStatus.active &&
+        !s.isExpired &&
+        !s.isDeleted &&
+        new Date(s.expiredAt) > new Date(),
+    );
+
+    if (!companySub) {
+      allowBuilder = false;
+    }
+  }
+
+  // 🔹 Case 3: Company Admin
+  if (author.role === UserRole.company_admin) {
+    const company = author.companyAdmin?.company;
+
+    if (!company || company.industryType !== CompanyType.enterprise) {
+      allowBuilder = false;
+    }
+
+    const companySub = author.subscription.find(
+      s =>
+        s.status === SubscriptionStatus.active &&
+        !s.isExpired &&
+        !s.isDeleted &&
+        new Date(s.expiredAt) > new Date(),
+    );
+
+    if (!companySub) {
+      allowBuilder = false;
+    }
+  }
+
+  /* =====================================================
+     6️⃣ Load Certificate Builder (If Allowed)
+  ===================================================== */
+  let builder = null;
+
+  if (allowBuilder) {
+    builder = await prisma.certificateBuilder.findFirst({
+      where: { authorId: author.id, isDeleted: false },
+    });
   }
 
   if (builder) {
     payload.company = builder.company ?? '';
     payload.logo = builder.logo ?? '';
+
+    if (builder.isVisibleTopics === false) {
+      payload.topics = [];
+    }
   } else {
     payload.company = '';
     payload.logo = '';
+    payload.topics = course.topics || [];
   }
 
-  // 🔟 Resolve Instructor & Designation
-  let instructorName = null;
-  let insDesignation = null;
+  /* =====================================================
+     👨‍🏫 Instructor Name & Designation
+  ===================================================== */
+  payload.instructor = author.name;
 
-  // Check multiple role tables that belong to instructor (User)
-  const instructorUser = await prisma.user.findFirst({
-    where: { id: courseAuthorId },
-    include: {
-      superAdmin: true,
-      companyAdmin: true,
-      businessInstructor: true,
-      instructor: true,
-    },
-  });
+  let insDesignation: string | null = null;
 
-  if (instructorUser) {
-    instructorName = instructorUser.name;
-
-    if (instructorUser.superAdmin) {
-      insDesignation = null;
-    } else if (instructorUser.companyAdmin) {
-      insDesignation = null;
-    } else if (instructorUser.businessInstructor) {
-      insDesignation = instructorUser.businessInstructor.designation || null;
-    } else if (instructorUser.instructor) {
-      insDesignation = instructorUser.instructor.designation || null;
-    }
+  if (author.businessInstructor) {
+    insDesignation = author.businessInstructor.designation;
+  } else if (author.instructor) {
+    insDesignation = author.instructor.designation;
   }
 
-  payload.instructor = instructorName ?? '';
   (payload as any).insDesignation = insDesignation ?? '';
 
-  // 1️⃣1️⃣ Auto-assign student (Name from User)
-  payload.student = user.name;
-
-  // 1️⃣2️⃣ Create Certificate
-  const result = await prisma.certificate.create({
-    data: payload,
-  });
+  /* =====================================================
+     8️⃣ Create Certificate
+  ===================================================== */
+  const result = await prisma.certificate.create({ data: payload });
 
   if (!result)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate creation failed!');

@@ -2,6 +2,8 @@ import {
   Event,
   PlatformType,
   Prisma,
+  SubscriptionStatus,
+  SubscriptionType,
   UserRole,
   UserStatus
 } from '@prisma/client';
@@ -33,7 +35,7 @@ const parseEventDate = (dateStr: string): Date | null => {
 const insertIntoDB = async (payload: IEvent, file: any) => {
   const { authorId, platform } = payload;
 
-  //🔹 1. Validate author user
+  // 1️⃣ Validate author user
   const author = await prisma.user.findFirst({
     where: {
       id: authorId,
@@ -41,61 +43,69 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
       isDeleted: false,
     },
     include: {
-      companyAdmin: { select: { company: { select: { id: true } } } },
-      businessInstructor: { select: { company: { select: { id: true } } } },
+      instructor: true,
+      subscription: true,
+      companyAdmin: { select: { company: { select: { id: true, isActive: true } } } },
+      businessInstructor: { select: { company: { select: { id: true, isActive: true } } } },
     },
   });
-  if (!author) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+  if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
+
+  /* =====================================================
+     🔐 INSTRUCTOR SUBSCRIPTION CHECK
+  ===================================================== */
+  const isInstructor = author.role === UserRole.instructor || Boolean(author.instructor);
+
+  if (isInstructor) {
+    const activeSubscription = author.subscription.find(
+      sub =>
+        sub.status === SubscriptionStatus.active &&
+        !sub.isDeleted &&
+        !sub.isExpired &&
+        new Date(sub.expiredAt) > new Date(),
+    );
+
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'You must have an active subscription to create an event.',
+      );
+    }
+
+    if (activeSubscription.type === SubscriptionType.standard) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Event creation is not allowed for standard subscriptions.',
+      );
+    }
   }
 
+  // 2️⃣ Platform = company → validate company & company admin
   let company: any = null;
   let companyAuthor: any = null;
 
-  // 🔹 2. If platform = company → validate company & company admin
   if (platform === PlatformType.company) {
-    if (
-      author.role !== UserRole.company_admin &&
-      author.role !== UserRole.business_instructors
-    ) {
+    if (![UserRole.company_admin, UserRole.business_instructors].includes(author.role as any)) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Only company admin or business instructor can add shop data in company platform!',
       );
     }
 
-    if (author.role === UserRole.company_admin) {
-      payload.companyId = author.companyAdmin?.company!.id;
-    }
-    if (author.role === UserRole.business_instructors) {
-      payload.companyId = author.businessInstructor?.company!.id;
-    }
+    payload.companyId =
+      author.role === UserRole.company_admin
+        ? author.companyAdmin?.company!.id
+        : author.businessInstructor?.company!.id;
 
-    // Validate company
     company = await prisma.company.findFirst({
       where: { id: payload.companyId, isDeleted: false },
       include: {
-        author: {
-          select: {
-            user: {
-              select: {
-                id: true,
-              },
-            },
-          },
-        },
+        author: { select: { user: { select: { id: true } } } },
       },
     });
 
-    if (!company) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-    }
-    if (company.isActive === false) {
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        'Your company is not active now!',
-      );
-    }
+    if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active now!');
 
     companyAuthor = await prisma.user.findFirst({
       where: {
@@ -105,12 +115,10 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
         isDeleted: false,
       },
     });
-    if (!companyAuthor) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
-    }
+    if (!companyAuthor) throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
   }
 
-  //3. upload to image
+  // 3️⃣ Upload image
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -118,13 +126,12 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
     })) as string;
   }
 
-  // 4. create record
+  // 4️⃣ Create record
   const result = await prisma.event.create({
     data: payload,
   });
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
-  }
+
+  if (!result) throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
 
   return result;
 };

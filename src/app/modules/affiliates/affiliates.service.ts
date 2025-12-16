@@ -6,6 +6,8 @@ import {
   CompanyType,
   CoursesStatus,
   Prisma,
+  SubscriptionStatus,
+  SubscriptionType,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -26,6 +28,8 @@ export const checkAffiliateRestriction = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId, status: UserStatus.active, isDeleted: false },
     include: {
+      instructor: true,
+      subscription: true,
       companyAdmin: { select: { company: { select: { industryType: true } } } },
       businessInstructor: { select: { company: { select: { industryType: true } } } },
     },
@@ -46,9 +50,39 @@ export const checkAffiliateRestriction = async (userId: string) => {
     );
   }
 
+  /* =====================================================
+     🔐 INSTRUCTOR SUBSCRIPTION CHECK (NEW)
+  ===================================================== */
+
+  const isInstructor =
+    user.role === UserRole.instructor || Boolean(user.instructor);
+
+  if (isInstructor) {
+    const activeSubscription = user.subscription.find(
+      sub =>
+        sub.status === SubscriptionStatus.active &&
+        !sub.isDeleted &&
+        !sub.isExpired &&
+        new Date(sub.expiredAt) > new Date(),
+    );
+
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'You must have an active premium subscription to use affiliate features.',
+      );
+    }
+
+    if (activeSubscription.type === SubscriptionType.standard) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Affiliate features are not available for standard subscriptions.',
+      );
+    }
+  }
+
   return user;
 };
-
 
 const createAffiliateAccount = async (payload: IAffiliateAccount) => {
   const { userId } = payload;

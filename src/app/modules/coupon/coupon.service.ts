@@ -14,39 +14,10 @@ import { couponSearchAbleFields } from './coupon.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
-
-// utils/companyCheck.ts
-export const checkCompanyRestriction = async (author: any, feature: string) => {
-  // Only for company_admin or business_instructors
-  if (
-    ![UserRole.company_admin, UserRole.business_instructors].includes(
-      author.role,
-    )
-  )
-    return;
-
-  const company =
-    author.role === UserRole.company_admin
-      ? author.companyAdmin?.company
-      : author.businessInstructor?.company;
-
-  if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-  if (!company.isActive)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Your company is not active now!',
-    );
-
-  // Block NGO (or add more types here if needed)
-  if (company.industryType === CompanyType.ngo) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      `NGO company admins or business instructors cannot create ${feature}!`,
-    );
-  }
-
-  return company;
-};
+import {
+  checkActiveSubscriptionForInstructor,
+  checkCompanyRestriction,
+} from '../../utils/checkActiveSubscription';
 
 const insertIntoDB = async (payload: ICoupon) => {
   const {
@@ -81,6 +52,9 @@ const insertIntoDB = async (payload: ICoupon) => {
 
   // 1a️⃣ Check company restriction
   await checkCompanyRestriction(author, 'coupons');
+
+  // subscription check ONLY for instructors
+  await checkActiveSubscriptionForInstructor(author, 'coupon');
 
   // set global coupon if author super admin
   payload.isGlobal = author.role === UserRole.super_admin;

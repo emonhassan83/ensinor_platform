@@ -3,7 +3,9 @@ import {
   CompanyType,
   CoursesStatus,
   Prisma,
+  Subscription,
   SubscriptionStatus,
+  SubscriptionType,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -23,19 +25,20 @@ import { sendCoInstructorNotification } from './coInstructors.utils';
 const inviteCoInstructor = async (payload: ICoInstructors) => {
   const { invitedById, coInstructorId, courseId } = payload;
 
-  // 1️⃣ Validate inviter (must be active instructor/business instructor)
+  // 1️⃣ Validate inviter
   const inviter = await prisma.user.findFirst({
     where: {
       id: invitedById,
+      role: { in: [UserRole.instructor, UserRole.business_instructors] },
       status: UserStatus.active,
       isDeleted: false,
-      role: { in: [UserRole.instructor, UserRole.business_instructors] },
     },
     include: {
       subscription: true,
       businessInstructor: { include: { company: true } },
     },
   });
+
   if (!inviter) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
@@ -43,25 +46,28 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     );
   }
 
-  // 🧭 1.1 Validate instructor’s active subscription
+  // 2️⃣ Resolve active subscription (ONLY for instructors)
+  let activeSubscription: Subscription | null = null;
+
   if (inviter.role === UserRole.instructor) {
-    const activeSubscription = inviter.subscription.find(
-      sub =>
-        sub.status === SubscriptionStatus.active &&
-        sub.isExpired === false &&
-        sub.isDeleted === false &&
-        new Date(sub.expiredAt) > new Date(),
-    );
+    activeSubscription =
+      inviter.subscription.find(
+        sub =>
+          sub.status === SubscriptionStatus.active &&
+          !sub.isExpired &&
+          !sub.isDeleted &&
+          new Date(sub.expiredAt) > new Date(),
+      ) || null;
 
     if (!activeSubscription) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        'You need an active subscription to invite a co-instructor.',
+        'You must have an active subscription to invite co-instructors.',
       );
     }
   }
 
-  // 2️⃣ Validate course
+  // 3️⃣ Validate course
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
@@ -70,13 +76,12 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     },
     include: { coInstructor: true },
   });
+
   if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found or inactive');
   }
 
-  // 3️⃣ Validate inviter authority:
-  //    - Either course main instructor
-  //    - Or already an existing co-instructor of the course
+  // 4️⃣ Validate inviter authority
   const isMainInstructor = course.authorId === invitedById;
   const isExistingCoInstructor = course.coInstructor.some(
     ci => ci.coInstructorId === invitedById && !ci.isDeleted,
@@ -89,20 +94,7 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     );
   }
 
-  // 4️⃣ Validate co-instructor user
-  const coInstructorUser = await prisma.user.findFirst({
-    where: {
-      id: coInstructorId,
-      role: { in: [UserRole.instructor, UserRole.business_instructors] },
-      // status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (!coInstructorUser) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Co-Instructor user not found');
-  }
-
-  //4.1: Validate vo instructor user
+  // 5️⃣ Validate co-instructor user
   if (invitedById === coInstructorId) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
@@ -110,49 +102,79 @@ const inviteCoInstructor = async (payload: ICoInstructors) => {
     );
   }
 
-  // 5️⃣ Determine max allowed co-instructors based on company type
-  let maxCoInstructors = 5; // default for enterprise
+  const coInstructorUser = await prisma.user.findFirst({
+    where: {
+      id: coInstructorId,
+      role: { in: [UserRole.instructor, UserRole.business_instructors] },
+      isDeleted: false,
+    },
+  });
+
+  if (!coInstructorUser) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Co-instructor user not found');
+  }
+
+  // 6️⃣ Determine max allowed co-instructors
+  let maxCoInstructors = 0;
+
+  // 🔹 Instructor logic (subscription-based)
+  if (inviter.role === UserRole.instructor && activeSubscription) {
+    if (activeSubscription.type === SubscriptionType.standard) {
+      maxCoInstructors = 1;
+    } else if (activeSubscription.type === SubscriptionType.premium) {
+      maxCoInstructors = 5;
+    }
+  }
+
+  // 🔹 Business instructor logic (company-based)
   if (
     inviter.role === UserRole.business_instructors &&
     inviter.businessInstructor?.company
   ) {
     const companyType = inviter.businessInstructor.company.industryType;
+
     if (companyType === CompanyType.ngo) maxCoInstructors = 2;
     else if (companyType === CompanyType.sme) maxCoInstructors = 3;
     else maxCoInstructors = 5; // enterprise
   }
 
-  // 6️⃣ Count current co-instructors for this course
+  // 7️⃣ Count existing co-instructors
   const coInstructorCount = await prisma.coInstructor.count({
     where: { courseId, isDeleted: false },
   });
+
   if (coInstructorCount >= maxCoInstructors) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Maximum ${maxCoInstructors} co-instructors allowed for this course based on your company type`,
+      `You can invite a maximum of ${maxCoInstructors} co-instructor(s) for this course.`,
     );
   }
 
-  // 6️⃣ Prevent duplicate invitation
+  // 8️⃣ Prevent duplicate
   const existingCoInstructor = await prisma.coInstructor.findFirst({
     where: { courseId, coInstructorId, isDeleted: false },
   });
+
   if (existingCoInstructor) {
     throw new ApiError(
       httpStatus.CONFLICT,
-      'This co-instructor is already invited to the course',
+      'This co-instructor is already added to the course.',
     );
   }
 
-  // 7️⃣ Create co-instructor entry
+  // 9️⃣ Create co-instructor
   const coInstructor = await prisma.coInstructor.create({
     data: payload,
   });
+
   if (!coInstructor) {
-    throw new ApiError(httpStatus.CONFLICT, 'Co-Instructor creation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Co-instructor creation failed.',
+    );
   }
 
-  // 8️⃣ Send email + notification
+  // 🔔 Notifications
   await sendCoInstructorInvitationEmail(
     coInstructorUser.email,
     coInstructorUser.name,
