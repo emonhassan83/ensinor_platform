@@ -25,7 +25,7 @@ import { sendEmployeeInvitationEmail } from '../../utils/email/sentEmployeeInvit
 const insertIntoDB = async (payload: IInvitation) => {
   const { userId, departmentId, name, email } = payload;
 
-  // 1. Check if inviter (company admin) exists
+  // 1️⃣ Check if inviter (company admin) exists
   const inviter = await prisma.user.findFirst({
     where: { id: userId, status: UserStatus.active, isDeleted: false },
     select: {
@@ -61,7 +61,7 @@ const insertIntoDB = async (payload: IInvitation) => {
   if (!inviter.companyAdmin.company.isActive)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company is inactive!');
 
-  // 2️. Determine subscription type & enforce invite limit
+  // 2️⃣ Determine subscription type & enforce invite limit
   const activeSubscription = inviter.subscription[0];
   if (!activeSubscription) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'No active subscription found!');
@@ -70,19 +70,22 @@ const insertIntoDB = async (payload: IInvitation) => {
   const companySize = inviter.companyAdmin.company.size;
   const subscriptionType = activeSubscription.type;
 
-  if (
-    (subscriptionType === SubscriptionType.ngo && companySize >= 50) ||
-    (subscriptionType === SubscriptionType.sme && companySize >= 200)
-  ) {
+  // 🔹 Define subscription limits
+  const subscriptionLimits: Partial<Record<SubscriptionType, number>> = {
+    ngo: 500,
+    sme: 1000,
+    enterprise: 3000,
+  };
+
+  const maxAllowed = subscriptionLimits[subscriptionType] ?? 0;
+  if (companySize >= maxAllowed) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Your subscription (${subscriptionType}) allows a maximum of ${
-        subscriptionType === SubscriptionType.ngo ? 50 : 200
-      } members. Upgrade to invite more.`,
+      `Your subscription (${subscriptionType}) allows a maximum of ${maxAllowed} members. Upgrade to invite more.`,
     );
   }
 
-  // 3. Check department validity
+  // 3️⃣ Check department validity
   const department = await prisma.department.findFirst({
     where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
   });
@@ -90,7 +93,7 @@ const insertIntoDB = async (payload: IInvitation) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
   }
 
-  // 4. Check if email already registered
+  // 4️⃣ Check if email already registered
   const existingUser = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true },
@@ -102,11 +105,11 @@ const insertIntoDB = async (payload: IInvitation) => {
     );
   }
 
-  // 5. Default password for invited employees (can be reset later)
+  // 5️⃣ Default password for invited employees (can be reset later)
   const defaultPassword = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(defaultPassword);
 
-  // 6. Create user + employee in a transaction
+  // 6️⃣ Create user + employee in a transaction
   const result = await prisma.$transaction(async tx => {
     const newUser = await tx.user.create({
       data: {
@@ -142,7 +145,7 @@ const insertIntoDB = async (payload: IInvitation) => {
       },
     });
 
-    // 7. Send congratulation email
+    // 7️⃣ Send congratulation email
     await sendEmployeeInvitationEmail(
       newUser.email,
       newUser.name,
@@ -154,7 +157,7 @@ const insertIntoDB = async (payload: IInvitation) => {
     return { user: newUser, employee: newEmployee };
   });
 
-  // 8. Increment company + department size
+  // 8️⃣ Increment company + department size
   await prisma.department.update({
     where: { id: department.id },
     data: {
@@ -215,18 +218,19 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
   const subscriptionType = activeSubscription.type;
   const newInvites = emails.length;
 
-  if (
-    (subscriptionType === SubscriptionType.ngo &&
-      companySize + newInvites > 50) ||
-    (subscriptionType === SubscriptionType.sme &&
-      companySize + newInvites > 200)
-  ) {
+  const subscriptionLimits: Partial<Record<SubscriptionType, number>> = {
+    standard: 0,
+    ngo: 50,
+    sme: 200,
+    enterprise: 3000,
+  };
+
+  const maxAllowed = subscriptionLimits[subscriptionType] ?? 0;
+  if (companySize + newInvites > maxAllowed) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Your subscription (${subscriptionType}) allows only ${
-        subscriptionType === SubscriptionType.ngo ? 50 : 200
-      } total members. You already have ${companySize}, so you can invite ${
-        (subscriptionType === SubscriptionType.ngo ? 50 : 200) - companySize
+      `Your subscription (${subscriptionType}) allows only ${maxAllowed} total members. You already have ${companySize}, so you can invite ${
+        maxAllowed - companySize
       } more.`,
     );
   }

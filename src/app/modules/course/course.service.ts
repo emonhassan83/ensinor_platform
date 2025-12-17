@@ -9,7 +9,6 @@ import {
   PlatformType,
   Prisma,
   SubscriptionStatus,
-  SubscriptionType,
   User,
   UserRole,
   UserStatus,
@@ -149,31 +148,6 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
         'NGO companies are not allowed to create paid courses. Please upload free course.',
       );
     }
-
-    // 🔹 Check company subscription
-    const activeSubscription = actor.subscription[0];
-    if (!activeSubscription) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'No active subscription found for this company!',
-      );
-    }
-
-    const { type: subscriptionType } = activeSubscription;
-
-    // 🔹 Course upload limits by subscription type
-    const currentCourses = company.courses;
-    if (
-      (subscriptionType === SubscriptionType.ngo && currentCourses >= 5) ||
-      (subscriptionType === SubscriptionType.sme && currentCourses >= 15)
-    ) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Your current subscription (${subscriptionType}) allows only ${
-          subscriptionType === SubscriptionType.ngo ? 5 : 15
-        } total courses. You’ve already uploaded ${currentCourses}. Upgrade to upload more.`,
-      );
-    }
   }
 
   // 🔹 Upload thumbnail (if file provided)
@@ -278,6 +252,9 @@ const getPopularCoursesFromDB = async () => {
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { code: true, discount: true, expireAt: true },
+      },
+      author: {
+        select: { name: true },
       },
     },
   });
@@ -432,6 +409,9 @@ const getCombineCoursesFromDB = async (
           take: 1,
           select: { code: true, discount: true, expireAt: true },
         },
+        author: {
+          select: { name: true },
+        },
       },
     }),
 
@@ -456,6 +436,9 @@ const getCombineCoursesFromDB = async (
         lectures: true,
         duration: true,
         createdAt: true,
+        author: {
+          select: { name: true },
+        },
       },
     }),
   ]);
@@ -474,6 +457,7 @@ const getCombineCoursesFromDB = async (
 
       return {
         id: c.id,
+        author: c.author,
         title: c.title,
         category: c.category,
         description: c.description,

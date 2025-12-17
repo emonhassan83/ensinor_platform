@@ -6,7 +6,6 @@ import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import multer, { memoryStorage } from 'multer';
 import parseData from '../../middlewares/parseData';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -29,7 +28,6 @@ router.post(
 router.post(
   '/business-instructor-invitation',
   auth(UserRole.company_admin),
-  checkCompanyAdminSubscription(),
   validateRequest(UserValidation.createBusinessInstructor),
   UserController.createBusinessInstructor,
 );
@@ -78,7 +76,6 @@ router.put(
     UserRole.instructor,
     UserRole.student,
   ),
-  checkCompanyAdminSubscription(),
   upload.single('image'),
   parseData(),
   UserController.updateMyProfile,

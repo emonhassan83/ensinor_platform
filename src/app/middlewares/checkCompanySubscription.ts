@@ -16,7 +16,7 @@ const checkCompanyAdminSubscription = () => {
     const userRole = req.user?.role;
 
     // 1️⃣ If not company admin, allow
-    if (userRole !== UserRole.company_admin) {
+    if (userRole === UserRole.instructor) {
       return next();
     }
 
@@ -42,6 +42,8 @@ const checkCompanyAdminSubscription = () => {
         !sub.isDeleted &&
         sub.expiredAt > today,
     );
+    console.log({activeSubscription});
+    
 
     if (!activeSubscription) {
       throw new ApiError(

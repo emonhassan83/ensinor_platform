@@ -4,7 +4,6 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { WithdrawRequestValidation } from './withdrawRequest.validation';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -15,7 +14,6 @@ router.post(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(WithdrawRequestValidation.createValidationSchema),
   WithdrawRequestController.insertIntoDB,
 );
@@ -27,7 +25,6 @@ router.get(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
-  // checkCompanyAdminSubscription(),
   WithdrawRequestController.getAuthorPayout,
 );
 
@@ -51,7 +48,6 @@ router.get(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
-  checkCompanyAdminSubscription(),
   WithdrawRequestController.getByIdFromDB,
 );
 
@@ -70,7 +66,6 @@ router.delete(
     UserRole.instructor,
     UserRole.business_instructors,
   ),
-  checkCompanyAdminSubscription(),
   WithdrawRequestController.deleteFromDB,
 );
 

@@ -4,7 +4,6 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { EventScheduleValidation } from './eventSchedule.validation';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -16,7 +15,6 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(EventScheduleValidation.createValidationSchema),
   EventScheduleController.insertIntoDB,
 );
@@ -33,7 +31,6 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(EventScheduleValidation.updateValidationSchema),
   EventScheduleController.updateIntoDB,
 );
@@ -46,7 +43,6 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   EventScheduleController.deleteFromDB,
 );
 

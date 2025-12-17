@@ -2,7 +2,6 @@ import express from 'express';
 import { MetaController } from './meta.controller';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -47,7 +46,6 @@ router.get(
 router.get(
   '/company-admin',
   auth(UserRole.company_admin),
-  checkCompanyAdminSubscription(),
   MetaController.companyAdminMetaData,
 );
 

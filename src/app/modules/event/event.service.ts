@@ -5,7 +5,7 @@ import {
   SubscriptionStatus,
   SubscriptionType,
   UserRole,
-  UserStatus
+  UserStatus,
 } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
@@ -45,8 +45,12 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
     include: {
       instructor: true,
       subscription: true,
-      companyAdmin: { select: { company: { select: { id: true, isActive: true } } } },
-      businessInstructor: { select: { company: { select: { id: true, isActive: true } } } },
+      companyAdmin: {
+        select: { company: { select: { id: true, isActive: true } } },
+      },
+      businessInstructor: {
+        select: { company: { select: { id: true, isActive: true } } },
+      },
     },
   });
   if (!author) throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
@@ -54,7 +58,8 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
   /* =====================================================
      🔐 INSTRUCTOR SUBSCRIPTION CHECK
   ===================================================== */
-  const isInstructor = author.role === UserRole.instructor || Boolean(author.instructor);
+  const isInstructor =
+    author.role === UserRole.instructor || Boolean(author.instructor);
 
   if (isInstructor) {
     const activeSubscription = author.subscription.find(
@@ -85,7 +90,11 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
   let companyAuthor: any = null;
 
   if (platform === PlatformType.company) {
-    if (![UserRole.company_admin, UserRole.business_instructors].includes(author.role as any)) {
+    if (
+      ![UserRole.company_admin, UserRole.business_instructors].includes(
+        author.role as any,
+      )
+    ) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'Only company admin or business instructor can add shop data in company platform!',
@@ -104,8 +113,13 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
       },
     });
 
-    if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-    if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active now!');
+    if (!company)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+    if (!company.isActive)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Your company is not active now!',
+      );
 
     companyAuthor = await prisma.user.findFirst({
       where: {
@@ -115,7 +129,8 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
         isDeleted: false,
       },
     });
-    if (!companyAuthor) throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
+    if (!companyAuthor)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found!');
   }
 
   // 3️⃣ Upload image
@@ -131,7 +146,8 @@ const insertIntoDB = async (payload: IEvent, file: any) => {
     data: payload,
   });
 
-  if (!result) throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
+  if (!result)
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Event creation failed!');
 
   return result;
 };
@@ -157,6 +173,9 @@ const getTrendingEventsFromDB = async () => {
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { code: true, discount: true, expireAt: true },
+      },
+      author: {
+        select: { name: true },
       },
     },
   });
@@ -218,7 +237,8 @@ const getAllFromDB = async (
   const andConditions: Prisma.EventWhereInput[] = [{ isDeleted: false }];
 
   if (filterBy?.authorId) andConditions.push({ authorId: filterBy.authorId });
-  if (filterBy?.companyId) andConditions.push({ companyId: filterBy.companyId });
+  if (filterBy?.companyId)
+    andConditions.push({ companyId: filterBy.companyId });
 
   if (searchTerm) {
     andConditions.push({
@@ -256,6 +276,9 @@ const getAllFromDB = async (
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { code: true, discount: true, expireAt: true },
+      },
+      author: {
+        select: { name: true },
       },
     },
   });

@@ -4,7 +4,6 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { CourseContentValidation } from './courseContent.validation';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 
 const router = express.Router();
 
@@ -16,7 +15,6 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(CourseContentValidation.createSectionValidationSchema),
   CourseContentController.insertIntoDB,
 );
@@ -29,7 +27,6 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(CourseContentValidation.createLessonValidationSchema),
   CourseContentController.addLessonIntoDB,
 );
@@ -44,7 +41,6 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(CourseContentValidation.updateLessonValidationSchema),
   CourseContentController.updateLessonFromDB,
 );
@@ -57,7 +53,6 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   validateRequest(CourseContentValidation.updateSectionValidationSchema),
   CourseContentController.updateIntoDB,
 );
@@ -70,7 +65,6 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   CourseContentController.deleteLessonFromDB,
 );
 
@@ -82,7 +76,6 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   CourseContentController.deleteFromDB,
 );
 

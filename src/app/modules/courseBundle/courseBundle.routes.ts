@@ -6,7 +6,6 @@ import { UserRole } from '@prisma/client';
 import { CourseBundleValidation } from './courseBundle.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
-import checkCompanyAdminSubscription from '../../middlewares/checkCompanySubscription';
 import { optionalAuth } from '../../middlewares/optionalAuth';
 
 const router = express.Router();
@@ -21,7 +20,6 @@ router.post(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   upload.single('image'),
   parseData(),
   validateRequest(CourseBundleValidation.createValidationSchema),
@@ -38,14 +36,12 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   CourseBundleController.getMyCourseFromDB,
 );
 
 router.get(
   '/company/:companyId',
   auth(UserRole.company_admin),
-  checkCompanyAdminSubscription(),
   CourseBundleController.getByCompanyFromDB,
 );
 
@@ -63,7 +59,6 @@ router.put(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   upload.single('image'),
   parseData(),
   validateRequest(CourseBundleValidation.updateValidationSchema),
@@ -78,7 +73,6 @@ router.delete(
     UserRole.business_instructors,
     UserRole.instructor,
   ),
-  checkCompanyAdminSubscription(),
   CourseBundleController.deleteFromDB,
 );
 
