@@ -348,35 +348,55 @@ const updateIntoDB = async (
 };
 
 const revokeAccess = async (id: string): Promise<CoInstructor> => {
-  const coInstructor = await prisma.coInstructor.findUnique({
-    where: { id, isDeleted: false },
+  // 1️⃣ Validate co-instructor
+  const coInstructor = await prisma.coInstructor.findFirst({
+    where: {
+      id,
+      isDeleted: false,
+    },
   });
+
   if (!coInstructor) {
-    throw new ApiError(httpStatus.CONFLICT, 'Co instructor found !');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Co-instructor not found!');
   }
-  const inviter = await prisma.user.findUnique({
-    where: { id: coInstructor.invitedById, isDeleted: false },
+
+  // 2️⃣ Validate inviter (access control)
+  const inviter = await prisma.user.findFirst({
+    where: {
+      id: coInstructor.invitedById,
+      isDeleted: false,
+      status: UserStatus.active,
+    },
   });
+
   if (!inviter) {
-    throw new ApiError(httpStatus.CONFLICT, 'You have no access to revoke!');
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'You do not have permission to update this co-instructor!',
+    );
   }
 
-  const result = await prisma.coInstructor.update({
+  // 3️⃣ Toggle isActive
+  const updated = await prisma.coInstructor.update({
     where: { id },
-    data: { isActive: false },
+    data: {
+      isActive: !coInstructor.isActive,
+    },
   });
-  if (!result) {
-    throw new ApiError(httpStatus.CONFLICT, 'Co instructors not revoked !');
+
+  if (!updated) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Failed to update co-instructor access!',
+    );
   }
 
-  // sent notification to invitee
-  await sendCoInstructorNotification(
-    inviter,
-    coInstructor.coInstructorId,
-    'revoke',
-  );
+  // 4️⃣ Send notification based on action
+  const action = updated.isActive ? 'invitation' : 'revoke';
 
-  return result;
+  await sendCoInstructorNotification(inviter, updated.coInstructorId, action);
+
+  return updated;
 };
 
 const deleteIntoDB = async (id: string): Promise<CoInstructor> => {

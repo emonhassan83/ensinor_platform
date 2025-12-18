@@ -19,14 +19,19 @@ import { isValid, parse, parseISO } from 'date-fns';
 
 const parseEventDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;
+
   const clean = dateStr.trim();
 
-  // Try ISO (e.g. 2025-12-05)
+  // 1️⃣ ISO format (2025-12-05)
   let parsed = parseISO(clean);
   if (isValid(parsed)) return parsed;
 
-  // Try DD/MM/YYYY (e.g. 20/10/2025)
+  // 2️⃣ DD/MM/YYYY (20/10/2025)
   parsed = parse(clean, 'dd/MM/yyyy', new Date());
+  if (isValid(parsed)) return parsed;
+
+  // 3️⃣ MM/DD/YYYY (8/18/2027) ← THIS WAS MISSING
+  parsed = parse(clean, 'MM/dd/yyyy', new Date());
   if (isValid(parsed)) return parsed;
 
   return null;
