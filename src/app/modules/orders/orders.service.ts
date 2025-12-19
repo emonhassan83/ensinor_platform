@@ -17,12 +17,15 @@ import {
 const createOrders = async (payload: IOrder) => {
   const { orderData, items } = payload;
 
-  // 1️. Validate User
+  /* ============================
+     1. Validate Buyer
+  ============================ */
   const user = await prisma.user.findUnique({
     where: { id: orderData.userId },
   });
-  if (!user || user.isDeleted)
+  if (!user || user.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
 
   let totalAmount = 0;
   let totalDiscount = 0;
@@ -35,57 +38,48 @@ const createOrders = async (payload: IOrder) => {
   const coInstructorIdsSet = new Set<string>();
   const orderFiles: string[] = [];
 
-  // 2️. Process Each Item
+  /* ============================
+     2. Process Order Items
+  ============================ */
   for (const item of items) {
     const entity = await fetchEntity(item.modelType, item.referenceId);
-    if (!entity)
-      throw new ApiError(httpStatus.NOT_FOUND, `${item.modelType} not found`);
 
-    // 3. Track author & company
     authorSet.add(entity.authorId);
     if (entity.companyId) companySet.add(entity.companyId);
 
-    // Base price
     const basePrice = entity.price * (item.quantity || 1);
     let discount = 0;
 
-    // 4.1: Validate Coupon
+    // Coupon
     if (orderData.couponCode) {
       const coupon = await validateCoupon(
         orderData.couponCode,
-        // @ts-ignore
-        item.modelType,
+        item.modelType as any,
         item.referenceId,
       );
       discount += (basePrice * coupon.discount) / 100;
     }
 
-    // 4.2: Validate Promo
+    // Promo
     if (orderData.promoCode) {
       const promo = await validatePromo(
         orderData.promoCode,
-        // @ts-ignore
-        item.modelType,
+        item.modelType as any,
         item.referenceId,
       );
       discount += (basePrice * promo.discount) / 100;
     }
 
-    // 4.3: Validate Affiliate
+    // Affiliate
     if (orderData.affiliateId) {
-      const affiliate = await validateAffiliate(orderData.affiliateId);
-      if (!affiliate)
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          'Affiliate invalid or inactive',
-        );
+      await validateAffiliate(orderData.affiliateId);
     }
 
     const finalPrice = basePrice - discount;
     totalAmount += basePrice;
     totalDiscount += discount;
 
-    // 5. Check if course has co-instructors
+    // Co-Instructor logic
     if (item.modelType === 'course') {
       const course = await prisma.course.findUnique({
         where: { id: item.referenceId },
@@ -94,24 +88,21 @@ const createOrders = async (payload: IOrder) => {
 
       if (course && course.coInstructor.length > 0) {
         hasCoInstructors = true;
-        const coInstructorCut = finalPrice * 0.35;
-        coInstructorShare += coInstructorCut;
-      }
+        coInstructorShare += finalPrice * 0.35;
 
-      // Collect coInstructorIds
-      course!.coInstructor.forEach(ci => {
-        if (ci.isActive && !ci.isDeleted) {
-          coInstructorIdsSet.add(ci.coInstructorId);
-        }
-      });
+        course.coInstructor.forEach(ci => {
+          if (ci.isActive && !ci.isDeleted) {
+            coInstructorIdsSet.add(ci.coInstructorId);
+          }
+        });
+      }
     }
 
-    // 6. If book, collect its file (if available)
+    // Book file
     if (item.modelType === 'book' && entity.file) {
       orderFiles.push(entity.file);
     }
 
-    // 7. Push order item
     orderItems.push({
       modelType: item.modelType,
       bookId: item.modelType === 'book' ? item.referenceId : undefined,
@@ -128,23 +119,140 @@ const createOrders = async (payload: IOrder) => {
 
   const finalAmount = totalAmount - totalDiscount;
 
-  // 8. Determine order-level authorId & companyId
-  const orderAuthorId = authorSet.size === 1 ? Array.from(authorSet)[0] : null;
+  /* ============================
+     3. Resolve Author & Company
+  ============================ */
+  const orderAuthorId =
+    authorSet.size === 1 ? Array.from(authorSet)[0] : null;
+
   const orderCompanyId =
     companySet.size === 1 ? Array.from(companySet)[0] : null;
 
-  // 9: Revenue split
-  let { instructorShare, platformShare, affiliateShare } = calculateRevenue(
-    finalAmount,
-    orderData,
-  );
-
-  if (hasCoInstructors) {
-    instructorShare = finalAmount * 0.35;
-    platformShare = finalAmount * 0.3;
+  if (!orderAuthorId) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Multiple authors in one order are not allowed',
+    );
   }
 
-  // 10. Create Order
+  /* ============================
+     4. Default Revenue (UTIL)
+  ============================ */
+  let { instructorShare, platformShare, affiliateShare } =
+    calculateRevenue(finalAmount, orderData);
+
+  /* ============================
+     5. Subscription-Based Override
+  ============================ */
+
+  // 🏢 COMPANY LOGIC (HIGHEST PRIORITY)
+  if (orderCompanyId) {
+    const company = await prisma.company.findUnique({
+      where: { id: orderCompanyId },
+      select: { author: { select: { userId: true } } },
+    });
+
+    if (!company) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found');
+    }
+
+    const companySubscription = await prisma.subscription.findFirst({
+      where: {
+        userId: company.author.userId,
+        status: 'active',
+        isDeleted: false,
+        isExpired: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!companySubscription) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Company has no active subscription',
+      );
+    }
+
+    switch (companySubscription.type) {
+      case 'sme':
+        instructorShare = finalAmount * 0.9;
+        platformShare = finalAmount * 0.1;
+        break;
+
+      case 'enterprise':
+        instructorShare = finalAmount * 0.95;
+        platformShare = finalAmount * 0.05;
+        break;
+
+      case 'ngo':
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'NGO companies cannot sell paid courses, events, or shops',
+        );
+
+      default:
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Invalid company subscription',
+        );
+    }
+  }
+
+  // 👨‍🏫 INSTRUCTOR LOGIC (NO COMPANY)
+  if (!orderCompanyId) {
+    const instructorSubscription = await prisma.subscription.findFirst({
+      where: {
+        userId: orderAuthorId,
+        status: 'active',
+        isDeleted: false,
+        isExpired: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!instructorSubscription) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Instructor has no active subscription',
+      );
+    }
+
+    switch (instructorSubscription.type) {
+      case 'standard':
+        instructorShare = finalAmount * 0.75;
+        platformShare = finalAmount * 0.25;
+        break;
+
+      case 'premium':
+        instructorShare = finalAmount * 0.85;
+        platformShare = finalAmount * 0.15;
+        break;
+
+      case 'basic':
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Basic instructors cannot sell paid items',
+        );
+
+      default:
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Invalid instructor subscription',
+        );
+    }
+  }
+
+  /* ============================
+     6. Co-Instructor Override
+  ============================ */
+  if (hasCoInstructors) {
+    instructorShare = finalAmount * 0.35;
+    platformShare = finalAmount - instructorShare - affiliateShare;
+  }
+
+  /* ============================
+     7. Create Order
+  ============================ */
   const order = await prisma.order.create({
     data: {
       userId: orderData.userId,
@@ -159,7 +267,9 @@ const createOrders = async (payload: IOrder) => {
       coInstructorsShare: coInstructorShare,
       coInstructorIds: Array.from(coInstructorIdsSet),
       files: orderFiles,
-      orderItem: { createMany: { data: orderItems } },
+      orderItem: {
+        createMany: { data: orderItems },
+      },
     },
     include: { orderItem: true },
   });

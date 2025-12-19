@@ -5,7 +5,7 @@ import { uploadManyToS3, uploadToS3 } from '../../utils/s3';
 const multiple = async (files: any) => {
   let fileArray: any[] = [];
 
-  // ✅ Handle different multer upload structures
+  // ✅ Normalize multer upload structures
   if (Array.isArray(files)) {
     fileArray = files;
   } else if (files?.files && Array.isArray(files.files)) {
@@ -20,23 +20,22 @@ const multiple = async (files: any) => {
     return [];
   }
 
-
-  // ✅ Detect file type and assign upload path
+  // ✅ Prepare upload tasks with proper paths
   const uploadTasks = fileArray.map((file: any) => {
-    let path = 'others'; // default fallback
+    let path = 'others';
 
     if (file.mimetype.startsWith('image/')) {
       path = 'images';
     } else if (file.mimetype.startsWith('video/')) {
       path = 'videos';
     } else if (
-      file.mimetype.startsWith('application/pdf') ||
-      file.originalname.toLowerCase().endsWith('.pdf')
+      file.mimetype === 'application/pdf' ||
+      file.originalname?.toLowerCase().endsWith('.pdf')
     ) {
       path = 'documents';
     } else if (
       file.mimetype.startsWith('application/vnd') ||
-      file.originalname.match(/\.(docx?|xlsx?|pptx?)$/i)
+      /\.(docx?|xlsx?|pptx?)$/i.test(file.originalname)
     ) {
       path = 'documents';
     } else if (file.mimetype.startsWith('audio/')) {
@@ -46,13 +45,23 @@ const multiple = async (files: any) => {
     return { file, path };
   });
 
-  // ✅ Upload all to S3
+  // ✅ Upload to S3
   const uploadedFiles = await uploadManyToS3(uploadTasks);
 
-  // ✅ Return only the URLs
-  const urls = uploadedFiles.map((item: any) => item.url);
+  // ✅ Return unified response: [{ url, size }]
+  const result = uploadedFiles.map((item: any, index: number) => {
+    const originalFile = fileArray[index];
+    const sizeInMB = Number(
+      (originalFile.size / (1024 * 1024)).toFixed(4),
+    );
 
-  return urls;
+    return {
+      url: item.url,
+      size: sizeInMB,
+    };
+  });
+
+  return result;
 };
 
 const single = async (file: any) => {
@@ -64,7 +73,12 @@ const single = async (file: any) => {
     fileName: `images/${Math.floor(100000 + Math.random() * 900000)}`,
   });
 
-  return result;
+  const fileSizeInMB = Number((file.size / (1024 * 1024)).toFixed(4))
+
+  return {
+    url: result,
+    size: fileSizeInMB,
+  }
 };
 
 const uploadService = { multiple, single };

@@ -13,6 +13,7 @@ export type ICourseLesson = {
   type: ContentType;
   media: string;
   duration?: number;
+  fileStorage?: number;
 };
 
 export type ICourseSection = {

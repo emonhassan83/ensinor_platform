@@ -786,6 +786,7 @@ const geUserById = async (userId: string) => {
       city: true,
       country: true,
       role: true,
+      storage: true,
       status: true,
       lastActive: true,
       isDeleted: true,

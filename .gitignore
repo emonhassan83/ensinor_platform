@@ -3,3 +3,4 @@ dist
 .env
 logs
 prisma/migrations
+prisma/migrations_old_backup

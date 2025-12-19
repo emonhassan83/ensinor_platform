@@ -51,6 +51,7 @@ model User {
   passwordChangedAt   DateTime     @default(now())
   expireAt            DateTime?
   stripeAccountId     String?
+  storage             Int          @default(0)
   status              UserStatus   @default(pending)
   avgRating           Float        @default(0.0)
   ratingCount         Int          @default(0)
@@ -264,6 +265,7 @@ model Company {
   courses      Int         @default(0)
   enrolled     Int         @default(0)
   completed    Int         @default(0)
+  storage      Int         @default(0)
   isActive     Boolean     @default(false)
   isDeleted    Boolean     @default(false)
   createdAt    DateTime    @default(now())

@@ -17,7 +17,7 @@ const insertIntoDB = catchAsync(async (req, res) => {
 });
 
 const addLessonIntoDB = catchAsync(async (req, res) => {
-  const result = await CourseContentService.addLessonIntoDB(req.body);
+  const result = await CourseContentService.addLessonIntoDB(req.body, req.user!.userId);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

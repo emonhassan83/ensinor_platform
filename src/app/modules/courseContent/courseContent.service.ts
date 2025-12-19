@@ -10,6 +10,7 @@ import { courseContentSearchAbleFields } from './courseContent.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
+import { applyStorageUsage } from './courseContent.utils';
 
 const insertIntoDB = async (
   payload: { courseId: string; sections: ICourseSection[] },
@@ -17,7 +18,7 @@ const insertIntoDB = async (
 ) => {
   const { courseId, sections } = payload;
 
-  // Validate course belongs to author
+  // Validate course ownership
   const course = await prisma.course.findFirst({
     where: { id: courseId, authorId, isDeleted: false },
   });
@@ -29,14 +30,15 @@ const insertIntoDB = async (
   return await prisma.$transaction(async tx => {
     let totalLectures = 0;
     let totalDuration = 0;
+    let totalStorage = 0;
+
     const createdSections: {
       section: ICourseSection;
       lessons: ICourseLesson[];
     }[] = [];
 
-    // Loop through each section in payload
     for (const sec of sections) {
-      // STEP 1: Create Section
+      // STEP 1: Create section
       const createdSection = await tx.courseSection.create({
         data: {
           courseId,
@@ -49,23 +51,27 @@ const insertIntoDB = async (
         throw new ApiError(httpStatus.BAD_REQUEST, 'Section creation failed!');
       }
 
-      // STEP 2: Prepare lessons for this section
-      const lessonsToCreate = sec.lesson.map(item => ({
-        sectionId: createdSection.id,
-        serial: item.serial,
-        title: item.title,
-        description: item.description,
-        type: item.type,
-        media: item.media,
-        duration: item.duration ?? 0,
-      }));
+      // STEP 2: Prepare lessons + calculate storage
+      const lessonsToCreate = sec.lesson.map(item => {
+        totalStorage += item.fileStorage ?? 0;
 
-      // STEP 3: Create all lessons
+        return {
+          sectionId: createdSection.id,
+          serial: Number(item.serial),
+          title: item.title,
+          description: item.description,
+          type: item.type,
+          media: item.media,
+          duration: item.duration ?? 0,
+        };
+      });
+
+      // STEP 3: Create lessons
       await tx.courseLesson.createMany({
         data: lessonsToCreate,
       });
 
-      // STEP 4: Track totals
+      // STEP 4: Update counters
       totalLectures += lessonsToCreate.length;
       totalDuration += lessonsToCreate.reduce(
         (sum, l) => sum + (l.duration || 0),
@@ -78,7 +84,7 @@ const insertIntoDB = async (
       });
     }
 
-    // STEP 5: Update parent course with total lectures & duration
+    // STEP 5: Update course stats
     await tx.course.update({
       where: { id: courseId },
       data: {
@@ -87,18 +93,32 @@ const insertIntoDB = async (
       },
     });
 
+    // STEP 6: Apply storage usage (USER or COMPANY)
+    await applyStorageUsage(tx, {
+      authorId,
+      courseId,
+      fileStorage: totalStorage,
+    });
+
     return createdSections;
   });
 };
 
-const addLessonIntoDB = async (payload: ICourseLesson) => {
+const addLessonIntoDB = async (
+  payload: ICourseLesson,
+  authorId: string,
+) => {
   const { sectionId } = payload;
 
   return await prisma.$transaction(async tx => {
     const courseSection = await tx.courseSection.findFirst({
       where: { id: sectionId },
       include: {
-        course: { select: { id: true } },
+        course: {
+          select: {
+            id: true,
+          },
+        },
       },
     });
 
@@ -106,16 +126,21 @@ const addLessonIntoDB = async (payload: ICourseLesson) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
     }
 
-    // Ensure serial is integer
     const serial = Number(payload.serial);
 
     const createdLesson = await tx.courseLesson.create({
       data: {
-        ...payload,
+        sectionId,
         serial,
+        title: payload.title,
+        description: payload.description,
+        type: payload.type,
+        media: payload.media,
+        duration: payload.duration ?? 0,
       },
     });
 
+    // Update course counters
     await tx.course.update({
       where: { id: courseSection.course.id },
       data: {
@@ -124,9 +149,17 @@ const addLessonIntoDB = async (payload: ICourseLesson) => {
       },
     });
 
+    // Apply storage usage
+    await applyStorageUsage(tx, {
+      authorId,
+      courseId: courseSection.course.id,
+      fileStorage: payload.fileStorage ?? 0,
+    });
+
     return createdLesson;
   });
 };
+
 
 const getAllFromDB = async (
   params: ICourseContentFilterRequest,
