@@ -18,7 +18,6 @@ const insertIntoDB = async (
 ) => {
   const { courseId, sections } = payload;
 
-  // Validate course ownership
   const course = await prisma.course.findFirst({
     where: { id: courseId, authorId, isDeleted: false },
   });
@@ -32,13 +31,7 @@ const insertIntoDB = async (
     let totalDuration = 0;
     let totalStorage = 0;
 
-    const createdSections: {
-      section: ICourseSection;
-      lessons: ICourseLesson[];
-    }[] = [];
-
     for (const sec of sections) {
-      // STEP 1: Create section
       const createdSection = await tx.courseSection.create({
         data: {
           courseId,
@@ -47,11 +40,6 @@ const insertIntoDB = async (
         },
       });
 
-      if (!createdSection) {
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Section creation failed!');
-      }
-
-      // STEP 2: Prepare lessons + calculate storage
       const lessonsToCreate = sec.lesson.map(item => {
         totalStorage += item.fileStorage ?? 0;
 
@@ -66,25 +54,15 @@ const insertIntoDB = async (
         };
       });
 
-      // STEP 3: Create lessons
-      await tx.courseLesson.createMany({
-        data: lessonsToCreate,
-      });
+      await tx.courseLesson.createMany({ data: lessonsToCreate });
 
-      // STEP 4: Update counters
       totalLectures += lessonsToCreate.length;
       totalDuration += lessonsToCreate.reduce(
         (sum, l) => sum + (l.duration || 0),
         0,
       );
-
-      createdSections.push({
-        section: { ...sec, courseId },
-        lessons: lessonsToCreate,
-      });
     }
 
-    // STEP 5: Update course stats
     await tx.course.update({
       where: { id: courseId },
       data: {
@@ -93,14 +71,13 @@ const insertIntoDB = async (
       },
     });
 
-    // STEP 6: Apply storage usage (USER or COMPANY)
     await applyStorageUsage(tx, {
       authorId,
       courseId,
       fileStorage: totalStorage,
     });
 
-    return createdSections;
+    return { success: true };
   });
 };
 
@@ -111,27 +88,19 @@ const addLessonIntoDB = async (
   const { sectionId } = payload;
 
   return await prisma.$transaction(async tx => {
-    const courseSection = await tx.courseSection.findFirst({
+    const section = await tx.courseSection.findUnique({
       where: { id: sectionId },
-      include: {
-        course: {
-          select: {
-            id: true,
-          },
-        },
-      },
+      include: { course: true },
     });
 
-    if (!courseSection) {
+    if (!section) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
     }
-
-    const serial = Number(payload.serial);
 
     const createdLesson = await tx.courseLesson.create({
       data: {
         sectionId,
-        serial,
+        serial: Number(payload.serial),
         title: payload.title,
         description: payload.description,
         type: payload.type,
@@ -140,26 +109,23 @@ const addLessonIntoDB = async (
       },
     });
 
-    // Update course counters
     await tx.course.update({
-      where: { id: courseSection.course.id },
+      where: { id: section.course.id },
       data: {
         lectures: { increment: 1 },
         duration: { increment: payload.duration ?? 0 },
       },
     });
 
-    // Apply storage usage
     await applyStorageUsage(tx, {
       authorId,
-      courseId: courseSection.course.id,
+      courseId: section.course.id,
       fileStorage: payload.fileStorage ?? 0,
     });
 
     return createdLesson;
   });
 };
-
 
 const getAllFromDB = async (
   params: ICourseContentFilterRequest,
