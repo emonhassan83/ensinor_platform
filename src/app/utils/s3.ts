@@ -51,41 +51,42 @@ export const deleteFromS3 = async (key: string) => {
 };
 
 // upload multiple files
-
 export const uploadManyToS3 = async (
-  files: {
+  tasks: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     file: any;
     path: string;
-    key?: string;
+    key?: string; // ← Now REQUIRED: we always pass a proper key from multiple()
   }[],
 ): Promise<{ url: string; key: string }[]> => {
   try {
-    const uploadPromises = files.map(async ({ file, path, key }) => {
-      const newFileName = key
-        ? key
-        : `${Math.floor(100000 + Math.random() * 900000)}${Date.now()}`;
-
-      const fileKey = `${path}/${newFileName}`;
+    const uploadPromises = tasks.map(async ({ file, path, key }) => {
+      // Full S3 key: path + filename (e.g., "images/my-photo-1234567890-abc123.jpg")
+      const fullKey = `${path}/${key}`;
 
       const command = new PutObjectCommand({
         Bucket: config.aws.bucket as string,
-        Key: fileKey,
+        Key: fullKey,
         Body: file?.buffer,
         ContentType: file.mimetype,
-        ACL: ObjectCannedACL.public_read, //access public read
+        ACL: ObjectCannedACL.public_read,
       });
 
-      const nn = await s3Client.send(command);
-      // const url = `${config?.aws?.s3BaseUrl}/${fileKey}`;
-      const url = `${config?.aws?.s3BaseUrl}/${fileKey}`;
-      return { url, key: newFileName };
+      await s3Client.send(command); // Throw on failure
+
+      const url = `${config.aws.s3BaseUrl}/${fullKey}`;
+
+      return {
+        url,
+        key: fullKey, // Return the full key (optional, useful for DB storage)
+      };
     });
 
-    const uploadedUrls = await Promise.all(uploadPromises);
-    return uploadedUrls;
+    const uploadedFiles = await Promise.all(uploadPromises);
+    return uploadedFiles;
   } catch (error) {
-    throw new Error('File Upload failed');
+    console.error('S3 Upload Error:', error);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'File upload failed');
   }
 };
 
