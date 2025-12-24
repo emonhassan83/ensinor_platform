@@ -1062,7 +1062,7 @@ const publishACourseIntoDB = async (
 ): Promise<Course> => {
   // 1. Fetch course
   const course = await prisma.course.findUnique({
-    where: { id, authorId, isDeleted: false },
+    where: { id, isDeleted: false },
   });
   if (!course) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Course not found!');

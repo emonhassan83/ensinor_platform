@@ -19,7 +19,7 @@ const insertIntoDB = async (
   const { courseId, sections } = payload;
 
   const course = await prisma.course.findFirst({
-    where: { id: courseId, authorId, isDeleted: false },
+    where: { id: courseId, isDeleted: false },
   });
 
   if (!course) {

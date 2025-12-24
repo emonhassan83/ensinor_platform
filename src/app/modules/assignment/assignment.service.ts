@@ -25,7 +25,6 @@ const insertIntoDB = async (payload: IAssignment, file: any) => {
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
-      authorId,
       isDeleted: false,
     },
   });

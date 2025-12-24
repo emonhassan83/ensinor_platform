@@ -189,7 +189,7 @@ const updateIntoDB = async (
 
       await transactionClient.company.create({
         data: {
-          userId: companyAdmin.id,
+          userId: companyAdmin.userId,
           name: updatedRequest.name,
           industryType: updatedRequest.platformType,
         },

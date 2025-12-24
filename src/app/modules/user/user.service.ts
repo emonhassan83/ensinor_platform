@@ -1,4 +1,10 @@
-import { CompanyType, Prisma, RegisterWith, UserRole, UserStatus } from '@prisma/client';
+import {
+  CompanyType,
+  Prisma,
+  RegisterWith,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import prisma from '../../utils/prisma';
 import httpStatus from 'http-status';
 import {
@@ -42,6 +48,20 @@ const INSTRUCTOR_LIMIT_BY_INDUSTRY: Record<CompanyType, number> = {
   ngo: 2,
   sme: 3,
   enterprise: 5,
+};
+
+const getActiveSubscription = async (userId: string) => {
+  return prisma.subscription.findFirst({
+    where: {
+      userId,
+      isDeleted: false,
+      isExpired: false,
+      expiredAt: { gt: new Date() },
+    },
+    select: {
+      type: true,
+    },
+  });
 };
 
 // TODO: here when register a user then created a student table as well
@@ -135,11 +155,7 @@ const registerAUser = async (
     });
 
     // ✅ Auto-join announcement chat
-    await joinInitialAnnouncementChat(
-      userRecord.id,
-      UserRole.student,
-      tx,
-    );
+    await joinInitialAnnouncementChat(userRecord.id, UserRole.student, tx);
 
     // ✅ Create Student profile
     await tx.student.create({
@@ -256,8 +272,7 @@ const createBusinessInstructor = async (
   /* --------------------------------------------
      2️⃣ Enforce Industry-based Instructor Limit
   --------------------------------------------- */
-  const instructorLimit =
-    INSTRUCTOR_LIMIT_BY_INDUSTRY[company.industryType];
+  const instructorLimit = INSTRUCTOR_LIMIT_BY_INDUSTRY[company.industryType];
 
   if (company.instructor >= instructorLimit) {
     throw new ApiError(
@@ -771,10 +786,7 @@ const getAllUser = async (
 
 const geUserById = async (userId: string) => {
   const userData = await prisma.user.findUnique({
-    where: {
-      id: userId,
-      isDeleted: false,
-    },
+    where: { id: userId, isDeleted: false },
     select: {
       id: true,
       name: true,
@@ -789,7 +801,6 @@ const geUserById = async (userId: string) => {
       storage: true,
       status: true,
       lastActive: true,
-      isDeleted: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -799,22 +810,8 @@ const geUserById = async (userId: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
   }
 
-  // ✅ Check subscription status
-  const activeSubscription = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      isDeleted: false,
-      isExpired: false,
-      expiredAt: { gt: new Date() },
-    },
-  });
-
-  const isActiveSubscription = !!activeSubscription;
-  const subscriptionType = activeSubscription
-    ? activeSubscription.type
-    : null;
-
-  let profileData;
+  let profileData: any = null;
+  let subscriptionOwnerId = userId;
 
   switch (userData.role) {
     case UserRole.super_admin:
@@ -831,8 +828,16 @@ const geUserById = async (userId: string) => {
     case UserRole.business_instructors:
       profileData = await prisma.businessInstructor.findUnique({
         where: { userId },
-        include: { company: true },
+        include: {
+          company: true,
+          author: {
+            select: { id: true },
+          },
+        },
       });
+
+      // 🔑 subscription inherited from company admin
+      subscriptionOwnerId = profileData?.authorId;
       break;
 
     case UserRole.instructor:
@@ -849,16 +854,18 @@ const geUserById = async (userId: string) => {
     case UserRole.student:
       profileData = await prisma.student.findUnique({ where: { userId } });
       break;
-
-    default:
-      profileData = null;
   }
 
+  // ✅ Subscription resolution (single source of truth)
+  const activeSubscription = subscriptionOwnerId
+    ? await getActiveSubscription(subscriptionOwnerId)
+    : null;
+
   return {
-    ...profileData,
     ...userData,
-    isActiveSubscription,
-    subscriptionType
+    ...profileData,
+    isActiveSubscription: Boolean(activeSubscription),
+    subscriptionType: activeSubscription?.type ?? null,
   };
 };
 

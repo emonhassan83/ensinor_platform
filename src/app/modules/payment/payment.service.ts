@@ -378,7 +378,7 @@ const confirmPayment = async (query: Record<string, any>) => {
           if (companyAdmin?.company) {
             await tx.company.update({
               where: { id: companyAdmin.company.id },
-              data: { isActive: true },
+              data: { industryType: sub.type as any, isActive: true },
             });
           }
         }
