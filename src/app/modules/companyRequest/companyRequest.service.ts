@@ -166,6 +166,8 @@ const updateIntoDB = async (
         data: {
           name: updatedRequest.name,
           email: updatedRequest.organizationEmail,
+          contactNo: updatedRequest.phoneNumber,
+          bio: updatedRequest.description,
           password: hashPassword,
           role: UserRole.company_admin,
           registerWith: RegisterWith.credentials,
@@ -189,7 +191,7 @@ const updateIntoDB = async (
 
       await transactionClient.company.create({
         data: {
-          userId: companyAdmin.userId,
+          userId: companyAdmin.id,
           name: updatedRequest.name,
           industryType: updatedRequest.platformType,
         },

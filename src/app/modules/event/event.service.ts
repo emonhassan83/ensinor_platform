@@ -39,7 +39,7 @@ const parseEventDate = (dateStr: string): Date | null => {
 
 const insertIntoDB = async (payload: IEvent, file: any) => {
   const { authorId, platform } = payload;
-
+  
   // 1️⃣ Validate author user
   const author = await prisma.user.findFirst({
     where: {

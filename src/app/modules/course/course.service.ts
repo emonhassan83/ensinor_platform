@@ -116,7 +116,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
         );
       }
 
-      resolvedAuthorId = companyAdminUser.id;
+      resolvedAuthorId = actor.id;
       companyAuthor = companyAdminUser;
     } else {
       throw new ApiError(

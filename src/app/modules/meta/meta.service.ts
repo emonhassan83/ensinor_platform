@@ -848,8 +848,16 @@ const companyAdminMetaData = async (user: any) => {
     throw new ApiError(httpStatus.CONFLICT, 'Invalid user role!');
   }
 
+  const companyAdmin = await prisma.user.findUnique({
+    where: { id: user.userId, isDeleted: false },
+    include: {companyAdmin: true},
+  });
+  if (!companyAdmin) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin not found !');
+  }
+
   const company = await prisma.company.findFirst({
-    where: { userId: user.id, isDeleted: false },
+    where: { userId: companyAdmin!.companyAdmin!.id, isDeleted: false },
   });
   if (!company) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Company not found !');
@@ -879,7 +887,7 @@ const companyAdminMetaData = async (user: any) => {
       status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
-      authorId: company.id,
+      companyId: company.id,
     },
   });
   const revenue = Math.round(totalRevenue._sum.amount ?? 0);
@@ -976,7 +984,6 @@ const businessInstructorMetaData = async (user: any) => {
   const totalCourseCount = await prisma.course.count({
     where: {
       authorId: user?.userId,
-      companyId: company.id,
       status: CoursesStatus.approved,
       isDeleted: false,
     },
@@ -986,7 +993,6 @@ const businessInstructorMetaData = async (user: any) => {
     where: {
       course: {
         authorId: user?.userId,
-        companyId: company.id,
         status: CoursesStatus.approved,
       },
       isDeleted: false,
@@ -1000,8 +1006,7 @@ const businessInstructorMetaData = async (user: any) => {
       status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
-      authorId: user.id,
-      companyId: company.id,
+      authorId: user.userId
     },
   });
   const revenue = Math.round(totalRevenue._sum.amount ?? 0);
@@ -1013,7 +1018,7 @@ const businessInstructorMetaData = async (user: any) => {
   // --- Upcoming events ---
   const upcomingEvents = await prisma.event.findMany({
     where: {
-      companyId: company.id,
+      // companyId: company.id,
       authorId: user.userId,
       isDeleted: false,
       date: { gte: today.toISOString() }, // date string compare
@@ -1032,7 +1037,7 @@ const businessInstructorMetaData = async (user: any) => {
 
   const totalUpcomingEventCount = await prisma.event.count({
     where: {
-      companyId: company.id,
+      // companyId: company.id,
       authorId: user.userId,
       isDeleted: false,
       date: { gte: today.toISOString() },
@@ -1045,7 +1050,7 @@ const businessInstructorMetaData = async (user: any) => {
       isComplete: true,
       isDeleted: false,
       updatedAt: { gte: startOfMonth },
-      course: { companyId: company.id },
+      // course: { companyId: company.id },
       authorId: user.userId,
     },
     orderBy: { updatedAt: 'desc' },
@@ -1062,7 +1067,7 @@ const businessInstructorMetaData = async (user: any) => {
       isComplete: true,
       isDeleted: false,
       updatedAt: { gte: startOfMonth },
-      course: { companyId: company.id },
+      // course: { companyId: company.id },
       authorId: user.userId,
     },
   });

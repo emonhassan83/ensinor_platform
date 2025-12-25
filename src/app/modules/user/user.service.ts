@@ -181,8 +181,10 @@ const invitationCompanyAdmin = async (
       data: {
         name: payload.name, // Company admin name (you can separate if needed)
         email: payload.organizationEmail,
+        contactNo: payload.phoneNumber,
         password: hashPassword,
         role: UserRole.company_admin,
+        bio: payload.description,
         registerWith: RegisterWith.credentials,
         verification: {
           create: {
@@ -666,6 +668,7 @@ const createStudent = async (
       data: {
         name: payload.user.name,
         email: payload.user.email,
+        contactNo: payload.user.contactNo,
         password: hashPassword,
         role: UserRole.student,
         registerWith: RegisterWith.credentials,
