@@ -3,7 +3,9 @@ import { addDays, addWeeks, addMonths } from 'date-fns';
 import prisma from '../../utils/prisma';
 import emailSender from '../../utils/emailSender';
 
-// 🧭 Helper: Next schedule date
+// ----------------------------
+// Helper: Next schedule date
+// ----------------------------
 const getNextScheduleDate = (
   recurrence: string,
   currentDate: Date,
@@ -15,30 +17,24 @@ const getNextScheduleDate = (
       return addWeeks(currentDate, 1);
     case 'monthly':
       return addMonths(currentDate, 1);
-    case 'once':
-      return null;
     default:
       return null;
   }
 };
 
-// ⏰ Run every hour, at the start of the hours
 let isRunning = false;
-export const newsletterScheduleCorn = () => {
-  cron.schedule('0 * * * *', async () => {
-    if (isRunning) {
-      console.log(
-        '⚠️ Newsletter job skipped — previous run still in progress.',
-      );
-      return;
-    }
 
+export const newsletterScheduleCron = () => {
+  cron.schedule('0 * * * *', async () => {
+    if (isRunning) return;
     isRunning = true;
-    console.log('🕐 Newsletter cron job running...');
 
     try {
       const now = new Date();
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
+      // 1️⃣ Fetch subscribers once
       const subscribers = await prisma.newsletterSubscriber.findMany({
         where: {
           status: 'active',
@@ -46,97 +42,77 @@ export const newsletterScheduleCorn = () => {
         },
       });
 
-      for (const subscriber of subscribers) {
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+      if (!subscribers.length) return;
 
-        // Count how many emails sent today
-        const sentToday = await prisma.newsletterLog.count({
-          where: {
-            subscriberId: subscriber.id,
-            sentAt: { gte: todayStart },
-          },
-        });
+      // 2️⃣ Preload all logs (single query)
+      const logs = await prisma.newsletterLog.findMany({
+        where: {
+          subscriberId: { in: subscribers.map(s => s.id) },
+          sentAt: { gte: todayStart },
+        },
+      });
 
-        // Max 5 emails per day
-        if (sentToday >= 5) {
-          console.log(`🚫 ${subscriber.email} reached daily limit (5 emails).`);
-          continue;
+      // 3️⃣ Group logs by subscriber
+      const sentMap = new Map<string, string[]>();
+      for (const log of logs) {
+        if (!sentMap.has(log.subscriberId)) {
+          sentMap.set(log.subscriberId, []);
         }
-
-        // ✅ Get already-sent newsletter IDs for this subscriber
-        const sentNewsletterIds = await prisma.newsletterLog.findMany({
-          where: { subscriberId: subscriber.id },
-          select: { newsletterId: true },
-        });
-
-        const alreadySentIds = sentNewsletterIds.map(n => n.newsletterId);
-
-        // ✅ Fetch only newsletters NOT already sent to this subscriber
-        const newsletters = await prisma.newsletter.findMany({
-          where: {
-            category: { in: subscriber.category },
-            scheduleDate: { lte: now },
-            id: { notIn: alreadySentIds }, // 🚀 Prevent duplicates
-          },
-          take: Math.min(5 - sentToday, 5),
-        });
-
-        if (newsletters.length === 0) {
-          console.log(`ℹ️ No new newsletters for ${subscriber.email}.`);
-          continue;
-        }
-
-        for (const newsletter of newsletters) {
-          await emailSender(
-            subscriber.email,
-            `📰 ${newsletter.title}`,
-            `
-              <div style="font-family:sans-serif;">
-                <h2>${newsletter.title}</h2>
-                <p>${newsletter.content}</p>
-                <p style="color:gray;">Category: ${newsletter.category}</p>
-              </div>
-            `,
-          );
-
-          // Log each send
-          await prisma.newsletterLog.create({
-            data: {
-              subscriberId: subscriber.id,
-              newsletterId: newsletter.id,
-              sentAt: new Date(),
-            },
-          });
-
-          console.log(`📬 Sent: ${newsletter.title} → ${subscriber.email}`);
-        }
-
-        // ✅ Recount after sending; if daily cap reached, update schedule
-        const totalSentNow = await prisma.newsletterLog.count({
-          where: {
-            subscriberId: subscriber.id,
-            sentAt: { gte: todayStart },
-          },
-        });
-
-        if (totalSentNow >= 5) {
-          const nextSchedule = getNextScheduleDate(subscriber.recurrence, now);
-          await prisma.newsletterSubscriber.update({
-            where: { id: subscriber.id },
-            data: {
-              lastSentAt: now,
-              scheduleDate: nextSchedule ?? now,
-              ...(subscriber.recurrence === 'once' && { status: 'paused' }),
-            },
-          });
-          console.log(`🔁 Updated next schedule for ${subscriber.email}`);
-        }
+        sentMap.get(log.subscriberId)!.push(log.newsletterId);
       }
 
-      console.log('✅ Newsletter cron job completed.');
+      for (const sub of subscribers) {
+        const sentIds = sentMap.get(sub.id) ?? [];
+        const sentToday = sentIds.length;
+
+        if (sentToday >= 5) continue;
+
+        // 4️⃣ Fetch newsletters once per subscriber
+        const newsletters = await prisma.newsletter.findMany({
+          where: {
+            category: { in: sub.category },
+            scheduleDate: { lte: now },
+            id: { notIn: sentIds },
+          },
+          take: 5 - sentToday,
+        });
+
+        if (!newsletters.length) continue;
+
+        // 5️⃣ Send emails concurrently (safe batch)
+        await Promise.all(
+          newsletters.map(n =>
+            emailSender(
+              sub.email,
+              `📰 ${n.title}`,
+              `<h2>${n.title}</h2><p>${n.content}</p>`,
+            ),
+          ),
+        );
+
+        // 6️⃣ Bulk insert logs
+        await prisma.newsletterLog.createMany({
+          data: newsletters.map(n => ({
+            subscriberId: sub.id,
+            newsletterId: n.id,
+            sentAt: new Date(),
+          })),
+        });
+
+        // 7️⃣ Update schedule once
+        const nextSchedule = getNextScheduleDate(sub.recurrence, now);
+
+        await prisma.newsletterSubscriber.update({
+          where: { id: sub.id },
+          data: {
+            lastSentAt: now,
+            scheduleDate: nextSchedule ?? now,
+            ...(sub.recurrence === 'once' && { status: 'paused' }),
+          },
+        });
+      }
     } catch (err) {
-      console.error('🚨 Newsletter cron job error:', err);
+      console.error('Newsletter cron error:', err);
     } finally {
       isRunning = false;
     }

@@ -1,55 +1,42 @@
-import cron from "node-cron";
-import prisma from "./prisma";
+import cron from 'node-cron';
+import prisma from './prisma';
+
+const log = (tag: string, msg: string) =>
+  console.log(`[${tag}] ${msg}`);
 
 // ---------------------------
-// Centralized Logging Helper
-// ---------------------------
-const log = (label: string, message: string) => {
-  console.log(`[${label}] ${message}`);
-};
-
-// ---------------------------
-// 1) Cleanup Expired Users
+// 1️⃣ Expired Users Cleanup
 // ---------------------------
 const cleanupExpiredUsers = async () => {
   const now = new Date();
-  log("USER-CLEANUP", "Scanning for expired users...");
 
-  const expiredUsers = await prisma.user.findMany({
+  const expiredUserIds = await prisma.user.findMany({
     where: {
       expireAt: { lte: now },
       verification: { status: false },
     },
-    select: { id: true, role: true },
+    select: { id: true },
   });
 
-  if (expiredUsers.length === 0) {
-    return log("USER-CLEANUP", "No expired users found.");
-  }
+  if (!expiredUserIds.length) return;
 
-  log("USER-CLEANUP", `Found ${expiredUsers.length} expired users.`);
+  const ids = expiredUserIds.map(u => u.id);
 
-  await prisma.$transaction(async (tx) => {
-    for (const usr of expiredUsers) {
-      if (usr.role === "student") {
-        await tx.student.deleteMany({ where: { userId: usr.id } });
-      }
-      await tx.user.delete({ where: { id: usr.id } });
-    }
-  });
+  await prisma.$transaction([
+    prisma.student.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.user.deleteMany({ where: { id: { in: ids } } }),
+  ]);
 
-  log("USER-CLEANUP", "Expired user cleanup completed successfully.");
+  log('USER-CLEANUP', `Deleted ${ids.length} expired users`);
 };
 
 // ---------------------------
-// 2) Cleanup Unpublished Courses
+// 2️⃣ Unpublished Course Cleanup
 // ---------------------------
 const cleanupUnpublishedCourses = async () => {
-  log("COURSE-CLEANUP", "Checking for unpublished courses...");
-
   const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
 
-  const result = await prisma.course.updateMany({
+  const res = await prisma.course.updateMany({
     where: {
       isPublished: false,
       isDeleted: false,
@@ -58,62 +45,35 @@ const cleanupUnpublishedCourses = async () => {
     data: { isDeleted: true },
   });
 
-  log(
-    "COURSE-CLEANUP",
-    `Soft-deleted ${result.count} unpublished courses.`
-  );
+  log('COURSE-CLEANUP', `Soft deleted ${res.count} courses`);
 };
 
 // ---------------------------
-// 3) Cleanup Coupons & Promo Codes
+// 3️⃣ Coupon Cleanup
 // ---------------------------
 const cleanupCouponsAndPromos = async () => {
   const now = new Date();
-  log("COUPON-CLEANUP", "Running daily coupon/promo cleanup...");
 
-  const deletedCoupons = await prisma.coupon.deleteMany({
-    where: {
-      OR: [{ isActive: false }, { expireAt: { lt: now } }],
-    },
-  });
+  await prisma.$transaction([
+    prisma.coupon.deleteMany({
+      where: { OR: [{ isActive: false }, { expireAt: { lt: now } }] },
+    }),
+    prisma.promoCode.deleteMany({
+      where: { OR: [{ isActive: false }, { expireAt: { lt: now } }] },
+    }),
+  ]);
 
-  const deletedPromos = await prisma.promoCode.deleteMany({
-    where: {
-      OR: [{ isActive: false }, { expireAt: { lt: now } }],
-    },
-  });
-
-  log(
-    "COUPON-CLEANUP",
-    `Deleted ${deletedCoupons.count} coupons & ${deletedPromos.count} promo codes.`
-  );
+  log('COUPON', 'Coupons & promos cleaned');
 };
 
 // ---------------------------
-// MASTER SCHEDULER
+// MASTER CRON
 // ---------------------------
 export const initializeCleanupJobs = () => {
-  log("CRON", "Initializing scheduled maintenance tasks...");
-
-  // Every 12 hours → expired users & unpublished courses
-  cron.schedule("0 */12 * * *", async () => {
-    try {
-      log("CRON", "Running 12-hour maintenance tasks...");
-      await cleanupExpiredUsers();
-      await cleanupUnpublishedCourses();
-    } catch (err) {
-      console.error("CRON ERROR (12-hour tasks):", err);
-    }
+  cron.schedule('0 */12 * * *', async () => {
+    await cleanupExpiredUsers();
+    await cleanupUnpublishedCourses();
   });
 
-  // Every day at 2 AM → coupons & promo codes
-  cron.schedule("0 2 * * *", async () => {
-    try {
-      await cleanupCouponsAndPromos();
-    } catch (err) {
-      console.error("CRON ERROR (coupon cleanup):", err);
-    }
-  });
-
-  log("CRON", "All scheduled jobs are active.");
+  cron.schedule('0 2 * * *', cleanupCouponsAndPromos);
 };
