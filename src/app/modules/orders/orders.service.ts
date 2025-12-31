@@ -122,8 +122,7 @@ const createOrders = async (payload: IOrder) => {
   /* ============================
      3. Resolve Author & Company
   ============================ */
-  const orderAuthorId =
-    authorSet.size === 1 ? Array.from(authorSet)[0] : null;
+  const orderAuthorId = authorSet.size === 1 ? Array.from(authorSet)[0] : null;
 
   const orderCompanyId =
     companySet.size === 1 ? Array.from(companySet)[0] : null;
@@ -138,12 +137,14 @@ const createOrders = async (payload: IOrder) => {
   /* ============================
      4. Default Revenue (UTIL)
   ============================ */
-  let { instructorShare, platformShare, affiliateShare } =
-    calculateRevenue(finalAmount, orderData);
+  let { instructorShare, platformShare, affiliateShare } = calculateRevenue(
+    finalAmount,
+    orderData,
+  );
 
   /* ============================
-     5. Subscription-Based Override
-  ============================ */
+   5. Subscription-Based Override
+============================ */
 
   // 🏢 COMPANY LOGIC (HIGHEST PRIORITY)
   if (orderCompanyId) {
@@ -152,28 +153,20 @@ const createOrders = async (payload: IOrder) => {
       select: { author: { select: { userId: true } } },
     });
 
-    if (!company) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found');
-    }
+    const companySubscription = company?.author?.userId
+      ? await prisma.subscription.findFirst({
+          where: {
+            userId: company.author.userId,
+            status: 'active',
+            isDeleted: false,
+            isExpired: false,
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : null;
 
-    const companySubscription = await prisma.subscription.findFirst({
-      where: {
-        userId: company.author.userId,
-        status: 'active',
-        isDeleted: false,
-        isExpired: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!companySubscription) {
-      throw new ApiError(
-        httpStatus.FORBIDDEN,
-        'Company has no active subscription',
-      );
-    }
-
-    switch (companySubscription.type) {
+    // যদি subscription না থাকে → default enterprise ratio
+    switch (companySubscription?.type) {
       case 'sme':
         instructorShare = finalAmount * 0.9;
         platformShare = finalAmount * 0.1;
@@ -185,16 +178,53 @@ const createOrders = async (payload: IOrder) => {
         break;
 
       case 'ngo':
+        // NGO restriction maintained
         throw new ApiError(
           httpStatus.FORBIDDEN,
           'NGO companies cannot sell paid courses, events, or shops',
         );
 
       default:
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          'Invalid company subscription',
-        );
+        // যদি subscription না থাকে বা invalid type → enterprise ratio
+        instructorShare = finalAmount * 0.95;
+        platformShare = finalAmount * 0.05;
+        break;
+    }
+  }
+
+  // 👨‍🏫 INSTRUCTOR LOGIC (NO COMPANY)
+  if (!orderCompanyId) {
+    const instructorSubscription = await prisma.subscription.findFirst({
+      where: {
+        userId: orderAuthorId,
+        status: 'active',
+        isDeleted: false,
+        isExpired: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    switch (instructorSubscription?.type) {
+      case 'standard':
+        instructorShare = finalAmount * 0.75;
+        platformShare = finalAmount * 0.25;
+        break;
+
+      case 'premium':
+        instructorShare = finalAmount * 0.85;
+        platformShare = finalAmount * 0.15;
+        break;
+
+      case 'basic':
+        instructorShare = finalAmount * 0.7; // Optional: basic ratio
+        platformShare = finalAmount * 0.3;
+        break;
+
+      default:
+        // যদি subscription না থাকে বা invalid → standard ratio
+        instructorShare = finalAmount * 0.75;
+        platformShare = finalAmount * 0.25;
+        break;
     }
   }
 
