@@ -102,13 +102,13 @@ const resendOtp = async (email: string) => {
     update: {
       otp,
       expiresAt,
-      status: false,
+      status: true,
     },
     create: {
       userId: user.id,
       otp,
       expiresAt,
-      status: false,
+      status: true,
     },
   });
 

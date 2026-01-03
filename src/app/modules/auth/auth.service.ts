@@ -318,7 +318,7 @@ const forgetPassword = async (payload: { email: string }) => {
     where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
@@ -341,7 +341,7 @@ const forgetPassword = async (payload: { email: string }) => {
 
   await prisma.verification.update({
     where: { userId: user.id },
-    data: { otp, expiresAt, status: false },
+    data: { otp, expiresAt, status: true },
   });
 
   // sent forgot email
@@ -382,7 +382,7 @@ const resetPassword = async (
     where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
   }
 
