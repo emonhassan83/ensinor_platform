@@ -1363,12 +1363,12 @@ model CV {
   id          String   @id @default(uuid())
   userId      String   @unique
   name        String
-  designation String
-  photo       String
+  designation String?
+  photo       String?
   phone       String
   email       String
-  linkedin    String
-  website     String
+  linkedin    String?
+  website     String?
   location    String
   aboutMe     String
   skills      String[]

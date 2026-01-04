@@ -10,9 +10,6 @@ const createValidationSchema = z.object({
       .string({ required_error: 'CV name is required' }),
     designation: z.string({
       required_error: 'CV designation is required!',
-    }),
-    photo: z.string({
-      required_error: 'CV photo is required!',
     }).optional(),
     phone: z.string({
       required_error: 'CV phone is required!',
@@ -22,10 +19,10 @@ const createValidationSchema = z.object({
     }),
     linkedin: z.string({
       required_error: 'CV linkedin is required!',
-    }),
+    }).optional(),
     website: z.string({
       required_error: 'CV website is required!',
-    }),
+    }).optional(),
     location: z.string({
       required_error: 'CV location is required!',
     }),
@@ -48,9 +45,6 @@ const updateValidationSchema = z.object({
       .string({ required_error: 'CV name is required' }),
     designation: z.string({
       required_error: 'CV designation is required!',
-    }).optional(),
-    photo: z.string({
-      required_error: 'CV photo is required!',
     }).optional(),
     phone: z.string({
       required_error: 'CV phone is required!',
