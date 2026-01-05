@@ -1088,6 +1088,7 @@ const getAllFromDB = async (
           description: true,
           thumbnail: true,
           duration: true,
+          hasCertificate: true,
         },
       },
     },
@@ -1498,7 +1499,7 @@ const getByIdFromDB = async (id: string, userId: string) => {
         include: {
           courseSections: {
             include: {
-              courseContents: true, // lessons
+              courseContents: true,
             },
           },
           resource: true,
@@ -1572,7 +1573,7 @@ const getByIdFromDB = async (id: string, userId: string) => {
   );
 
   /* --------------------------------------------
-     5️⃣ Inject isCompleted → Lectures
+     5️⃣ Inject isCompleted → Lessons
   --------------------------------------------- */
   const courseSectionsWithStatus =
     enrolledCourse.course.courseSections.map(section => ({
@@ -1601,9 +1602,45 @@ const getByIdFromDB = async (id: string, userId: string) => {
     }));
 
   /* --------------------------------------------
-     8️⃣ Count Watched Lectures
+     8️⃣ Calculate Overall Completion
   --------------------------------------------- */
-  const lectureWatched = enrolledCourse.watchedLectures.length;
+
+  // 🔹 Lessons
+  const totalLessons =
+    enrolledCourse.course.courseSections.reduce(
+      (sum, section) => sum + section.courseContents.length,
+      0,
+    );
+
+  const completedLessons = enrolledCourse.watchedLectures.length;
+
+  const isLessonCompleted =
+    totalLessons === 0 || completedLessons === totalLessons;
+
+  // 🔹 Quizzes
+  const totalQuizzes = enrolledCourse.course.quiz.length;
+
+  const completedQuizzes = quizzesWithStatus.filter(
+    q => q.isCompleted,
+  ).length;
+
+  const isQuizCompleted =
+    totalQuizzes === 0 || completedQuizzes === totalQuizzes;
+
+  // 🔹 Assignments
+  const totalAssignments = enrolledCourse.course.assignment.length;
+
+  const completedAssignments = assignmentsWithStatus.filter(
+    a => a.isCompleted,
+  ).length;
+
+  const isAssignmentCompleted =
+    totalAssignments === 0 ||
+    completedAssignments === totalAssignments;
+
+  // ✅ FINAL FLAG
+  const isEntireCourseCompleted =
+    isLessonCompleted && isQuizCompleted && isAssignmentCompleted;
 
   /* --------------------------------------------
      9️⃣ Final Response
@@ -1612,7 +1649,8 @@ const getByIdFromDB = async (id: string, userId: string) => {
 
   return {
     ...rest,
-    lectureWatched,
+    lectureWatched: completedLessons,
+    isEntireCourseCompleted, // 👈 NEW FIELD
     course: {
       ...rest.course,
       courseSections: courseSectionsWithStatus,
