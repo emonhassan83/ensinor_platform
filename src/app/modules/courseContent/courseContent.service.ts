@@ -10,7 +10,7 @@ import { courseContentSearchAbleFields } from './courseContent.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
-import { applyStorageUsage } from './courseContent.utils';
+import { applyStorageUsage, validateStorageQuota } from './courseContent.utils';
 
 const insertIntoDB = async (
   payload: { courseId: string; sections: ICourseSection[] },
@@ -31,6 +31,21 @@ const insertIntoDB = async (
     let totalDuration = 0;
     let totalStorage = 0;
 
+    /* 🔹 CALCULATE TOTAL INCOMING STORAGE */
+    for (const sec of sections) {
+      for (const lesson of sec.lesson) {
+        totalStorage += lesson.fileStorage ?? 0;
+      }
+    }
+
+    /* 🔹 VALIDATE BEFORE WRITE */
+    await validateStorageQuota(tx, {
+      authorId,
+      courseId,
+      incomingStorage: totalStorage,
+    });
+
+    /* 🔹 CREATE DATA */
     for (const sec of sections) {
       const createdSection = await tx.courseSection.create({
         data: {
@@ -40,24 +55,20 @@ const insertIntoDB = async (
         },
       });
 
-      const lessonsToCreate = sec.lesson.map(item => {
-        totalStorage += item.fileStorage ?? 0;
+      const lessons = sec.lesson.map(item => ({
+        sectionId: createdSection.id,
+        serial: Number(item.serial),
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        media: item.media,
+        duration: item.duration ?? 0,
+      }));
 
-        return {
-          sectionId: createdSection.id,
-          serial: Number(item.serial),
-          title: item.title,
-          description: item.description,
-          type: item.type,
-          media: item.media,
-          duration: item.duration ?? 0,
-        };
-      });
+      await tx.courseLesson.createMany({ data: lessons });
 
-      await tx.courseLesson.createMany({ data: lessonsToCreate });
-
-      totalLectures += lessonsToCreate.length;
-      totalDuration += lessonsToCreate.reduce(
+      totalLectures += lessons.length;
+      totalDuration += lessons.reduce(
         (sum, l) => sum + (l.duration || 0),
         0,
       );
@@ -71,6 +82,7 @@ const insertIntoDB = async (
       },
     });
 
+    /* 🔹 APPLY STORAGE */
     await applyStorageUsage(tx, {
       authorId,
       courseId,
@@ -94,10 +106,20 @@ const addLessonIntoDB = async (
     });
 
     if (!section) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Course section not found!');
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'Course section not found!',
+      );
     }
 
-    const createdLesson = await tx.courseLesson.create({
+    /* 🔹 VALIDATE FIRST */
+    await validateStorageQuota(tx, {
+      authorId,
+      courseId: section.course.id,
+      incomingStorage: payload.fileStorage ?? 0,
+    });
+
+    const lesson = await tx.courseLesson.create({
       data: {
         sectionId,
         serial: Number(payload.serial),
@@ -123,7 +145,7 @@ const addLessonIntoDB = async (
       fileStorage: payload.fileStorage ?? 0,
     });
 
-    return createdLesson;
+    return lesson;
   });
 };
 

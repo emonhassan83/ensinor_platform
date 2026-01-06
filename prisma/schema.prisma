@@ -304,7 +304,7 @@ model Department {
   id        String   @id @default(uuid())
   authorId  String
   name      String
-  image     String
+  image     String?
   joined    Int      @default(0)
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())

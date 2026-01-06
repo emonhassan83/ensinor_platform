@@ -176,6 +176,18 @@ const invitationCompanyAdmin = async (
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
   const result = await prisma.$transaction(async transactionClient => {
+    const isExist = await prisma.user.findFirst({
+      where: {
+        email: payload.organizationEmail,
+      },
+    });
+    if (isExist) {
+      throw new ApiError(
+        httpStatus.NOT_FOUND,
+        'This email already exist in this platform!',
+      );
+    }
+
     // 1️⃣ Create User
     const user = await transactionClient.user.create({
       data: {
