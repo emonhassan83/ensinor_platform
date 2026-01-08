@@ -40,7 +40,7 @@ router.put(
   auth(UserRole.student, UserRole.employee),
   upload.single('image'),
   parseData(),
-  validateRequest(CVValidation.updateValidationSchema),
+  // validateRequest(CVValidation.updateValidationSchema),
   CVController.updateIntoDB,
 );
 
