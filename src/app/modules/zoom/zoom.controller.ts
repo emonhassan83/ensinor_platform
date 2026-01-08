@@ -4,6 +4,7 @@ import { ZoomService } from './zoom.service';
 import config from '../../config';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
+import prisma from '../../utils/prisma';
 
 // Redirect to Zoom Authorization
 const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
@@ -11,7 +12,7 @@ const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Zoom token refreshed successfully!',
+    message: 'Zoom redirect auth link fetch successfully!',
     data: authUrl,
   });
 });
@@ -44,6 +45,17 @@ const refreshZoomToken = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getZoomAccount = async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const account = await prisma.zoomAccount.findFirst({ where: { userId } });
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Zoom token refreshed successfully!',
+    data: account ? true : false,
+  });
+};
+
 // Create Meeting
 const createZoomMeeting = catchAsync(async (req: Request, res: Response) => {
   const result = await ZoomService.createMeeting(req.body);
@@ -59,5 +71,6 @@ export const ZoomController = {
   redirectToZoomAuth,
   zoomAuthCallback,
   refreshZoomToken,
-  createZoomMeeting
+  createZoomMeeting,
+  getZoomAccount
 }

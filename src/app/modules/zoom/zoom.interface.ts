@@ -23,4 +23,5 @@ export type IZoomMeeting = {
   duration: number;
   startTime: string;
   endTime: string;
+  timezone?: string;
 };

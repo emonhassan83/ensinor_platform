@@ -190,6 +190,7 @@ model ZoomMeeting {
   startUrl      String
   joinUrl       String
   password      String?
+  timezone      String?
   duration      Int
   startTime     DateTime
   endTime       DateTime

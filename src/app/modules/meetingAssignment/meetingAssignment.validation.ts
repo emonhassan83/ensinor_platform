@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Create validation
 const createValidationSchema = z.object({
   body: z.object({
-     authorId: z.string().uuid({ message: "Author must be a valid UUID" }),
+    authorId: z.string().uuid({ message: "Author must be a valid UUID" }),
     modelType: z.enum(["course", "event", "user"]),
     courseId: z.string().uuid().optional(),
     eventId: z.string().uuid().optional(),

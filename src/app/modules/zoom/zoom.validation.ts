@@ -31,6 +31,7 @@ const createMeetingValidation = z.object({
     duration: z.string({ required_error: 'Duration is required!' }),
     startTime: z.string({ required_error: 'Start time is required!' }), // ISO string
     endTime: z.string({ required_error: 'End time is required!' }), // ISO string
+    timezone: z.string().optional(),
     password: z.string().optional(),
   }),
 })

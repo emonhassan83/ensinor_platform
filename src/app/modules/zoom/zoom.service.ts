@@ -104,7 +104,7 @@ const refreshAccessToken = async (userId: string) => {
 
 // Create Meeting
 const createMeeting = async (payload: IZoomMeeting) => {
-  const { userId, topic, startTime, duration, agenda } = payload;
+  const { userId, topic, startTime, duration, agenda, timezone } = payload;
 
   const account = await prisma.zoomAccount.findFirst({ where: { userId } });
   if (!account) throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
@@ -117,7 +117,7 @@ const createMeeting = async (payload: IZoomMeeting) => {
       type: 2,
       start_time: startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       duration: duration || 60,
-      timezone: 'Asia/Dhaka',
+      timezone: timezone || 'UTC',
       settings: {
         host_video: true,
         participant_video: true,
@@ -140,6 +140,7 @@ const createMeeting = async (payload: IZoomMeeting) => {
       duration: m.duration,
       startTime: new Date(m.start_time),
       endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+      timezone: m.timezone,
     },
   });
 };

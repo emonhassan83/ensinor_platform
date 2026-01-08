@@ -289,7 +289,7 @@ const moduleRoutes = [
     route: ZoomRoutes,
   },
   {
-    path: '/meeting-assignments',
+    path: '/meeting-assign',
     route: MeetingAssignmentRoutes,
   },
   {

@@ -64,15 +64,15 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
       );
 
     // ❌ Restrict NGO/SME from creating certificate builder
-    if (
-      company.industryType === CompanyType.ngo ||
-      company.industryType === CompanyType.sme
-    ) {
-      throw new ApiError(
-        httpStatus.FORBIDDEN,
-        'NGO or SME company admins or business instructors cannot create certificate builders!',
-      );
-    }
+    // if (
+    //   company.industryType === CompanyType.ngo ||
+    //   company.industryType === CompanyType.sme
+    // ) {
+    //   throw new ApiError(
+    //     httpStatus.FORBIDDEN,
+    //     'NGO or SME company admins or business instructors cannot create certificate builders!',
+    //   );
+    // }
   }
 
   // 3️⃣ Check if a pending certificate builder already exists

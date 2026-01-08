@@ -1504,13 +1504,16 @@ const getByIdFromDB = async (id: string, userId: string) => {
           },
           resource: true,
           quiz: {
+            where: { isDeleted: false },
             include: {
               questionsList: {
                 include: { options: true },
               },
             },
           },
-          assignment: true,
+          assignment: {
+            where: { isDeleted: false }
+          },
         },
       },
     },
@@ -1547,26 +1550,23 @@ const getByIdFromDB = async (id: string, userId: string) => {
     },
   });
 
-  const completedQuizSet = new Set(
-    quizAttempts.map(attempt => attempt.quizId),
-  );
+  const completedQuizSet = new Set(quizAttempts.map(attempt => attempt.quizId));
 
   /* --------------------------------------------
      4️⃣ Fetch Assignment Submissions
   --------------------------------------------- */
-  const assignmentSubmissions =
-    await prisma.assignmentSubmission.findMany({
-      where: {
-        userId,
-        assignment: {
-          courseId: enrolledCourse.courseId,
-        },
-        isDeleted: false,
+  const assignmentSubmissions = await prisma.assignmentSubmission.findMany({
+    where: {
+      userId,
+      assignment: {
+        courseId: enrolledCourse.courseId,
       },
-      select: {
-        assignmentId: true,
-      },
-    });
+      isDeleted: false,
+    },
+    select: {
+      assignmentId: true,
+    },
+  });
 
   const completedAssignmentSet = new Set(
     assignmentSubmissions.map(sub => sub.assignmentId),
@@ -1575,14 +1575,15 @@ const getByIdFromDB = async (id: string, userId: string) => {
   /* --------------------------------------------
      5️⃣ Inject isCompleted → Lessons
   --------------------------------------------- */
-  const courseSectionsWithStatus =
-    enrolledCourse.course.courseSections.map(section => ({
+  const courseSectionsWithStatus = enrolledCourse.course.courseSections.map(
+    section => ({
       ...section,
       courseContents: section.courseContents.map(content => ({
         ...content,
         isCompleted: watchedLectureSet.has(content.id),
       })),
-    }));
+    }),
+  );
 
   /* --------------------------------------------
      6️⃣ Inject isCompleted → Quizzes
@@ -1595,22 +1596,22 @@ const getByIdFromDB = async (id: string, userId: string) => {
   /* --------------------------------------------
      7️⃣ Inject isCompleted → Assignments
   --------------------------------------------- */
-  const assignmentsWithStatus =
-    enrolledCourse.course.assignment.map(assignment => ({
+  const assignmentsWithStatus = enrolledCourse.course.assignment.map(
+    assignment => ({
       ...assignment,
       isCompleted: completedAssignmentSet.has(assignment.id),
-    }));
+    }),
+  );
 
   /* --------------------------------------------
      8️⃣ Calculate Overall Completion
   --------------------------------------------- */
 
   // 🔹 Lessons
-  const totalLessons =
-    enrolledCourse.course.courseSections.reduce(
-      (sum, section) => sum + section.courseContents.length,
-      0,
-    );
+  const totalLessons = enrolledCourse.course.courseSections.reduce(
+    (sum, section) => sum + section.courseContents.length,
+    0,
+  );
 
   const completedLessons = enrolledCourse.watchedLectures.length;
 
@@ -1620,9 +1621,7 @@ const getByIdFromDB = async (id: string, userId: string) => {
   // 🔹 Quizzes
   const totalQuizzes = enrolledCourse.course.quiz.length;
 
-  const completedQuizzes = quizzesWithStatus.filter(
-    q => q.isCompleted,
-  ).length;
+  const completedQuizzes = quizzesWithStatus.filter(q => q.isCompleted).length;
 
   const isQuizCompleted =
     totalQuizzes === 0 || completedQuizzes === totalQuizzes;
@@ -1635,8 +1634,7 @@ const getByIdFromDB = async (id: string, userId: string) => {
   ).length;
 
   const isAssignmentCompleted =
-    totalAssignments === 0 ||
-    completedAssignments === totalAssignments;
+    totalAssignments === 0 || completedAssignments === totalAssignments;
 
   // ✅ FINAL FLAG
   const isEntireCourseCompleted =
@@ -1765,8 +1763,6 @@ const watchLectureIntoDB = async (payload: {
       where: { id: enrolledCourseId },
       data: {
         completedRate,
-        isComplete: true,
-        courseFinishTime: new Date(),
       },
     });
 

@@ -12,14 +12,19 @@ router.get(
   ZoomController.redirectToZoomAuth,
 );
 
+router.get(
+  '/auth/zoom',
+  ZoomController.getZoomAccount,
+);
+
 router.get('/auth/zoom/callback', ZoomController.zoomAuthCallback);
 
 router.post('/refresh', ZoomController.refreshZoomToken);
 
 router.post(
   '/zoom/create-meeting',
-  // auth(UserRole.super_admin),
-  // validateRequest(ZoomValidation.createMeetingValidation),
+  auth(UserRole.super_admin),
+  validateRequest(ZoomValidation.createMeetingValidation),
   ZoomController.createZoomMeeting,
 );
 

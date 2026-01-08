@@ -210,7 +210,7 @@ const updateIntoDB = async (
   return result;
 };
 
-const deleteFromDB = async (id: string): Promise<Batch> => {
+const deleteFromDB = async (id: string): Promise<Assignment> => {
   const assignment = await prisma.assignment.findUnique({
     where: { id, isDeleted: false },
   });
@@ -218,8 +218,9 @@ const deleteFromDB = async (id: string): Promise<Batch> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Assignment not found!');
   }
 
-  const result = await prisma.batch.delete({
+  const result = await prisma.assignment.update({
     where: { id },
+    data: { isDeleted: true },
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Assignment not deleted!');
