@@ -6,8 +6,11 @@ import config from '../../config';
 import { IZoomMeeting } from './zoom.interface';
 
 // Handle OAuth Callback (Save Zoom Account)
-const handleOAuthCallback = async (code: string) => {
+// zoom.service.ts
+const handleOAuthCallback = async (code: string, currentUserId: string) => {
   console.log('🚀 ~ handleOAuthCallback ~ code:', code);
+  console.log('Current App User ID:', currentUserId); // ডিবাগ
+
   try {
     const tokenResponse = await axios.post(
       'https://zoom.us/oauth/token',
@@ -20,40 +23,47 @@ const handleOAuthCallback = async (code: string) => {
         },
         headers: {
           Authorization: `Basic ${Buffer.from(
-            `${config.zoom.client_id}:${config.zoom.client_secret}`,
+            `${config.zoom.client_id}:${config.zoom.client_secret}`
           ).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-      },
+      }
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // Get user info from Zoom
+    // Get Zoom user info
     const userInfo = await axios.get('https://api.zoom.us/v2/users/me', {
       headers: { Authorization: `Bearer ${access_token}` },
     });
 
-    // Save or update Zoom account
+    const zoomUserId = userInfo.data.id; // Zoom-এর ID
+    const zoomEmail = userInfo.data.email;
+
+    // Check if already connected for THIS app user
     let zoomAccount = await prisma.zoomAccount.findFirst({
-      where: { userId: userInfo.data.id },
+      where: { userId: currentUserId }, // ← আপনার অ্যাপের userId
     });
 
     if (zoomAccount) {
+      // Update existing
       zoomAccount = await prisma.zoomAccount.update({
         where: { id: zoomAccount.id },
         data: {
           accessToken: access_token,
           refreshToken: refresh_token,
           expiresAt: new Date(Date.now() + expires_in * 1000),
+          zoomUserId, // update if needed
+          email: zoomEmail,
         },
       });
     } else {
+      // Create new with YOUR app's userId
       zoomAccount = await prisma.zoomAccount.create({
         data: {
-          userId: userInfo.data.id,
-          zoomUserId: userInfo.data.id,
-          email: userInfo.data.email,
+          userId: currentUserId, // ← এটা ঠিক করা হয়েছে
+          zoomUserId,
+          email: zoomEmail,
           accessToken: access_token,
           refreshToken: refresh_token,
           expiresAt: new Date(Date.now() + expires_in * 1000),
@@ -72,7 +82,7 @@ const handleOAuthCallback = async (code: string) => {
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
       'Zoom OAuth failed!',
-      error.response?.data,
+      error.response?.data
     );
   }
 };
