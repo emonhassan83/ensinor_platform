@@ -25,16 +25,16 @@ const updateAccountValidation = z.object({
 const createMeetingValidation = z.object({
   body: z.object({
     userId: z.string({ required_error: 'User ID is required!' }).uuid('Invalid user ID'),
-    zoomAccountId: z.string({ required_error: 'Zoom Account ID is required!' }).uuid('Invalid Zoom Account ID'),
-    topic: z.string({ required_error: 'Meeting topic is required!' }),
+    zoomAccountId: z.string().uuid('Invalid Zoom Account ID').optional(),
+    topic: z.string({ required_error: 'Meeting topic is required!' }).min(1),
     agenda: z.string().optional(),
-    duration: z.string({ required_error: 'Duration is required!' }),
-    startTime: z.string({ required_error: 'Start time is required!' }), // ISO string
-    endTime: z.string({ required_error: 'End time is required!' }), // ISO string
+    duration: z.number({ required_error: 'Duration is required!' }).int().positive().min(1).optional(),
+    startTime: z.string({ required_error: 'Start time is required!' }).datetime({ message: 'Invalid ISO date' }).optional(),
+    endTime: z.string().datetime().optional(),
     timezone: z.string().optional(),
     password: z.string().optional(),
   }),
-})
+});
 
 // Zoom Meeting Update Validation
 const updateMeetingValidation = z.object({
