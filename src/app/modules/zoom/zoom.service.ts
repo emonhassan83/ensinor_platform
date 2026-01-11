@@ -36,6 +36,8 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
     const userInfo = await axios.get('https://api.zoom.us/v2/users/me', {
       headers: { Authorization: `Bearer ${access_token}` },
     });
+    console.log({userInfo});
+    
 
     const zoomUserId = userInfo.data.id; // Zoom-এর ID
     const zoomEmail = userInfo.data.email;

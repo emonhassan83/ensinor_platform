@@ -24,7 +24,7 @@ const zoomAuthCallback = catchAsync(async (req: Request, res: Response) => {
     throw new Error('Missing authorization code!');
   }
 
-  const result = await ZoomService.handleOAuthCallback(code as string, req.user?.userId);
+  const result = await ZoomService.handleOAuthCallback(code as string, req.user!.userId);
 
   res.send(
     `<h1>✅ Zoom account connected successfully!</h1>
