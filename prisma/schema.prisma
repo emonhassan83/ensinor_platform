@@ -1863,6 +1863,7 @@ enum NotificationModeType {
   withdraw_request
   subscription
   achievement
+  meeting
 }
 
 enum UserStatus {

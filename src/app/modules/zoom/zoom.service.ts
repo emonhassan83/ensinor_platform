@@ -10,7 +10,6 @@ import { Prisma, ZoomMeeting } from '@prisma/client';
 import { zoomSearchAbleFields } from './zoom.constant';
 
 // Handle OAuth Callback (Save Zoom Account)
-// zoom.service.ts
 const handleOAuthCallback = async (code: string, currentUserId: string) => {
   console.log('🚀 ~ handleOAuthCallback ~ code:', code);
   console.log('Current App User ID:', currentUserId); // ডিবাগ
@@ -186,7 +185,7 @@ const getAllFromDB = async (
   userId: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { searchTerm, status, ...filterData } = params; // ← status আলাদা করে নাও
 
   const user = await prisma.user.findUnique({
     where: { id: userId, isDeleted: false },
@@ -197,7 +196,7 @@ const getAllFromDB = async (
 
   const andConditions: Prisma.ZoomMeetingWhereInput[] = [];
 
-  // Search across Package and nested User fields
+  // Search
   if (searchTerm) {
     andConditions.push({
       OR: zoomSearchAbleFields.map(field => ({
@@ -209,7 +208,21 @@ const getAllFromDB = async (
     });
   }
 
-  // Filters
+  // Status filter (incoming / expired)
+  if (status) {
+    const now = new Date();
+    if (status === 'incoming') {
+      andConditions.push({
+        startTime: { gt: now },
+      });
+    } else if (status === 'expired') {
+      andConditions.push({
+        startTime: { lte: now },
+      });
+    }
+  }
+
+  // Other filters (topic, duration ইত্যাদি)
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map(key => ({
@@ -220,6 +233,7 @@ const getAllFromDB = async (
     });
   }
 
+  // Only own meetings
   andConditions.push({
     zoomAccount: {
       userId: userId,
@@ -236,12 +250,8 @@ const getAllFromDB = async (
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { startTime: 'asc' }, // default sort by upcoming first
     include: {
       meetingAssignment: true,
     },
@@ -251,10 +261,17 @@ const getAllFromDB = async (
     where: whereConditions,
   });
 
-  const formattedResult = result.map(meeting => ({
-    ...meeting,
-    isAssignMeeting: meeting.meetingAssignment.length > 0,
-  }));
+  // Add isAssignMeeting & status
+  const formattedResult = result.map(meeting => {
+    const now = new Date();
+    const start = new Date(meeting.startTime);
+
+    return {
+      ...meeting,
+      isAssignMeeting: meeting.meetingAssignment.length > 0,
+      status: start > now ? 'incoming' : 'expired', // ← নতুন status ফিল্ড
+    };
+  });
 
   return {
     meta: {
@@ -290,9 +307,13 @@ const getByIdFromDB = async (id: string): Promise<ZoomMeeting | null> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Meeting not found!');
   }
 
+  const now = new Date();
+  const start = new Date(result.startTime);
+
   const formattedResult = {
     ...result,
     isAssignMeeting: result.meetingAssignment.length > 0,
+    status: start > now ? 'incoming' : 'expired',
   };
 
   return formattedResult;

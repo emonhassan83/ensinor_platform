@@ -1,3 +1,3 @@
 export const zoomSearchAbleFields = [''];
 
-export const zoomFilterableFields = ['searchTerm'];
+export const zoomFilterableFields = ['searchTerm', 'status'];

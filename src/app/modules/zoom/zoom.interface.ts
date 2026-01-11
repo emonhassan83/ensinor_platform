@@ -1,5 +1,6 @@
 export type IZoomFilterRequest = {
   searchTerm?: string | undefined;
+  status?: string | undefined;
 };
 
 export type IZoomAccount = {
