@@ -3,7 +3,11 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import axios from 'axios';
 import config from '../../config';
-import { IZoomMeeting } from './zoom.interface';
+import { IZoomFilterRequest, IZoomMeeting } from './zoom.interface';
+import { IPaginationOptions } from '../../interfaces/pagination';
+import { paginationHelpers } from '../../helpers/paginationHelper';
+import { Prisma, ZoomMeeting } from '@prisma/client';
+import { zoomSearchAbleFields } from './zoom.constant';
 
 // Handle OAuth Callback (Save Zoom Account)
 // zoom.service.ts
@@ -23,11 +27,11 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
         },
         headers: {
           Authorization: `Basic ${Buffer.from(
-            `${config.zoom.client_id}:${config.zoom.client_secret}`
+            `${config.zoom.client_id}:${config.zoom.client_secret}`,
           ).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-      }
+      },
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
@@ -82,7 +86,7 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
       'Zoom OAuth failed!',
-      error.response?.data
+      error.response?.data,
     );
   }
 };
@@ -176,8 +180,168 @@ const createMeeting = async (payload: IZoomMeeting) => {
   });
 };
 
+const getAllFromDB = async (
+  params: IZoomFilterRequest,
+  options: IPaginationOptions,
+  userId: string,
+) => {
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  const andConditions: Prisma.ZoomMeetingWhereInput[] = [];
+
+  // Search across Package and nested User fields
+  if (searchTerm) {
+    andConditions.push({
+      OR: zoomSearchAbleFields.map(field => ({
+        [field]: {
+          contains: searchTerm,
+          mode: 'insensitive',
+        },
+      })),
+    });
+  }
+
+  // Filters
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push({
+      AND: Object.keys(filterData).map(key => ({
+        [key]: {
+          equals: (filterData as any)[key],
+        },
+      })),
+    });
+  }
+
+  andConditions.push({
+    zoomAccount: {
+      userId: userId,
+    },
+  });
+
+  const whereConditions: Prisma.ZoomMeetingWhereInput = {
+    AND: andConditions,
+  };
+
+  const result = await prisma.zoomMeeting.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy:
+      options.sortBy && options.sortOrder
+        ? {
+            [options.sortBy]: options.sortOrder,
+          }
+        : {
+            createdAt: 'desc',
+          },
+    include: {
+      meetingAssignment: true,
+    },
+  });
+
+  const total = await prisma.zoomMeeting.count({
+    where: whereConditions,
+  });
+
+  const formattedResult = result.map(meeting => ({
+    ...meeting,
+    isAssignMeeting: meeting.meetingAssignment.length > 0,
+  }));
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: formattedResult,
+  };
+};
+
+const getByIdFromDB = async (id: string): Promise<ZoomMeeting | null> => {
+  const result = await prisma.zoomMeeting.findUnique({
+    where: { id, isDeleted: false },
+    include: {
+      zoomAccount: {
+        select: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              photoUrl: true,
+            },
+          },
+        },
+      },
+      meetingAssignment: true,
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Meeting not found!');
+  }
+
+  return result;
+};
+
+const updateIntoDB = async (
+  id: string,
+  payload: Partial<IZoomMeeting>,
+): Promise<ZoomMeeting> => {
+  const meeting = await prisma.zoomMeeting.findUnique({
+    where: { id },
+  });
+  if (!meeting || meeting?.isDeleted) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not found!');
+  }
+
+  const result = await prisma.zoomMeeting.update({
+    where: { id },
+    data: payload,
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not updated!');
+  }
+
+  return result;
+};
+
+const deleteFromDB = async (id: string): Promise<ZoomMeeting> => {
+  const meeting = await prisma.zoomMeeting.findUnique({
+    where: { id },
+  });
+  if (!meeting) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not found!');
+  }
+
+  const result = await prisma.zoomMeeting.update({
+    where: { id },
+    data: {
+      isDeleted: true,
+    },
+  });
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not deleted!');
+  }
+
+  return result;
+};
+
 export const ZoomService = {
   handleOAuthCallback,
   refreshAccessToken,
   createMeeting,
+  getAllFromDB,
+  getByIdFromDB,
+  updateIntoDB,
+  deleteFromDB,
 };

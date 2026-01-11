@@ -6,6 +6,8 @@ import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
+import pick from '../../utils/pick';
+import { zoomFilterableFields } from './zoom.constant';
 
 const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
   const currentUserId = req.user!.userId;
@@ -103,10 +105,61 @@ const createZoomMeeting = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Get Meeting
+const getMyZoomMeeting = catchAsync(async (req: Request, res: Response) => {
+  const filters = pick(req.query, zoomFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await ZoomService.getAllFromDB(filters, options, req.user!.userId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My Meeting fetched successfully!',
+    data: result,
+  });
+});
+
+// Get a Meeting
+const getAZoomMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await ZoomService.getByIdFromDB(req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting fetched successfully!',
+    data: result,
+  });
+});
+
+// Update Meeting
+const updateAZoomMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await ZoomService.updateIntoDB(req.params.id, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting updated successfully!',
+    data: result,
+  });
+});
+
+// Remove Zoom Meeting
+const deleteAZoomMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await ZoomService.deleteFromDB(req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting deleted successfully!',
+    data: result,
+  });
+});
+
 export const ZoomController = {
   redirectToZoomAuth,
   zoomAuthCallback,
   refreshZoomToken,
   createZoomMeeting,
   getZoomAccount,
+  getMyZoomMeeting,
+  getAZoomMeeting,
+  updateAZoomMeeting,
+  deleteAZoomMeeting
 };

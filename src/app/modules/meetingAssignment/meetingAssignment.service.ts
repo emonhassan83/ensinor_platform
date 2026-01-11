@@ -31,7 +31,6 @@ const insertIntoDB = async (payload: IMeetingAssign) => {
 const getAllFromDB = async (
   params: IMeetingAssignFilterRequest,
   options: IPaginationOptions,
-  reference?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;

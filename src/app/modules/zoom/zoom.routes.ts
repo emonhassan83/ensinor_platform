@@ -45,4 +45,48 @@ router.post(
   ZoomController.createZoomMeeting,
 );
 
+router.get(
+  '/zoom/meeting/my-meeting',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.getMyZoomMeeting,
+);
+
+router.get(
+  '/zoom/meeting/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.getAZoomMeeting,
+);
+
+router.put(
+  '/zoom/meeting/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.updateAZoomMeeting,
+);
+
+router.delete(
+  '/zoom/meeting/:id',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.deleteAZoomMeeting,
+);
+
 export const ZoomRoutes = router;
