@@ -290,7 +290,12 @@ const getByIdFromDB = async (id: string): Promise<ZoomMeeting | null> => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Meeting not found!');
   }
 
-  return result;
+  const formattedResult = {
+    ...result,
+    isAssignMeeting: result.meetingAssignment.length > 0,
+  };
+
+  return formattedResult;
 };
 
 const updateIntoDB = async (
