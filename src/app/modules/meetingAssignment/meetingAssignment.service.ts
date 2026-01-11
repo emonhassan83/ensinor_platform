@@ -1,4 +1,4 @@
-import { MeetingAssignment, Prisma, UserRole, UserStatus } from '@prisma/client';
+import { MeetingAssignment, Prisma, UserStatus } from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -8,10 +8,14 @@ import {
 import { meetingAssignmentSearchAbleFields } from './meetingAssignment.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
-import { sendMeetingAssignmentEmail, sendMeetingAssignmentNotification } from './meetingAssignment.utils';
+import {
+  sendMeetingAssignmentEmail,
+  sendMeetingAssignmentNotification,
+} from './meetingAssignment.utils';
 
 const insertIntoDB = async (payload: IMeetingAssign) => {
-  const { authorId, modelType, zoomMeetingId, courseId, eventId, userId } = payload;
+  const { authorId, modelType, zoomMeetingId, courseId, eventId, userId } =
+    payload;
 
   // ১. Author validation (active + instructor/admin)
   const author = await prisma.user.findUnique({
@@ -31,33 +35,63 @@ const insertIntoDB = async (payload: IMeetingAssign) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Zoom meeting not found!');
   }
   if (meeting.zoomAccount.userId !== authorId) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You can only assign your own Zoom meetings!');
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'You can only assign your own Zoom meetings!',
+    );
   }
 
   // ৩. ModelType wise validation + invalid target
   if (modelType === 'course') {
-    if (!courseId) throw new ApiError(httpStatus.BAD_REQUEST, 'Course ID is required for course assignment!');
-    if (eventId || userId) throw new ApiError(httpStatus.BAD_REQUEST, 'For course assignment, only courseId should be provided!');
-    
+    if (!courseId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Course ID is required for course assignment!',
+      );
+    if (eventId || userId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'For course assignment, only courseId should be provided!',
+      );
+
     // Course exist
     const course = await prisma.course.findUnique({ where: { id: courseId } });
-    if (!course) throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found course!');
+    if (!course)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found course!');
   } else if (modelType === 'event') {
-    if (!eventId) throw new ApiError(httpStatus.BAD_REQUEST, 'Event ID is required for event assignment!');
-    if (courseId || userId) throw new ApiError(httpStatus.BAD_REQUEST, 'For event assignment, only eventId should be provided!');
-    
+    if (!eventId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Event ID is required for event assignment!',
+      );
+    if (courseId || userId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'For event assignment, only eventId should be provided!',
+      );
+
     // Event exist
     const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found event!');
+    if (!event)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found event!');
   } else if (modelType === 'user') {
-    if (!userId) throw new ApiError(httpStatus.BAD_REQUEST, 'User ID is required for user assignment!');
-    if (courseId || eventId) throw new ApiError(httpStatus.BAD_REQUEST, 'For user assignment, only userId should be provided!');
-    
+    if (!userId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'User ID is required for user assignment!',
+      );
+    if (courseId || eventId)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'For user assignment, only userId should be provided!',
+      );
+
     // User exist + active
     const targetUser = await prisma.user.findUnique({
       where: { id: userId, isDeleted: false },
     });
-    if (!targetUser) throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found user!');
+    if (!targetUser)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or not found user!');
   } else {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid modelType!');
   }
@@ -72,7 +106,10 @@ const insertIntoDB = async (payload: IMeetingAssign) => {
     },
   });
   if (existing) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'This meeting is already assigned to this target!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'This meeting is already assigned to this target!',
+    );
   }
 
   // ৫. Create assignment
@@ -123,15 +160,24 @@ const insertIntoDB = async (payload: IMeetingAssign) => {
     };
 
     // reusable notification utils
-    await sendMeetingAssignmentNotification(recipients, meetingDetails, modelType);
+    await sendMeetingAssignmentNotification(
+      recipients,
+      meetingDetails,
+      modelType,
+    );
 
     // Email sent
     const emailPromises = recipients.map(rec =>
-      sendMeetingAssignmentEmail(rec.email, rec.name, meetingDetails, modelType)
+      sendMeetingAssignmentEmail(
+        rec.email,
+        rec.name,
+        meetingDetails,
+        modelType,
+      ),
     );
-    
+
     Promise.allSettled(emailPromises).catch(err =>
-      console.error('Meeting email failed:', err)
+      console.error('Meeting email failed:', err),
     );
   }
 
@@ -186,6 +232,31 @@ const getAllFromDB = async (
         : {
             createdAt: 'desc',
           },
+    include: {
+      course: {
+        select: {
+          title: true,
+          thumbnail: true,
+          description: true,
+        },
+      },
+      event: {
+        select: {
+          title: true,
+          thumbnail: true,
+          description: true,
+        },
+      },
+      user: {
+        select: {
+          name: true,
+          email: true,
+          photoUrl: true,
+          contactNo: true,
+        },
+      },
+      zoomMeeting: true,
+    },
   });
 
   const total = await prisma.meetingAssignment.count({

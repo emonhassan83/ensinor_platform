@@ -185,7 +185,7 @@ const getAllFromDB = async (
   userId: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, status, ...filterData } = params; // ← status আলাদা করে নাও
+  const { searchTerm, status, ...filterData } = params;
 
   const user = await prisma.user.findUnique({
     where: { id: userId, isDeleted: false },
@@ -253,7 +253,33 @@ const getAllFromDB = async (
         ? { [options.sortBy]: options.sortOrder }
         : { startTime: 'asc' }, // default sort by upcoming first
     include: {
-      meetingAssignment: true,
+      meetingAssignment: {
+        include: {
+          course: {
+            select: {
+              title: true,
+              thumbnail: true,
+              description: true,
+            },
+          },
+          event: {
+            select: {
+              title: true,
+              thumbnail: true,
+              description: true,
+            },
+          },
+          user: {
+            select: {
+              name: true,
+              email: true,
+              photoUrl: true,
+              contactNo: true,
+            },
+          },
+          zoomMeeting: true,
+        },
+      },
     },
   });
 
@@ -269,7 +295,7 @@ const getAllFromDB = async (
     return {
       ...meeting,
       isAssignMeeting: meeting.meetingAssignment.length > 0,
-      status: start > now ? 'incoming' : 'expired', // ← নতুন status ফিল্ড
+      status: start > now ? 'incoming' : 'expired',
     };
   });
 
@@ -299,7 +325,29 @@ const getByIdFromDB = async (id: string): Promise<ZoomMeeting | null> => {
           },
         },
       },
-      meetingAssignment: true,
+      meetingAssignment: {
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              photoUrl: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              photoUrl: true,
+            },
+          },
+          zoomMeeting: true,
+          course: true,
+          event: true,
+        },
+      },
     },
   });
 
