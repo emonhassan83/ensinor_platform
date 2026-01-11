@@ -7,7 +7,7 @@ import { IZoomMeeting } from './zoom.interface';
 
 // Handle OAuth Callback (Save Zoom Account)
 const handleOAuthCallback = async (code: string) => {
-  console.log("🚀 ~ handleOAuthCallback ~ code:", code)
+  console.log('🚀 ~ handleOAuthCallback ~ code:', code);
   try {
     const tokenResponse = await axios.post(
       'https://zoom.us/oauth/token',
@@ -20,11 +20,11 @@ const handleOAuthCallback = async (code: string) => {
         },
         headers: {
           Authorization: `Basic ${Buffer.from(
-            `${config.zoom.client_id}:${config.zoom.client_secret}`
+            `${config.zoom.client_id}:${config.zoom.client_secret}`,
           ).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-      }
+      },
     );
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
@@ -63,42 +63,61 @@ const handleOAuthCallback = async (code: string) => {
 
     return zoomAccount;
   } catch (error: any) {
-    console.error(error.response?.data);
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Zoom OAuth failed!');
+    console.error('Zoom OAuth Error Details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers,
+    });
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Zoom OAuth failed!',
+      error.response?.data,
+    );
   }
 };
 
 // Refresh Access Token
 const refreshAccessToken = async (userId: string) => {
   const account = await prisma.zoomAccount.findFirst({ where: { userId } });
-  if (!account) throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found!');
+  if (!account)
+    throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found!');
 
   try {
-    const refreshResponse = await axios.post('https://zoom.us/oauth/token', null, {
-      params: {
-        grant_type: 'refresh_token',
-        refresh_token: account.refreshToken,
+    const refreshResponse = await axios.post(
+      'https://zoom.us/oauth/token',
+      null,
+      {
+        params: {
+          grant_type: 'refresh_token',
+          refresh_token: account.refreshToken,
+        },
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            `${config.zoom.client_id}:${config.zoom.client_secret}`,
+          ).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       },
-      headers: {
-        Authorization: `Basic ${Buffer.from(
-          `${config.zoom.client_id}:${config.zoom.client_secret}`
-        ).toString('base64')}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
+    );
 
     const updated = await prisma.zoomAccount.update({
       where: { id: account.id },
       data: {
         accessToken: refreshResponse.data.access_token,
         refreshToken: refreshResponse.data.refresh_token,
-        expiresAt: new Date(Date.now() + refreshResponse.data.expires_in * 1000),
+        expiresAt: new Date(
+          Date.now() + refreshResponse.data.expires_in * 1000,
+        ),
       },
     });
 
     return updated;
   } catch (error) {
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Token refresh failed!');
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Token refresh failed!',
+    );
   }
 };
 
@@ -107,7 +126,8 @@ const createMeeting = async (payload: IZoomMeeting) => {
   const { userId, topic, startTime, duration, agenda, timezone } = payload;
 
   const account = await prisma.zoomAccount.findFirst({ where: { userId } });
-  if (!account) throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
+  if (!account)
+    throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
 
   const response = await axios.post(
     `https://api.zoom.us/v2/users/me/meetings`,
@@ -115,7 +135,8 @@ const createMeeting = async (payload: IZoomMeeting) => {
       topic: topic || 'New Meeting',
       agenda: agenda || '',
       type: 2,
-      start_time: startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      start_time:
+        startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       duration: duration || 60,
       timezone: timezone || 'UTC',
       settings: {
@@ -123,7 +144,7 @@ const createMeeting = async (payload: IZoomMeeting) => {
         participant_video: true,
       },
     },
-    { headers: { Authorization: `Bearer ${account.accessToken}` } }
+    { headers: { Authorization: `Bearer ${account.accessToken}` } },
   );
 
   const m = response.data;

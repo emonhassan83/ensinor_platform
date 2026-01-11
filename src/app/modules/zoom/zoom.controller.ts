@@ -28,7 +28,7 @@ const zoomAuthCallback = catchAsync(async (req: Request, res: Response) => {
 
   res.send(
     `<h1>✅ Zoom account connected successfully!</h1>
-     <p>Access Token: ${result.accessToken}</p>`
+     <p>Access Token: ${result.accessToken}</p>`,
   );
 });
 
@@ -48,11 +48,14 @@ const refreshZoomToken = catchAsync(async (req: Request, res: Response) => {
 const getZoomAccount = async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const account = await prisma.zoomAccount.findFirst({ where: { userId } });
+
+  console.log({ account });
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Zoom token refreshed successfully!',
-    data: account ? true : false,
+    message: account ? 'Zoom account is connected' : 'No Zoom account found',
+    data: !!account, 
   });
 };
 
@@ -72,5 +75,5 @@ export const ZoomController = {
   zoomAuthCallback,
   refreshZoomToken,
   createZoomMeeting,
-  getZoomAccount
-}
+  getZoomAccount,
+};

@@ -4,16 +4,20 @@ import validateRequest from '../../middlewares/validateRequest';
 import auth from '../../middlewares/auth';
 import { UserRole } from '@prisma/client';
 import { ZoomValidation } from './zoom.validation';
+import { USE_PROXY } from 'http-status';
 
 const router = express.Router();
 
-router.get(
-  '/auth/zoom',
-  ZoomController.redirectToZoomAuth,
-);
+router.get('/auth/zoom', ZoomController.redirectToZoomAuth);
 
 router.get(
-  '/auth/zoom',
+  '/zoom/account',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   ZoomController.getZoomAccount,
 );
 
