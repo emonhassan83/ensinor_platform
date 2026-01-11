@@ -21,7 +21,16 @@ router.get(
   ZoomController.getZoomAccount,
 );
 
-router.get('/auth/zoom/callback', ZoomController.zoomAuthCallback);
+router.get(
+  '/auth/zoom/callback',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.zoomAuthCallback,
+);
 
 router.post('/refresh', ZoomController.refreshZoomToken);
 
