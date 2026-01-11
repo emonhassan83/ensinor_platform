@@ -115,7 +115,8 @@ const getMyZoomMeeting = catchAsync(async (req: Request, res: Response) => {
     statusCode: httpStatus.OK,
     success: true,
     message: 'My Meeting fetched successfully!',
-    data: result,
+    meta: result.meta,
+    data: result.data,
   });
 });
 
