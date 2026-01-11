@@ -303,15 +303,35 @@ const updateIntoDB = async (
   payload: Partial<IZoomMeeting>,
 ): Promise<ZoomMeeting> => {
   const meeting = await prisma.zoomMeeting.findUnique({
-    where: { id },
+    where: { id, isDeleted: false },
   });
-  if (!meeting || meeting?.isDeleted) {
+  if (!meeting) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not found!');
   }
 
+  let newEndTime: Date | undefined;
+
+  if (payload.startTime || payload.duration) {
+    // current start time and duration
+    const baseStartTime = payload.startTime
+      ? new Date(payload.startTime)
+      : meeting.startTime;
+    const baseDuration =
+      payload.duration !== undefined ? payload.duration : meeting.duration;
+
+    // New endTime = startTime + duration minutes
+    newEndTime = new Date(baseStartTime.getTime() + baseDuration * 60 * 1000);
+  }
+
+  // Update payload
+  const updateData: Prisma.ZoomMeetingUpdateInput = {
+    ...payload,
+    ...(newEndTime && { endTime: newEndTime }),
+  };
+
   const result = await prisma.zoomMeeting.update({
     where: { id },
-    data: payload,
+    data: updateData,
   });
   if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Meeting not updated!');
