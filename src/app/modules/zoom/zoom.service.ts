@@ -6,11 +6,9 @@ import config from '../../config';
 import { IZoomMeeting } from './zoom.interface';
 
 // Handle OAuth Callback (Save Zoom Account)
-// zoom.service.ts
-const handleOAuthCallback = async (code: string, currentUserId: string) => {
-  console.log('🚀 ~ handleOAuthCallback ~ code:', code);
-  console.log('Current App User ID:', currentUserId); // ডিবাগ
-
+// Handle OAuth Callback (Save Zoom Account)
+const handleOAuthCallback = async (code: string) => {
+  console.log("🚀 ~ handleOAuthCallback ~ code:", code)
   try {
     const tokenResponse = await axios.post(
       'https://zoom.us/oauth/token',
@@ -32,40 +30,31 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
 
     const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // Get Zoom user info
+    // Get user info from Zoom
     const userInfo = await axios.get('https://api.zoom.us/v2/users/me', {
       headers: { Authorization: `Bearer ${access_token}` },
     });
-    console.log({userInfo});
-    
 
-    const zoomUserId = userInfo.data.id; // Zoom-এর ID
-    const zoomEmail = userInfo.data.email;
-
-    // Check if already connected for THIS app user
+    // Save or update Zoom account
     let zoomAccount = await prisma.zoomAccount.findFirst({
-      where: { userId: currentUserId }, // ← আপনার অ্যাপের userId
+      where: { userId: userInfo.data.id },
     });
 
     if (zoomAccount) {
-      // Update existing
       zoomAccount = await prisma.zoomAccount.update({
         where: { id: zoomAccount.id },
         data: {
           accessToken: access_token,
           refreshToken: refresh_token,
           expiresAt: new Date(Date.now() + expires_in * 1000),
-          zoomUserId, // update if needed
-          email: zoomEmail,
         },
       });
     } else {
-      // Create new with YOUR app's userId
       zoomAccount = await prisma.zoomAccount.create({
         data: {
-          userId: currentUserId, // ← এটা ঠিক করা হয়েছে
-          zoomUserId,
-          email: zoomEmail,
+          userId: userInfo.data.id,
+          zoomUserId: userInfo.data.id,
+          email: userInfo.data.email,
           accessToken: access_token,
           refreshToken: refresh_token,
           expiresAt: new Date(Date.now() + expires_in * 1000),
@@ -75,17 +64,8 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
 
     return zoomAccount;
   } catch (error: any) {
-    console.error('Zoom OAuth Error Details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      headers: error.response?.headers,
-    });
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Zoom OAuth failed!',
-      error.response?.data
-    );
+    console.error(error.response?.data);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Zoom OAuth failed!');
   }
 };
 
