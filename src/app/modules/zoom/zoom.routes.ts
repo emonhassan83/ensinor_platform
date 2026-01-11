@@ -35,7 +35,12 @@ router.post('/refresh', ZoomController.refreshZoomToken);
 
 router.post(
   '/zoom/create-meeting',
-  auth(UserRole.super_admin),
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
   validateRequest(ZoomValidation.createMeetingValidation),
   ZoomController.createZoomMeeting,
 );
