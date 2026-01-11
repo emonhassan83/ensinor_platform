@@ -7,7 +7,16 @@ import { ZoomValidation } from './zoom.validation';
 
 const router = express.Router();
 
-router.get('/auth/zoom', ZoomController.redirectToZoomAuth);
+router.get(
+  '/auth/zoom',
+  auth(
+    UserRole.super_admin,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+    UserRole.instructor,
+  ),
+  ZoomController.redirectToZoomAuth,
+);
 
 router.get(
   '/zoom/account',
@@ -20,16 +29,7 @@ router.get(
   ZoomController.getZoomAccount,
 );
 
-router.get(
-  '/auth/zoom/callback',
-  auth(
-    UserRole.super_admin,
-    UserRole.company_admin,
-    UserRole.business_instructors,
-    UserRole.instructor,
-  ),
-  ZoomController.zoomAuthCallback,
-);
+router.get('/auth/zoom/callback', ZoomController.zoomAuthCallback);
 
 router.post('/refresh', ZoomController.refreshZoomToken);
 
