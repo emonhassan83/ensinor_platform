@@ -7,21 +7,29 @@ import sendResponse from '../../utils/sendResponse';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 
-// Redirect to Zoom Authorization
 const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
   const currentUserId = req.user!.userId;
 
   if (!config.zoom.redirect_url) {
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Zoom redirect URL is not configured');
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Zoom redirect URL is not configured',
+    );
   }
 
   const state = Buffer.from(
-    JSON.stringify({ userId: currentUserId, timestamp: Date.now() })
+    JSON.stringify({ userId: currentUserId, timestamp: Date.now() }),
   ).toString('base64');
 
   const authUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${config.zoom.client_id}&redirect_uri=${encodeURIComponent(config.zoom.redirect_url)}&state=${state}`;
 
-  res.redirect(authUrl);
+  // Frontend-এ authUrl পাঠাও (redirect না করে)
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Zoom auth URL generated',
+    data: { authUrl },
+  });
 });
 
 // Handle Zoom OAuth Callback
@@ -48,10 +56,13 @@ const zoomAuthCallback = catchAsync(async (req: Request, res: Response) => {
     code as string,
     currentUserId,
   );
-  res.send(
-    `<h1>✅ Zoom account connected successfully!</h1>
-     <p>Access Token: ${result.accessToken}</p>`,
-  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Zoom connected successfully!',
+    data: { accessToken: result.accessToken },
+  });
 });
 
 // Refresh Zoom Token
