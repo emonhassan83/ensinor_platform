@@ -31,7 +31,7 @@ router.get(
 
 router.get('/auth/zoom/callback', ZoomController.zoomAuthCallback);
 
-router.post('/refresh', ZoomController.refreshZoomToken);
+router.post('/zoom/refresh', ZoomController.refreshZoomToken);
 
 router.post(
   '/zoom/create-meeting',
