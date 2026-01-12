@@ -93,8 +93,7 @@ const handleOAuthCallback = async (code: string, currentUserId: string) => {
 // Refresh Access Token
 const refreshAccessToken = async (userId: string) => {
   const account = await prisma.zoomAccount.findFirst({ where: { userId } });
-  if (!account)
-    throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found!');
+  if (!account) throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found!');
 
   try {
     const refreshResponse = await axios.post(
@@ -106,31 +105,25 @@ const refreshAccessToken = async (userId: string) => {
           refresh_token: account.refreshToken,
         },
         headers: {
-          Authorization: `Basic ${Buffer.from(
-            `${config.zoom.client_id}:${config.zoom.client_secret}`,
-          ).toString('base64')}`,
+          Authorization: `Basic ${Buffer.from(`$$   {config.zoom.client_id}:   $${config.zoom.client_secret}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-      },
+      }
     );
 
     const updated = await prisma.zoomAccount.update({
       where: { id: account.id },
       data: {
         accessToken: refreshResponse.data.access_token,
-        refreshToken: refreshResponse.data.refresh_token,
-        expiresAt: new Date(
-          Date.now() + refreshResponse.data.expires_in * 1000,
-        ),
+        refreshToken: refreshResponse.data.refresh_token || account.refreshToken,
+        expiresAt: new Date(Date.now() + refreshResponse.data.expires_in * 1000),
       },
     });
 
     return updated;
-  } catch (error) {
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Token refresh failed!',
-    );
+  } catch (error: any) {
+    console.error('Refresh token failed:', error.response?.data);
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Zoom token refresh failed. Please reconnect Zoom account.');
   }
 };
 
@@ -138,45 +131,110 @@ const refreshAccessToken = async (userId: string) => {
 const createMeeting = async (payload: IZoomMeeting) => {
   const { userId, topic, startTime, duration, agenda, timezone } = payload;
 
-  const account = await prisma.zoomAccount.findFirst({ where: { userId } });
-  if (!account)
+  // ১. Zoom account
+  let account = await prisma.zoomAccount.findFirst({ where: { userId } });
+  if (!account) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
+  }
 
-  const response = await axios.post(
-    `https://api.zoom.us/v2/users/me/meetings`,
-    {
-      topic: topic || 'New Meeting',
-      agenda: agenda || '',
-      type: 2,
-      start_time:
-        startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      duration: duration || 60,
-      timezone: timezone || 'UTC',
-      settings: {
-        host_video: true,
-        participant_video: true,
+  // ২. Access token expire 
+  const now = new Date();
+  if (account.expiresAt < now) {
+    console.log(`Access token expired for user: ${userId} - Refreshing...`);
+    account = await refreshAccessToken(userId); 
+  }
+
+  // ৩. API 
+  const headers = { Authorization: `Bearer ${account.accessToken}` };
+
+  try {
+    const response = await axios.post(
+      `https://api.zoom.us/v2/users/me/meetings`,
+      {
+        topic: topic || 'New Meeting',
+        agenda: agenda || '',
+        type: 2,
+        start_time: startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        duration: duration || 60,
+        timezone: timezone || 'UTC',
+        settings: {
+          host_video: true,
+          participant_video: true,
+        },
       },
-    },
-    { headers: { Authorization: `Bearer ${account.accessToken}` } },
-  );
+      { headers }
+    );
 
-  const m = response.data;
+    const m = response.data;
 
-  return await prisma.zoomMeeting.create({
-    data: {
-      zoomAccountId: account.id,
-      zoomMeetingId: m.id.toString(),
-      topic: m.topic,
-      agenda: m.agenda,
-      startUrl: m.start_url,
-      joinUrl: m.join_url,
-      password: m.password,
-      duration: m.duration,
-      startTime: new Date(m.start_time),
-      endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
-      timezone: m.timezone,
-    },
-  });
+    return await prisma.zoomMeeting.create({
+      data: {
+        zoomAccountId: account.id,
+        zoomMeetingId: m.id.toString(),
+        topic: m.topic,
+        agenda: m.agenda,
+        startUrl: m.start_url,
+        joinUrl: m.join_url,
+        password: m.password,
+        duration: m.duration,
+        startTime: new Date(m.start_time),
+        endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+        timezone: m.timezone,
+      },
+    });
+  } catch (error: any) {
+    // ৪. If 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.log('401 error during create meeting - refreshing token and retrying...');
+
+      // Token refresh
+      account = await refreshAccessToken(userId);
+
+      // try again create meeting
+      const retryResponse = await axios.post(
+        `https://api.zoom.us/v2/users/me/meetings`,
+        {
+          topic: topic || 'New Meeting',
+          agenda: agenda || '',
+          type: 2,
+          start_time: startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          duration: duration || 60,
+          timezone: timezone || 'UTC',
+          settings: {
+            host_video: true,
+            participant_video: true,
+          },
+        },
+        { headers: { Authorization: `Bearer ${account.accessToken}` } }
+      );
+
+      const m = retryResponse.data;
+
+      return await prisma.zoomMeeting.create({
+        data: {
+          zoomAccountId: account.id,
+          zoomMeetingId: m.id.toString(),
+          topic: m.topic,
+          agenda: m.agenda,
+          startUrl: m.start_url,
+          joinUrl: m.join_url,
+          password: m.password,
+          duration: m.duration,
+          startTime: new Date(m.start_time),
+          endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+          timezone: m.timezone,
+        },
+      });
+    }
+
+    // If others error found
+    console.error('Zoom meeting creation failed:', error.response?.data || error.message);
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      'Failed to create Zoom meeting',
+      error.response?.data
+    );
+  }
 };
 
 const getAllFromDB = async (
