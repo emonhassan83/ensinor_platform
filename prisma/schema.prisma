@@ -819,7 +819,7 @@ model QuizAnswer {
   id          String   @id @default(uuid())
   attemptId   String
   questionId  String
-  optionId    String
+  optionId    String?
   shortAnswer String?
   isCorrect   Boolean
   createdAt   DateTime @default(now())
@@ -827,7 +827,7 @@ model QuizAnswer {
 
   attempt  QuizAttempt @relation(fields: [attemptId], references: [id])
   question Question    @relation(fields: [questionId], references: [id])
-  option   Options     @relation(fields: [optionId], references: [id])
+  option   Options?     @relation(fields: [optionId], references: [id])
 
   @@map("quiz_answers")
 }

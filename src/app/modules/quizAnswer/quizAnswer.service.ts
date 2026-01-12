@@ -44,7 +44,8 @@ const insertIntoDB = async (payload: IQuizAnswer) => {
       data: {
         attemptId,
         questionId,
-        optionId: optionId ?? null, // optional
+        shortAnswer,
+        // optionId: optionId ?? null, // optional
         isCorrect,
       },
     });

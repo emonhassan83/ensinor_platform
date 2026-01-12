@@ -13,7 +13,7 @@ import { zoomSearchAbleFields } from './zoom.constant';
 const handleOAuthCallback = async (
   code: string,
   currentUserId: string | null | undefined,
-  state?: string, // যদি state পাঠানো হয় (recommended)
+  state?: string, 
 ): Promise<any> => {
   console.log('🚀 Zoom OAuth Callback Started');
   console.log('Code received:', code);
