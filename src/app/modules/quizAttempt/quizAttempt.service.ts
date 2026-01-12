@@ -42,10 +42,8 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
   // If there is an incomplete attempt → return it directly
   if (existingIncompleteAttempt) return existingIncompleteAttempt;
 
-  /* ---------------------------------------------------
-     If no incomplete attempt exists, apply attempt limit
-     --------------------------------------------------- */
-  const completedAttempts = await prisma.quizAttempt.count({
+  // 4. Check attempt limit (শুধু completed attempts গণনা করো)
+  const completedAttemptsCount = await prisma.quizAttempt.count({
     where: {
       quizId,
       userId,
@@ -54,23 +52,41 @@ const insertIntoDB = async (payload: IQuizAttempt) => {
     },
   });
 
-  if (completedAttempts >= quiz.attemptAllow) {
+  if (completedAttemptsCount >= quiz.attemptAllow) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       `You have reached the maximum attempt limit (${quiz.attemptAllow}).`,
     );
   }
 
+  // 5. নতুন attempt number ক্যালকুলেট (সব attempts +1)
+  const totalPreviousAttempts = await prisma.quizAttempt.count({
+    where: { quizId, userId, isDeleted: false },
+  });
+  const attemptNumber = totalPreviousAttempts + 1;
+
+  // 6. Create new attempt
   const result = await prisma.quizAttempt.create({
     data: {
       ...payload,
       authorId: quiz.authorId,
-      totalMarks: quiz.marks ?? undefined,
+      totalMarks: quiz.marks ?? 0,
+      attemptNumber,
+      timeTaken: 0,
+      marksObtained: 0,
+      isCompleted: false,
     },
   });
+
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt creation failed!');
   }
+
+  // 7. Optional: quiz.totalAttempt increment
+  await prisma.quiz.update({
+    where: { id: quizId },
+    data: { totalAttempt: { increment: 1 } },
+  });
 
   return result;
 };
