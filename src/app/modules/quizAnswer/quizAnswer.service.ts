@@ -11,216 +11,180 @@ import { isShortAnswerCorrect } from '../../utils/answerAnalyzer';
 const insertIntoDB = async (payload: IQuizAnswer) => {
   const { attemptId, questionId, optionId, shortAnswer } = payload;
 
-  // 1. Validate attempt
-  const attempt = await prisma.quizAttempt.findFirst({
-    where: { id: attemptId, isDeleted: false },
-    include: { quiz: true },
-  });
-  if (!attempt)
-    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid or completed attempt!");
-
-  // 2. Validate question
-  const question = await prisma.question.findFirst({
-    where: { id: questionId, quizId: attempt.quizId, isDeleted: false },
-    include: { options: true },
-  });
-  if (!question)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Invalid question for this quiz!"
-    );
-
-  let isCorrect = false;
-
-  // Handle SHORT ANSWER logic
-  if (question.type === "short_answer") {
-    if (!shortAnswer)
-      throw new ApiError(httpStatus.BAD_REQUEST, "Short answer required");
-
-    isCorrect = isShortAnswerCorrect(shortAnswer, question.expectedAnswer);
-
-    // Save short-answer result (no optionId required)
-    const result = await prisma.quizAnswer.create({
-      data: {
-        attemptId,
-        questionId,
-        shortAnswer,
-        // optionId: optionId ?? null, // optional
-        isCorrect,
-      },
+  return await prisma.$transaction(async tx => {
+    // 1. Validate attempt (incomplete হতে হবে)
+    const attempt = await tx.quizAttempt.findFirst({
+      where: { id: attemptId, isDeleted: false, isCompleted: false },
+      include: { quiz: true },
     });
+    if (!attempt) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Invalid, completed, or deleted attempt!',
+      );
+    }
 
-    return result;
-  }
+    // 2. Validate question belongs to this quiz
+    const question = await tx.question.findFirst({
+      where: { id: questionId, quizId: attempt.quizId, isDeleted: false },
+      include: { options: true },
+    });
+    if (!question) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Invalid question for this quiz!',
+      );
+    }
 
-  // For other question types → optionId must exist
-  if (!optionId)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Option is required for this question type"
-    );
+    // 3. Check if already answered this question in this attempt
+    const existingAnswer = await tx.quizAnswer.findFirst({
+      where: { attemptId, questionId },
+    });
+    if (existingAnswer) {
+      return existingAnswer;
+    }
 
-  // 3. Validate option
-  const option = await prisma.options.findFirst({
-    where: { id: optionId, questionId: question.id },
+    let isCorrect = false;
+    let savedAnswer;
+
+    if (question.type === 'short_answer') {
+      if (!shortAnswer) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Short answer required!');
+      }
+
+      isCorrect = isShortAnswerCorrect(shortAnswer, question.expectedAnswer);
+
+      savedAnswer = await tx.quizAnswer.create({
+        data: {
+          attemptId,
+          questionId,
+          shortAnswer,
+          isCorrect,
+        },
+      });
+    } else {
+      // MCQ / TrueFalse / Multi-select
+      if (!optionId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Option required for this question type!',
+        );
+      }
+
+      const option = await tx.options.findFirst({
+        where: { id: optionId, questionId: question.id },
+      });
+      if (!option) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid option!');
+      }
+
+      isCorrect = option.isCorrect;
+
+      savedAnswer = await tx.quizAnswer.create({
+        data: {
+          attemptId,
+          questionId,
+          optionId,
+          isCorrect,
+        },
+      });
+    }
+
+    return savedAnswer;
   });
-  if (!option)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Invalid option for this question!"
-    );
-
-  // 4. Check if already answered
-  const existing = await prisma.quizAnswer.findFirst({
-    where: { attemptId, questionId },
-  });
-
-  if (existing) {
-    return existing; // return existing answer
-  }
-
-  // 5. Save for MCQ / True/False
-  const result = await prisma.quizAnswer.create({
-    data: {
-      attemptId,
-      questionId,
-      optionId,
-      isCorrect: option.isCorrect,
-    },
-  });
-
-  if (!result)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      "Quiz question answer save failed!"
-    );
-
-  return result;
 };
 
 const completeAttemptIntoDB = async (
   attemptId: string,
   payload: { timeTaken: number },
 ) => {
-  try {
-    return await prisma.$transaction(async tx => {
-      // 1. Fetch attempt with relations
-      const attempt = await tx.quizAttempt.findFirst({
-        where: { id: attemptId, isDeleted: false },
-        include: { quizAnswer: true, quiz: true },
-      });
+  return await prisma.$transaction(async (tx) => {
+    // 1. Fetch attempt + answers + quiz
+    const attempt = await tx.quizAttempt.findUnique({
+      where: { id: attemptId, isDeleted: false },
+      include: {
+        quiz: true,
+        quizAnswer: {
+          include: { question: true },
+        },
+      },
+    });
 
-      if (!attempt) {
-        throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
-      }
+    if (!attempt) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
+    }
+    if (attempt.isCompleted) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Already completed!');
+    }
 
-      const quiz = attempt.quiz;
+    const quiz = attempt.quiz;
 
-      // 2. Count total questions
-      const totalQuestions = await tx.question.count({
-        where: { quizId: quiz.id, isDeleted: false },
-      });
+    // 2. Total questions (isDeleted false)
+    const totalQuestions = await tx.question.count({
+      where: { quizId: quiz.id, isDeleted: false },
+    });
 
-      // 3. Count correct answers
-      const correctAnswers = attempt.quizAnswer.filter(a => a.isCorrect)
-        .length;
+    // 3. Correct answers count
+    const correctAnswers = attempt.quizAnswer.filter((a) => a.isCorrect).length;
 
-      // 4. Calculate marks & percent
-      const marksPerQuestion =
-        quiz.marks && totalQuestions > 0
-          ? quiz.marks / totalQuestions
-          : 1;
+    // 4. Calculate marks & correctRate
+    const marksPerQuestion = totalQuestions > 0 ? quiz.marks / totalQuestions : 0;
+    const marksObtained = Math.round(correctAnswers * marksPerQuestion);
+    const correctRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 
-      const marksObtained = Math.round(correctAnswers * marksPerQuestion);
-      const correctRate =
-        totalQuestions > 0 ? correctAnswers / totalQuestions : 0;
-      const percent = correctRate * 100;
+    // 5. Determine if passed
+    const isPassed = marksObtained >= quiz.passingScore;
 
-      // 5. Passing score check FIRST
-      if (percent < quiz.passingScore) {
-        // Auto fail — no grading calculation required
-        const updatedFailAttempt = await tx.quizAttempt.update({
-          where: { id: attempt.id },
-          data: {
-            isCompleted: true,
-            lastAttempt: new Date(),
-            marksObtained,
-            correctRate,
-            grade: CourseGrade.FAIL,
-            timeTaken: payload.timeTaken,
-          },
-        });
+    // 6. Grade calculation
+    let grade: CourseGrade = CourseGrade.FAIL;
 
-        // increment quiz attempts
-        await tx.quiz.update({
-          where: { id: quiz.id },
-          data: { totalAttempt: { increment: 1 } },
-        });
-
-        return updatedFailAttempt;
-      }
-
-      // Otherwise user passed the quiz — continue grading
-      let grade: CourseGrade = CourseGrade.PASS; // default for success
-      let status: 'pass' | 'fail' = 'pass';
-
-      // 6. Fetch grading system
-      let gradingSystem = await tx.gradingSystem.findFirst({
+    if (isPassed) {
+      // Grading system
+      const gradingSystem = await tx.gradingSystem.findFirst({
         where: { courseId: quiz.courseId, isDeleted: false },
+        include: { grades: true },
+      }) || await tx.gradingSystem.findFirst({
+        where: { isDefault: true, isDeleted: false },
         include: { grades: true },
       });
 
-      if (!gradingSystem) {
-        gradingSystem = await tx.gradingSystem.findFirst({
-          where: { isDefault: true, isDeleted: false },
-          include: { grades: true },
-        });
-      }
-
-      // 7. Apply grading if available
       if (gradingSystem && gradingSystem.grades.length > 0) {
-        gradingSystem.grades.sort((a, b) => b.minScore - a.minScore);
-
-        const matched = gradingSystem.grades.find(g => {
-          return percent >= g.minScore;
-        });
-
-        if (matched) {
-          grade = matched.gradeLabel as CourseGrade;
+        const sortedGrades = gradingSystem.grades.sort((a, b) => b.minScore - a.minScore);
+        const matchedGrade = sortedGrades.find(g => correctRate >= g.minScore);
+        if (matchedGrade) {
+          grade = matchedGrade.gradeLabel as CourseGrade;
+        } else {
+          grade = CourseGrade.PASS; // fallback
         }
       } else {
-        // final fallback if no grading rules exist
-        grade = CourseGrade.PASS;
+        grade = CourseGrade.PASS; // no system → pass
       }
+    }
 
-      // 8. Update final attempt
-      const updatedAttempt = await tx.quizAttempt.update({
-        where: { id: attempt.id },
-        data: {
-          isCompleted: true,
-          lastAttempt: new Date(),
-          marksObtained,
-          correctRate,
-          grade,
-          timeTaken: payload.timeTaken,
-        },
-      });
-
-      // 9. Increment quiz attempt count
-      await tx.quiz.update({
-        where: { id: quiz.id },
-        data: { totalAttempt: { increment: 1 } },
-      });
-
-      return updatedAttempt;
+    // 7. Update attempt
+    const updatedAttempt = await tx.quizAttempt.update({
+      where: { id: attemptId },
+      data: {
+        marksObtained,
+        totalMarks: quiz.marks,
+        correctRate,
+        grade,
+        timeTaken: payload.timeTaken,
+        isPassed,
+        isCompleted: true,
+        lastAttempt: new Date(),
+        attemptNumber: attempt.attemptNumber, // already set
+      },
     });
-  } catch (error) {
-    console.error('completeAttemptIntoDB error:', error);
-    throw new ApiError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      'Failed to complete quiz attempt',
-    );
-  }
+
+    // 8. Increment quiz totalAttempt
+    await tx.quiz.update({
+      where: { id: quiz.id },
+      data: { totalAttempt: { increment: 1 } },
+    });
+
+    return updatedAttempt;
+  });
 };
 
 const getAllFromDB = async (
@@ -266,7 +230,7 @@ const getAllFromDB = async (
         ? { [options.sortBy]: options.sortOrder }
         : { createdAt: 'desc' },
     include: {
-      question: true,
+      question: { include: { options: true } },
       option: true,
     },
   });
@@ -283,9 +247,9 @@ const getByIdFromDB = async (id: string) => {
   const result = await prisma.quizAnswer.findUnique({
     where: { id },
     include: {
-      question: true,
+      question: { include: { options: true } },
       option: true,
-      attempt: true,
+      attempt: { include: { quiz: true } },
     },
   });
 
@@ -294,49 +258,45 @@ const getByIdFromDB = async (id: string) => {
   return result;
 };
 
-const updateIntoDB = async (
-  id: string, // quizAnswerId
-  payload: { optionId: string },
-): Promise<QuizAnswer> => {
-  const quizAnswer = await prisma.quizAnswer.findUnique({
-    where: { id },
-    include: {
-      question: true,
-    },
+const updateIntoDB = async (id: string, payload: { optionId?: string; shortAnswer?: string }) => {
+  return await prisma.$transaction(async (tx) => {
+    const answer = await tx.quizAnswer.findUnique({
+      where: { id },
+      include: { question: true },
+    });
+
+    if (!answer) throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
+
+    const attempt = await tx.quizAttempt.findFirst({
+      where: { id: answer.attemptId, isCompleted: false, isDeleted: false },
+    });
+    if (!attempt) throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update completed attempt!');
+
+    let isCorrect = false;
+
+    if (payload.shortAnswer && answer.question.type === 'short_answer') {
+      isCorrect = isShortAnswerCorrect(payload.shortAnswer, answer.question.expectedAnswer);
+      return tx.quizAnswer.update({
+        where: { id },
+        data: { shortAnswer: payload.shortAnswer, isCorrect },
+      });
+    }
+
+    if (payload.optionId) {
+      const option = await tx.options.findFirst({
+        where: { id: payload.optionId, questionId: answer.questionId },
+      });
+      if (!option) throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid option!');
+
+      isCorrect = option.isCorrect;
+      return tx.quizAnswer.update({
+        where: { id },
+        data: { optionId: payload.optionId, isCorrect },
+      });
+    }
+
+    throw new ApiError(httpStatus.BAD_REQUEST, 'No valid update data provided!');
   });
-
-  if (!quizAnswer) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
-  }
-
-  // Validate new option belongs to the same question
-  const option = await prisma.options.findFirst({
-    where: {
-      id: payload.optionId,
-      questionId: quizAnswer.questionId,
-    },
-  });
-
-  if (!option) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Invalid option for this question!',
-    );
-  }
-
-  // Update quizAnswer with new optionId + correctness
-  const result = await prisma.quizAnswer.update({
-    where: { id },
-    data: {
-      optionId: option.id,
-      isCorrect: option.isCorrect,
-    },
-  });
-
-  if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz answer not updated!');
-  }
-  return result;
 };
 
 const deleteFromDB = async (id: string): Promise<QuizAnswer> => {

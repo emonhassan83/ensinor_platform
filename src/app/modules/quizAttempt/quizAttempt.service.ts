@@ -221,6 +221,43 @@ const getAllFromDB = async (
   };
 };
 
+const getUserQuizAttempts = async (userId: string, quizId: string) => {
+  const attempts = await prisma.quizAttempt.findMany({
+    where: {
+      userId,
+      quizId,
+      isDeleted: false,
+    },
+    orderBy: { attemptNumber: 'asc' },
+    select: {
+      id: true,
+      attemptNumber: true,
+      marksObtained: true,
+      totalMarks: true,
+      correctRate: true,
+      grade: true,
+      isPassed: true,
+      timeTaken: true,
+      isCompleted: true,
+      lastAttempt: true,
+      createdAt: true,
+    },
+  });
+
+  const quiz = await prisma.quiz.findUnique({
+    where: { id: quizId },
+    select: { attemptAllow: true, passingScore: true },
+  });
+
+  return {
+    attempts,
+    totalAttempts: attempts.length,
+    remainingAttempts: quiz ? quiz.attemptAllow - attempts.length : 0,
+    maxAttempts: quiz?.attemptAllow ?? 1,
+    passingScore: quiz?.passingScore,
+  };
+};
+
 const getByIdFromDB = async (id: string): Promise<QuizAttempt | null> => {
   const result = await prisma.quizAttempt.findUnique({
     where: { id, isDeleted: false },
@@ -306,6 +343,7 @@ export const QuizAttemptService = {
   insertIntoDB,
   completeAttemptIntoDB,
   getAllFromDB,
+  getUserQuizAttempts,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,

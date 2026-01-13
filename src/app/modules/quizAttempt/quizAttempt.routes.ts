@@ -27,9 +27,15 @@ router.get(
     UserRole.business_instructors,
     UserRole.instructor,
     UserRole.student,
-    UserRole.employee
+    UserRole.employee,
   ),
   QuizAttemptController.getByQuizIdFromDB,
+);
+
+router.get(
+  '/quiz/:quizId',
+  auth(UserRole.student, UserRole.employee),
+  QuizAttemptController.getUserQuizAttempts,
 );
 
 router.get(

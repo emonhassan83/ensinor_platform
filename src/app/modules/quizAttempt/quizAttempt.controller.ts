@@ -76,6 +76,19 @@ const getMyAttemptFromDB = catchAsync(async (req, res) => {
   });
 });
 
+const getUserQuizAttempts = catchAsync(async (req, res) => {
+  const result = await QuizAttemptService.getUserQuizAttempts(
+    req.user!.userId,
+    req.params.quizId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Quiz attempt by user data fetched!',
+    data: result,
+  });
+});
+
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await QuizAttemptService.getByIdFromDB(req.params.id);
   sendResponse(res, {
@@ -112,6 +125,7 @@ export const QuizAttemptController = {
   getByQuizIdFromDB,
   getMyAttemptFromDB,
   getByAuthorQuizFromDB,
+  getUserQuizAttempts,
   getByIdFromDB,
   updateIntoDB,
   deleteFromDB,
