@@ -1,4 +1,12 @@
-import { Certificate, CompanyType, Prisma, SubscriptionStatus, SubscriptionType, UserRole, UserStatus } from '@prisma/client';
+import {
+  Certificate,
+  CompanyType,
+  Prisma,
+  SubscriptionStatus,
+  SubscriptionType,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { paginationHelpers } from '../../helpers/paginationHelper';
 import { IPaginationOptions } from '../../interfaces/pagination';
 import {
@@ -153,8 +161,10 @@ const insertIntoDB = async (payload: ICertificate) => {
     builder = await prisma.certificateBuilder.findFirst({
       where: { authorId: author.id, isDeleted: false },
     });
+    console.log('Builder Found:', builder ? 'YES' : 'NO', builder);
   }
 
+  // 🔹 Main Fix: Fallback to Company Data if Builder Not Found
   if (builder) {
     payload.company = builder.company ?? '';
     payload.logo = builder.logo ?? '';
@@ -163,9 +173,28 @@ const insertIntoDB = async (payload: ICertificate) => {
       payload.topics = [];
     }
   } else {
+    // Fallback for premium/enterprise cases where builder is missing
     payload.company = '';
     payload.logo = '';
     payload.topics = course.topics || [];
+
+    // If course is from company (enterprise), set from Company model
+    if (course.platform === 'company' && course.companies) {
+      payload.company = course.companies.name ?? '';
+      payload.logo = course.companies.logo ?? '';
+    } else if (
+      author.role === UserRole.business_instructors &&
+      author.businessInstructor?.company
+    ) {
+      payload.company = author.businessInstructor.company.name ?? '';
+      payload.logo = author.businessInstructor.company.logo ?? '';
+    } else if (
+      author.role === UserRole.company_admin &&
+      author.companyAdmin?.company
+    ) {
+      payload.company = author.companyAdmin.company.name ?? '';
+      payload.logo = author.companyAdmin.company.logo ?? '';
+    }
   }
 
   /* =====================================================
@@ -286,7 +315,7 @@ const getAllFromDB = async (
 
 const getByEnrolledIdFromDB = async (
   enrolledId: string,
-): Promise<Certificate | null> => {
+): Promise<Certificate & { subscriptionType: string | null }> => {
   const result = await prisma.certificate.findFirst({
     where: { enrolledCourseId: enrolledId },
     include: {
@@ -296,9 +325,77 @@ const getByEnrolledIdFromDB = async (
           name: true,
           email: true,
           photoUrl: true,
+          role: true,
+          subscription: {
+            where: {
+              status: SubscriptionStatus.active,
+              isExpired: false,
+              isDeleted: false,
+              expiredAt: { gt: new Date() },
+            },
+            select: { type: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+          businessInstructor: {
+            select: {
+              company: {
+                select: {
+                  author: {
+                    select: {
+                      user: {
+                        include: {
+                          subscription: {
+                            where: {
+                              status: SubscriptionStatus.active,
+                              isExpired: false,
+                              isDeleted: false,
+                              expiredAt: { gt: new Date() },
+                            },
+                            select: { type: true },
+                            take: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          companyAdmin: {
+            select: {
+              company: {
+                select: {
+                  author: {
+                    select: {
+                      user: {
+                        include: {
+                          subscription: {
+                            where: {
+                              status: SubscriptionStatus.active,
+                              isExpired: false,
+                              isDeleted: false,
+                              expiredAt: { gt: new Date() },
+                            },
+                            select: { type: true },
+                            take: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
-      course: true,
+      course: {
+        select: {
+          platform: true,
+        },
+      },
     },
   });
 
@@ -306,7 +403,29 @@ const getByEnrolledIdFromDB = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Certificate not found!');
   }
 
-  return result;
+  // subscriptionType ক্যালকুলেট করা
+  let subscriptionType: string | null = null;
+
+  const author = result.author;
+  const platform = result.course.platform;
+
+  if (platform === 'admin' && author.role === UserRole.instructor) {
+    subscriptionType = author.subscription[0]?.type ?? null;
+  } else if (platform === 'company') {
+    if (author.role === UserRole.company_admin) {
+      subscriptionType =
+        author.companyAdmin?.company?.author.user.subscription?.[0]?.type ?? null;
+    } else if (author.role === UserRole.business_instructors) {
+      subscriptionType =
+        author.businessInstructor?.company?.author.user.subscription?.[0]?.type ?? null;
+    }
+  }
+
+  // ফাইনাল রিটার্ন: আগের মতোই + শুধু subscriptionType যোগ
+  return {
+    ...result,
+    subscriptionType,
+  };
 };
 
 const getByIdFromDB = async (id: string): Promise<Certificate | null> => {
