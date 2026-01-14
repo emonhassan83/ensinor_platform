@@ -44,7 +44,29 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
       },
       businessInstructor: {
         select: {
-          company: { include: { author: { include: { user: true } } } },
+          company: {
+            include: {
+              author: {
+                include: {
+                  user: {
+                    include: {
+                      subscription: {
+                        where: {
+                          status: SubscriptionStatus.active,
+                          isExpired: false,
+                          isDeleted: false,
+                          expiredAt: { gt: new Date() },
+                        },
+                        select: { type: true },
+                        orderBy: { createdAt: 'desc' },
+                        take: 1,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       instructor: true,
@@ -113,7 +135,7 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
           'Only enterprise companies allowed!',
         );
       }
-      if (user.subscription[0]) allowBuilder = true;
+      if (user.businessInstructor?.company.author.user.subscription[0]) allowBuilder = true;
       else
         throw new ApiError(
           httpStatus.FORBIDDEN,
