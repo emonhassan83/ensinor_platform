@@ -135,7 +135,8 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
           'Only enterprise companies allowed!',
         );
       }
-      if (user.businessInstructor?.company.author.user.subscription[0]) allowBuilder = true;
+      if (user.businessInstructor?.company.author.user.subscription[0])
+        allowBuilder = true;
       else
         throw new ApiError(
           httpStatus.FORBIDDEN,

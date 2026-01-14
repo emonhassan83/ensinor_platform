@@ -43,7 +43,33 @@ const insertIntoDB = async (payload: ICertificate) => {
             include: {
               subscription: true,
               instructor: true,
-              businessInstructor: { include: { company: true } },
+              businessInstructor: {
+                include: {
+                  company: {
+                    include: {
+                      author: {
+                        include: {
+                          user: {
+                            include: {
+                              subscription: {
+                                where: {
+                                  status: SubscriptionStatus.active,
+                                  isExpired: false,
+                                  isDeleted: false,
+                                  expiredAt: { gt: new Date() },
+                                },
+                                select: { type: true },
+                                orderBy: { createdAt: 'desc' },
+                                take: 1,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
               companyAdmin: { include: { company: true } },
               superAdmin: true,
             },
@@ -78,6 +104,7 @@ const insertIntoDB = async (payload: ICertificate) => {
   ===================================================== */
   payload.authorId = author.id;
   payload.courseId = course.id;
+  payload.courseName = course.title;
   payload.platform = enrollment.platform;
   payload.studyHour = Number((enrollment.learningTime / 60).toFixed(2));
   payload.completeDate = new Date().toISOString();
@@ -118,14 +145,7 @@ const insertIntoDB = async (payload: ICertificate) => {
       allowBuilder = false;
     }
 
-    const companySub = author.subscription.find(
-      s =>
-        s.status === SubscriptionStatus.active &&
-        !s.isExpired &&
-        !s.isDeleted &&
-        new Date(s.expiredAt) > new Date(),
-    );
-
+    const companySub = author.businessInstructor?.company.author.user.subscription[0]
     if (!companySub) {
       allowBuilder = false;
     }
@@ -413,10 +433,12 @@ const getByEnrolledIdFromDB = async (
   } else if (platform === 'company') {
     if (author.role === UserRole.company_admin) {
       subscriptionType =
-        author.companyAdmin?.company?.author.user.subscription?.[0]?.type ?? null;
+        author.companyAdmin?.company?.author.user.subscription?.[0]?.type ??
+        null;
     } else if (author.role === UserRole.business_instructors) {
       subscriptionType =
-        author.businessInstructor?.company?.author.user.subscription?.[0]?.type ?? null;
+        author.businessInstructor?.company?.author.user.subscription?.[0]
+          ?.type ?? null;
     }
   }
 
