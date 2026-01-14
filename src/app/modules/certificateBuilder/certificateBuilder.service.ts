@@ -2,6 +2,8 @@ import {
   CertificateBuilder,
   CompanyType,
   Prisma,
+  SubscriptionStatus,
+  SubscriptionType,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -20,10 +22,21 @@ import { uploadToS3 } from '../../utils/s3';
 const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
   const { authorId } = payload;
 
-  // 1️⃣ Validate author user
+  // 1️⃣ Validate author user + subscription + role
   const user = await prisma.user.findFirst({
     where: { id: authorId, status: UserStatus.active, isDeleted: false },
     include: {
+      subscription: {
+        where: {
+          status: SubscriptionStatus.active,
+          isExpired: false,
+          isDeleted: false,
+          expiredAt: { gt: new Date() },
+        },
+        select: { type: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
       companyAdmin: {
         select: {
           company: { select: { id: true, industryType: true, isActive: true } },
@@ -34,52 +47,66 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
           company: { select: { id: true, industryType: true, isActive: true } },
         },
       },
+      instructor: true,
     },
   });
-  if (!user)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Certificate builder author not found!',
-    );
 
-  let company: any = null;
-
-  // 2️⃣ If author is a company admin or business instructor → check company type
-  if (
-    [UserRole.company_admin, UserRole.business_instructors].includes(
-      user.role as any,
-    )
-  ) {
-    company =
-      user.role === UserRole.company_admin
-        ? user.companyAdmin?.company
-        : user.businessInstructor?.company;
-
-    if (!company)
-      throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-    if (!company.isActive)
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Your company is not active now!',
-      );
-
-    // ❌ Restrict NGO/SME from creating certificate builder
-    // if (
-    //   company.industryType === CompanyType.ngo ||
-    //   company.industryType === CompanyType.sme
-    // ) {
-    //   throw new ApiError(
-    //     httpStatus.FORBIDDEN,
-    //     'NGO or SME company admins or business instructors cannot create certificate builders!',
-    //   );
-    // }
+  if (!user) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate builder author not found!');
   }
 
-  // 3️⃣ Check if a pending certificate builder already exists
-  const existingBuilder = await prisma.certificateBuilder.findFirst({
-    where: { authorId },
-  });
-  if (existingBuilder) return existingBuilder;
+  let company: any = null;
+  let allowBuilder = false;
+
+  // Role-based validation + subscription check
+  switch (user.role) {
+    case UserRole.instructor:
+      const instructorSub = user.subscription[0];
+      if (instructorSub && instructorSub.type === SubscriptionType.premium) {
+        allowBuilder = true;
+      } else {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Only premium instructors can create/update certificate builders!',
+        );
+      }
+      break;
+
+    case UserRole.company_admin:
+      company = user.companyAdmin?.company;
+      if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+      if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
+      if (company.industryType !== CompanyType.enterprise) {
+        throw new ApiError(httpStatus.FORBIDDEN, 'Only enterprise companies allowed!');
+      }
+      if (user.subscription[0]) allowBuilder = true;
+      else throw new ApiError(httpStatus.FORBIDDEN, 'Active subscription required!');
+      break;
+
+    case UserRole.business_instructors:
+      company = user.businessInstructor?.company;
+      if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+      if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
+      if (company.industryType !== CompanyType.enterprise) {
+        throw new ApiError(httpStatus.FORBIDDEN, 'Only enterprise companies allowed!');
+      }
+      if (user.subscription[0]) allowBuilder = true;
+      else throw new ApiError(httpStatus.FORBIDDEN, 'Active subscription required!');
+      break;
+
+    default:
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'Only instructors, company admins, or business instructors can create/update certificate builders!',
+      );
+  }
+
+  if (!allowBuilder) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'You do not have permission to create/update certificate builder!',
+    );
+  }
 
   // 4️⃣ Upload logo (if file provided)
   if (file) {
@@ -89,13 +116,26 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
     })) as string;
   }
 
-  // 5️⃣ Create certificate request
-  const result = await prisma.certificateBuilder.create({ data: payload });
-  if (!result)
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Certificate request creation failed!',
-    );
+  // 5️⃣ Check if builder already exists 
+  const existingBuilder = await prisma.certificateBuilder.findFirst({
+    where: { authorId },
+  });
+
+  let result;
+
+  if (existingBuilder) {
+    // UPDATE existing builder
+    result = await prisma.certificateBuilder.update({
+      where: { id: existingBuilder.id },
+      data: payload,
+    });
+  } else {
+    result = await prisma.certificateBuilder.create({ data: payload });
+  }
+
+  if (!result) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate builder operation failed!');
+  }
 
   return result;
 };
