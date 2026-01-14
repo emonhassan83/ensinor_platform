@@ -17,6 +17,7 @@ const main = async () => {
     seeder.seedAdmin();
     seeder.seedContents();
     seeder.seedInitialChats();
+    seeder.seedDefaultGradingSystem();
     initializeCleanupJobs();
     newsletterScheduleCron();
 

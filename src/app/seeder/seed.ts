@@ -5,6 +5,7 @@ import {
   ChatType,
   ChatStatus,
   ChatRole,
+  CourseGrade,
 } from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
@@ -194,8 +195,81 @@ const seedInitialChats = async () => {
   });
 }
 
+const seedDefaultGradingSystem = async () => {
+  console.log('\n📊 Checking default grading system...');
+  const adminExists = await prisma.user.findFirst({
+    where: { role: UserRole.super_admin },
+  });
+
+  // Check if any default grading system already exists
+  const defaultGradingExists = await prisma.gradingSystem.findFirst({
+    where: { isDefault: true, isDeleted: false },
+  });
+
+  if (defaultGradingExists) {
+    console.log('ℹ️ Default grading system already exists. Skipping...');
+    return;
+  }
+
+  console.log('🚀 Creating default grading system...');
+
+  // Create default GradingSystem
+  const defaultGrading = await prisma.gradingSystem.create({
+    data: {
+      authorId: adminExists?.id,
+      isDefault: true,
+      isDeleted: false,
+    },
+  });
+
+  // Default Grade ranges (you can adjust minScore/maxScore as needed)
+  await prisma.grade.createMany({
+    data: [
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 90,
+        maxScore: 100,
+        gradeLabel: CourseGrade.A_PLUS,
+      },
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 80,
+        maxScore: 89.99,
+        gradeLabel: CourseGrade.A,
+      },
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 70,
+        maxScore: 79.99,
+        gradeLabel: CourseGrade.B,
+      },
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 60,
+        maxScore: 69.99,
+        gradeLabel: CourseGrade.C,
+      },
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 50,
+        maxScore: 59.99,
+        gradeLabel: CourseGrade.D,
+      },
+      {
+        gradingSystemId: defaultGrading.id,
+        minScore: 0,
+        maxScore: 49.99,
+        gradeLabel: CourseGrade.FAIL,
+      },
+    ],
+  });
+
+  console.log('✅ Default Grading System seeded with A, B, C, D, FAIL grades!');
+};
+
 export const seeder = {
   seedAdmin,
   seedContents,
   seedInitialChats,
+  seedDefaultGradingSystem
 };

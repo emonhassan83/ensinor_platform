@@ -114,7 +114,7 @@ const insertIntoDB = async (payload: ICertificate) => {
   if (author.role === UserRole.business_instructors) {
     const company = author.businessInstructor?.company;
 
-    if (!company || company.industryType !== CompanyType.enterprise) {
+    if (!company || company.industryType === CompanyType.ngo) {
       allowBuilder = false;
     }
 
@@ -135,7 +135,7 @@ const insertIntoDB = async (payload: ICertificate) => {
   if (author.role === UserRole.company_admin) {
     const company = author.companyAdmin?.company;
 
-    if (!company || company.industryType !== CompanyType.enterprise) {
+    if (!company || company.industryType === CompanyType.ngo) {
       allowBuilder = false;
     }
 
@@ -161,7 +161,6 @@ const insertIntoDB = async (payload: ICertificate) => {
     builder = await prisma.certificateBuilder.findFirst({
       where: { authorId: author.id, isDeleted: false },
     });
-    console.log('Builder Found:', builder ? 'YES' : 'NO', builder);
   }
 
   // 🔹 Main Fix: Fallback to Company Data if Builder Not Found
