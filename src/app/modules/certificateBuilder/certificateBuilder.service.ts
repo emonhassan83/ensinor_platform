@@ -44,7 +44,7 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
       },
       businessInstructor: {
         select: {
-          company: { select: { id: true, industryType: true, isActive: true } },
+          company: { include: { author: { include: { user: true } } } },
         },
       },
       instructor: true,
@@ -52,7 +52,10 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
   });
 
   if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate builder author not found!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Certificate builder author not found!',
+    );
   }
 
   let company: any = null;
@@ -74,24 +77,48 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
 
     case UserRole.company_admin:
       company = user.companyAdmin?.company;
-      if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-      if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
-      if (company.industryType !== CompanyType.enterprise) {
-        throw new ApiError(httpStatus.FORBIDDEN, 'Only enterprise companies allowed!');
+      if (!company)
+        throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+      if (!company.isActive)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Your company is not active!',
+        );
+      if (company.industryType === CompanyType.ngo) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Only enterprise companies allowed!',
+        );
       }
       if (user.subscription[0]) allowBuilder = true;
-      else throw new ApiError(httpStatus.FORBIDDEN, 'Active subscription required!');
+      else
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Active subscription required!',
+        );
       break;
 
     case UserRole.business_instructors:
       company = user.businessInstructor?.company;
-      if (!company) throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
-      if (!company.isActive) throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
-      if (company.industryType !== CompanyType.enterprise) {
-        throw new ApiError(httpStatus.FORBIDDEN, 'Only enterprise companies allowed!');
+      if (!company)
+        throw new ApiError(httpStatus.NOT_FOUND, 'Company not found!');
+      if (!company.isActive)
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Your company is not active!',
+        );
+      if (company.industryType === CompanyType.ngo) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Only enterprise companies allowed!',
+        );
       }
       if (user.subscription[0]) allowBuilder = true;
-      else throw new ApiError(httpStatus.FORBIDDEN, 'Active subscription required!');
+      else
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          'Active subscription required!',
+        );
       break;
 
     default:
@@ -116,7 +143,7 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
     })) as string;
   }
 
-  // 5️⃣ Check if builder already exists 
+  // 5️⃣ Check if builder already exists
   const existingBuilder = await prisma.certificateBuilder.findFirst({
     where: { authorId },
   });
@@ -134,7 +161,10 @@ const insertIntoDB = async (payload: ICertificateBuilder, file: any) => {
   }
 
   if (!result) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate builder operation failed!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Certificate builder operation failed!',
+    );
   }
 
   return result;
