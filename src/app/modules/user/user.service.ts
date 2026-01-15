@@ -814,6 +814,7 @@ const geUserById = async (userId: string) => {
       country: true,
       role: true,
       storage: true,
+      registerWith: true,
       status: true,
       lastActive: true,
       createdAt: true,
