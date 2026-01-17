@@ -147,6 +147,8 @@ const refreshAccessToken = async (userId: string) => {
   if (!account)
     throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found!');
 
+  console.log(config.zoom.client_id, config.zoom.client_secret)
+
   try {
     const refreshResponse = await axios.post(
       'https://zoom.us/oauth/token',
