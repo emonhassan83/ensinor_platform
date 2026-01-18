@@ -187,6 +187,8 @@ const insertIntoDB = async (payload: ICertificate) => {
   if (builder) {
     payload.company = builder.company ?? '';
     payload.logo = builder.logo ?? '';
+    payload.logoHeight = builder.logoHeight ?? 0;
+    payload.logoWidth = builder.logoWidth ?? 0;
 
     if (builder.isVisibleTopics === false) {
       payload.topics = [];
@@ -196,6 +198,8 @@ const insertIntoDB = async (payload: ICertificate) => {
     payload.company = '';
     payload.logo = '';
     payload.topics = course.topics || [];
+    payload.logoHeight = 0;
+    payload.logoWidth = 0;
 
     // If course is from company (enterprise), set from Company model
     if (course.platform === 'company' && course.companies) {

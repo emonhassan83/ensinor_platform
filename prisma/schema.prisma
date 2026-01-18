@@ -829,7 +829,7 @@ model QuizAnswer {
 
   attempt  QuizAttempt @relation(fields: [attemptId], references: [id])
   question Question    @relation(fields: [questionId], references: [id])
-  option   Options?     @relation(fields: [optionId], references: [id])
+  option   Options?    @relation(fields: [optionId], references: [id])
 
   @@map("quiz_answers")
 }
@@ -954,6 +954,8 @@ model CertificateBuilder {
   authorId        String
   company         String?
   logo            String?
+  logoHeight       Float?
+  logoWidth        Float?
   isVisibleTopics Boolean  @default(true)
   isDeleted       Boolean  @default(false)
   createdAt       DateTime @default(now())
@@ -974,6 +976,8 @@ model Certificate {
   platform         PlatformType @default(admin)
   company          String?
   logo             String?
+  logoHeight       Float?
+  logoWidth        Float?
   student          String?
   courseName       String?
   instructor       String?
