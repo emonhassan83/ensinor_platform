@@ -8,5 +8,7 @@ export type ICertificateBuilder = {
   logo?: string;
   logoHeight?: number;
   logoWidth?: number;
+  mainLogoHeight?: number;
+  mainLogoWidth?: number;
   isVisibleTopics: boolean
 };

@@ -954,8 +954,10 @@ model CertificateBuilder {
   authorId        String
   company         String?
   logo            String?
-  logoHeight       Float?
-  logoWidth        Float?
+  logoHeight      Float?
+  logoWidth       Float?
+  mainLogoHeight  Float?
+  mainLogoWidth   Float?
   isVisibleTopics Boolean  @default(true)
   isDeleted       Boolean  @default(false)
   createdAt       DateTime @default(now())
@@ -978,6 +980,8 @@ model Certificate {
   logo             String?
   logoHeight       Float?
   logoWidth        Float?
+  mainLogoHeight   Float?
+  mainLogoWidth    Float?
   student          String?
   courseName       String?
   instructor       String?

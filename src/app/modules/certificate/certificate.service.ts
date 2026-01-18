@@ -189,6 +189,8 @@ const insertIntoDB = async (payload: ICertificate) => {
     payload.logo = builder.logo ?? '';
     payload.logoHeight = builder.logoHeight ?? 0;
     payload.logoWidth = builder.logoWidth ?? 0;
+    payload.mainLogoHeight = builder.mainLogoHeight ?? 0;
+    payload.mainLogoWidth = builder.mainLogoWidth ?? 0;
 
     if (builder.isVisibleTopics === false) {
       payload.topics = [];

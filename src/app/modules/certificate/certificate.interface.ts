@@ -18,6 +18,8 @@ export type ICertificate = {
   logo?: string;
   logoHeight?: number;
   logoWidth?: number;
+  mainLogoHeight?: number;
+  mainLogoWidth?: number;
   student: string;
   courseName: string;
   instructor: string;
