@@ -189,7 +189,7 @@ const refreshAccessToken = async (userId: string) => {
 
 // Create Meeting
 const createMeeting = async (payload: IZoomMeeting) => {
-  const { userId, topic, startTime, duration, agenda, timezone = 'Asia/Dhaka' } = payload;
+  const { userId, topic, startTime, duration, agenda, timezone = 'Asia/Dhaka' } = payload; // ★★★ default Asia/Dhaka ★★★
 
   let account = await prisma.zoomAccount.findFirst({ where: { userId } });
   if (!account) {
@@ -204,7 +204,6 @@ const createMeeting = async (payload: IZoomMeeting) => {
 
   const headers = { Authorization: `Bearer ${account.accessToken}` };
 
-  // ★★★ start_time সবসময় UTC ISO string হিসেবে পাঠাও ★★★
   let finalStartTime = startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
   try {
@@ -214,9 +213,9 @@ const createMeeting = async (payload: IZoomMeeting) => {
         topic: topic || 'New Meeting',
         agenda: agenda || '',
         type: 2,
-        start_time: finalStartTime, // ISO string (UTC)
+        start_time: finalStartTime,
         duration: duration || 60,
-        timezone: timezone, // display-এর জন্য
+        timezone: timezone, // এখন "Asia/Dhaka" বা অন্য IANA name
         settings: {
           host_video: true,
           participant_video: true,
@@ -227,8 +226,7 @@ const createMeeting = async (payload: IZoomMeeting) => {
 
     const m = response.data;
 
-    // ★★★ Prisma-এ UTC time সেভ করো (new Date(m.start_time) ঠিক আছে কারণ ISO Z সহ) ★★★
-    const savedStartTime = new Date(m.start_time); // UTC time
+    const savedStartTime = new Date(m.start_time);
     const savedEndTime = new Date(savedStartTime.getTime() + m.duration * 60000);
 
     const savedMeeting = await prisma.zoomMeeting.create({
@@ -247,23 +245,22 @@ const createMeeting = async (payload: IZoomMeeting) => {
       },
     });
 
-    // ★★★ লগ যোগ করো যাতে চেক করতে পারো ★★★
+    // লগ যোগ করো
     console.log('Meeting created successfully:', {
-      inputStartTime: startTime || 'default (30 min later)',
+      inputStartTime: startTime || 'default',
       sentToZoom: finalStartTime,
       zoomReturned: m.start_time,
       savedInDB: savedStartTime.toISOString(),
       timezoneUsed: timezone,
-      expectedLocalTime: savedStartTime.toLocaleString('en-US', { timeZone: timezone }),
+      expectedLocal: savedStartTime.toLocaleString('en-US', { timeZone: timezone })
     });
 
     return savedMeeting;
   } catch (error: any) {
     if (error.response?.status === 401) {
-      console.log('401 error - refreshing token and retrying...');
+      console.log('401 - refreshing and retrying...');
       account = await refreshAccessToken(userId);
 
-      // Retry with same logic
       const retryResponse = await axios.post(
         `https://api.zoom.us/v2/users/me/meetings`,
         {
