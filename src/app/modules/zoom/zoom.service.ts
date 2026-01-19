@@ -189,7 +189,7 @@ const refreshAccessToken = async (userId: string) => {
 
 // Create Meeting
 const createMeeting = async (payload: IZoomMeeting) => {
-  const { userId, topic, startTime, duration, agenda, timezone = 'UTC' } = payload;
+  const { userId, topic, startTime, duration, agenda, timezone = 'Asia/Dhaka' } = payload;
 
   let account = await prisma.zoomAccount.findFirst({ where: { userId } });
   if (!account) {
@@ -204,16 +204,8 @@ const createMeeting = async (payload: IZoomMeeting) => {
 
   const headers = { Authorization: `Bearer ${account.accessToken}` };
 
-  // ★★★ সময় ক্যালকুলেশন ঠিক করো ★★★
-  let finalStartTime: string;
-
-  if (startTime) {
-    // startTime যদি ISO string হয় → সরাসরি ব্যবহার করো
-    finalStartTime = startTime;
-  } else {
-    // default: 30 মিনিট পর
-    finalStartTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-  }
+  // ★★★ start_time সবসময় UTC ISO string হিসেবে পাঠাও ★★★
+  let finalStartTime = startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
   try {
     const response = await axios.post(
@@ -222,9 +214,9 @@ const createMeeting = async (payload: IZoomMeeting) => {
         topic: topic || 'New Meeting',
         agenda: agenda || '',
         type: 2,
-        start_time: finalStartTime, // ★★★ এখানে সরাসরি ISO string দাও ★★★
+        start_time: finalStartTime, // ISO string (UTC)
         duration: duration || 60,
-        timezone: timezone, // Asia/Dhaka বা UTC+06:00
+        timezone: timezone, // display-এর জন্য
         settings: {
           host_video: true,
           participant_video: true,
@@ -235,7 +227,10 @@ const createMeeting = async (payload: IZoomMeeting) => {
 
     const m = response.data;
 
-    // ★★★ Prisma-এ সেভ করার সময় timezone সঠিকভাবে হ্যান্ডেল করো ★★★
+    // ★★★ Prisma-এ UTC time সেভ করো (new Date(m.start_time) ঠিক আছে কারণ ISO Z সহ) ★★★
+    const savedStartTime = new Date(m.start_time); // UTC time
+    const savedEndTime = new Date(savedStartTime.getTime() + m.duration * 60000);
+
     const savedMeeting = await prisma.zoomMeeting.create({
       data: {
         zoomAccountId: account.id,
@@ -246,18 +241,20 @@ const createMeeting = async (payload: IZoomMeeting) => {
         joinUrl: m.join_url,
         password: m.password,
         duration: m.duration,
-        startTime: new Date(m.start_time),
-        endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+        startTime: savedStartTime,
+        endTime: savedEndTime,
         timezone: m.timezone || timezone,
       },
     });
 
     // ★★★ লগ যোগ করো যাতে চেক করতে পারো ★★★
-    console.log('Meeting created:', {
-      inputStartTime: startTime,
-      zoomStartTime: m.start_time,
-      savedStartTime: savedMeeting.startTime.toISOString(),
-      timezone: savedMeeting.timezone,
+    console.log('Meeting created successfully:', {
+      inputStartTime: startTime || 'default (30 min later)',
+      sentToZoom: finalStartTime,
+      zoomReturned: m.start_time,
+      savedInDB: savedStartTime.toISOString(),
+      timezoneUsed: timezone,
+      expectedLocalTime: savedStartTime.toLocaleString('en-US', { timeZone: timezone }),
     });
 
     return savedMeeting;
@@ -266,7 +263,7 @@ const createMeeting = async (payload: IZoomMeeting) => {
       console.log('401 error - refreshing token and retrying...');
       account = await refreshAccessToken(userId);
 
-      // Retry 
+      // Retry with same logic
       const retryResponse = await axios.post(
         `https://api.zoom.us/v2/users/me/meetings`,
         {
@@ -286,6 +283,9 @@ const createMeeting = async (payload: IZoomMeeting) => {
 
       const m = retryResponse.data;
 
+      const savedStartTime = new Date(m.start_time);
+      const savedEndTime = new Date(savedStartTime.getTime() + m.duration * 60000);
+
       return await prisma.zoomMeeting.create({
         data: {
           zoomAccountId: account.id,
@@ -296,8 +296,8 @@ const createMeeting = async (payload: IZoomMeeting) => {
           joinUrl: m.join_url,
           password: m.password,
           duration: m.duration,
-          startTime: new Date(m.start_time),
-          endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+          startTime: savedStartTime,
+          endTime: savedEndTime,
           timezone: m.timezone || timezone,
         },
       });
