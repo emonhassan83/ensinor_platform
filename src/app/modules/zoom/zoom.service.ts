@@ -189,23 +189,31 @@ const refreshAccessToken = async (userId: string) => {
 
 // Create Meeting
 const createMeeting = async (payload: IZoomMeeting) => {
-  const { userId, topic, startTime, duration, agenda, timezone } = payload;
+  const { userId, topic, startTime, duration, agenda, timezone = 'UTC' } = payload;
 
-  // ১. Zoom account
   let account = await prisma.zoomAccount.findFirst({ where: { userId } });
   if (!account) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Zoom account not found');
   }
 
-  // ২. Access token expire
   const now = new Date();
   if (account.expiresAt < now) {
     console.log(`Access token expired for user: ${userId} - Refreshing...`);
     account = await refreshAccessToken(userId);
   }
 
-  // ৩. API
   const headers = { Authorization: `Bearer ${account.accessToken}` };
+
+  // ★★★ সময় ক্যালকুলেশন ঠিক করো ★★★
+  let finalStartTime: string;
+
+  if (startTime) {
+    // startTime যদি ISO string হয় → সরাসরি ব্যবহার করো
+    finalStartTime = startTime;
+  } else {
+    // default: 30 মিনিট পর
+    finalStartTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  }
 
   try {
     const response = await axios.post(
@@ -214,21 +222,21 @@ const createMeeting = async (payload: IZoomMeeting) => {
         topic: topic || 'New Meeting',
         agenda: agenda || '',
         type: 2,
-        start_time:
-          startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        start_time: finalStartTime, // ★★★ এখানে সরাসরি ISO string দাও ★★★
         duration: duration || 60,
-        timezone: timezone || 'UTC',
+        timezone: timezone, // Asia/Dhaka বা UTC+06:00
         settings: {
           host_video: true,
           participant_video: true,
         },
       },
-      { headers },
+      { headers }
     );
 
     const m = response.data;
 
-    return await prisma.zoomMeeting.create({
+    // ★★★ Prisma-এ সেভ করার সময় timezone সঠিকভাবে হ্যান্ডেল করো ★★★
+    const savedMeeting = await prisma.zoomMeeting.create({
       data: {
         zoomAccountId: account.id,
         zoomMeetingId: m.id.toString(),
@@ -239,39 +247,41 @@ const createMeeting = async (payload: IZoomMeeting) => {
         password: m.password,
         duration: m.duration,
         startTime: new Date(m.start_time),
-        endTime: new Date(
-          new Date(m.start_time).getTime() + m.duration * 60000,
-        ),
-        timezone: m.timezone,
+        endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+        timezone: m.timezone || timezone,
       },
     });
-  } catch (error: any) {
-    // ৪. If 401 Unauthorized
-    if (error.response?.status === 401) {
-      console.log(
-        '401 error during create meeting - refreshing token and retrying...',
-      );
 
-      // Token refresh
+    // ★★★ লগ যোগ করো যাতে চেক করতে পারো ★★★
+    console.log('Meeting created:', {
+      inputStartTime: startTime,
+      zoomStartTime: m.start_time,
+      savedStartTime: savedMeeting.startTime.toISOString(),
+      timezone: savedMeeting.timezone,
+    });
+
+    return savedMeeting;
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      console.log('401 error - refreshing token and retrying...');
       account = await refreshAccessToken(userId);
 
-      // try again create meeting
+      // Retry 
       const retryResponse = await axios.post(
         `https://api.zoom.us/v2/users/me/meetings`,
         {
           topic: topic || 'New Meeting',
           agenda: agenda || '',
           type: 2,
-          start_time:
-            startTime || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          start_time: finalStartTime,
           duration: duration || 60,
-          timezone: timezone || 'UTC',
+          timezone: timezone,
           settings: {
             host_video: true,
             participant_video: true,
           },
         },
-        { headers: { Authorization: `Bearer ${account.accessToken}` } },
+        { headers: { Authorization: `Bearer ${account.accessToken}` } }
       );
 
       const m = retryResponse.data;
@@ -287,23 +297,17 @@ const createMeeting = async (payload: IZoomMeeting) => {
           password: m.password,
           duration: m.duration,
           startTime: new Date(m.start_time),
-          endTime: new Date(
-            new Date(m.start_time).getTime() + m.duration * 60000,
-          ),
-          timezone: m.timezone,
+          endTime: new Date(new Date(m.start_time).getTime() + m.duration * 60000),
+          timezone: m.timezone || timezone,
         },
       });
     }
 
-    // If others error found
-    console.error(
-      'Zoom meeting creation failed:',
-      error.response?.data || error.message,
-    );
+    console.error('Zoom meeting creation failed:', error.response?.data || error.message);
     throw new ApiError(
       httpStatus.INTERNAL_SERVER_ERROR,
       'Failed to create Zoom meeting',
-      error.response?.data,
+      error.response?.data
     );
   }
 };
