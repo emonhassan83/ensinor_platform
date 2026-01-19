@@ -8,6 +8,7 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import pick from '../../utils/pick';
 import { zoomFilterableFields } from './zoom.constant';
+import { UserRole } from '@prisma/client';
 
 const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
   const currentUserId = req.user!.userId;
@@ -37,34 +38,100 @@ const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
 // Handle Zoom OAuth Callback
 const zoomAuthCallback = catchAsync(async (req: Request, res: Response) => {
   const { code, state } = req.query;
-  if (!code) throw new ApiError(httpStatus.BAD_REQUEST, 'Missing code!');
-  if (!state) throw new ApiError(httpStatus.BAD_REQUEST, 'Missing state!');
 
-  let currentUserId: string;
-  try {
-    const decoded = JSON.parse(
-      Buffer.from(state as string, 'base64').toString(),
-    );
-    currentUserId = decoded.userId;
+  console.log('🚀 Zoom OAuth Callback Started');
+  console.log('Code received:', code);
+  console.log('State received:', state);
 
-    if (Math.abs(Date.now() - decoded.timestamp) > 15 * 60 * 1000) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'State expired!');
-    }
-  } catch {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid state!');
+  if (!code) {
+    return res.redirect('/dashboard?error=missing_code');
   }
 
-  const result = await ZoomService.handleOAuthCallback(
-    code as string,
-    currentUserId,
-  );
+  let currentUserId: string;
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Zoom connected successfully!',
-    data: { accessToken: result.accessToken },
-  });
+  // Step 1: From State collected userId
+  if (state) {
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(state as string, 'base64').toString(),
+      );
+      currentUserId = decoded.userId;
+
+      // Timestamp expire
+      if (Math.abs(Date.now() - decoded.timestamp) > 15 * 60 * 1000) {
+        return res.redirect('/dashboard?error=state_expired');
+      }
+    } catch (err) {
+      console.error('Invalid state:', err);
+      return res.redirect('/dashboard?error=invalid_state');
+    }
+  } else {
+    return res.redirect('/dashboard?error=missing_state');
+  }
+
+  if (!currentUserId) {
+    return res.redirect('/dashboard?error=missing_user_id');
+  }
+
+  try {
+    // Step 2: Zoom OAuth tokens + user info
+    const zoomAccount = await ZoomService.handleOAuthCallback(
+      code as string,
+      currentUserId,
+    );
+
+    // Step 3: User role wise find
+    const user = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      console.error('User not found after Zoom connect:', currentUserId);
+      return res.redirect(`${config.client_dashboard_url}/dashboard?error=user_not_found`);
+    }
+
+    const role = user.role;
+
+    // Step 4: Role wise set redirect url
+    let redirectUrl = `${config.client_dashboard_url}/dashboard`;
+
+    switch (role) {
+      case UserRole.super_admin:
+        redirectUrl =
+          `${config.client_dashboard_url}/dashboard/superAdmin/integration/zoom`;
+        break;
+      case UserRole.company_admin:
+        redirectUrl =
+          `${config.client_dashboard_url}/dashboard/companysAdmin/integration/zoom`;
+        break;
+      case UserRole.business_instructors:
+        redirectUrl =
+          `${config.client_dashboard_url}/dashboard/businessInstructor/integration/zoom`;
+        break;
+      case UserRole.instructor:
+        redirectUrl =
+          `${config.client_dashboard_url}/dashboard/instructors/integration/zoom`;
+        break;
+      default:
+        console.warn('Unknown role after Zoom connect:', role);
+        redirectUrl = `${config.client_dashboard_url}/dashboard`;
+    }
+
+    // Step 5: role-based dashboard
+    console.log(
+      `Zoom connected successfully! Redirecting ${role} to: ${redirectUrl}`,
+    );
+    return res.redirect(`${redirectUrl}?success=zoom_connected`);
+  } catch (error: any) {
+    console.error('Zoom OAuth Error Details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+
+    return res.redirect(`${config.client_dashboard_url}/dashboard?error=zoom_connect_failed`);
+  }
 });
 
 // Refresh Zoom Token
@@ -110,7 +177,11 @@ const getMyZoomMeeting = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, zoomFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await ZoomService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await ZoomService.getAllFromDB(
+    filters,
+    options,
+    req.user!.userId,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -162,5 +233,5 @@ export const ZoomController = {
   getMyZoomMeeting,
   getAZoomMeeting,
   updateAZoomMeeting,
-  deleteAZoomMeeting
+  deleteAZoomMeeting,
 };
