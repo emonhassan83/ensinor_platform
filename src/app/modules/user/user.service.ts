@@ -2,6 +2,7 @@ import {
   CompanyType,
   Prisma,
   RegisterWith,
+  SubscriptionType,
   UserRole,
   UserStatus,
 } from '@prisma/client';
@@ -58,6 +59,7 @@ const getActiveSubscription = async (userId: string) => {
       isExpired: false,
       expiredAt: { gt: new Date() },
     },
+    orderBy: { createdAt: 'desc' },
     select: {
       type: true,
     },
@@ -877,11 +879,46 @@ const geUserById = async (userId: string) => {
     ? await getActiveSubscription(subscriptionOwnerId)
     : null;
 
+  // ★★★ storageLimit Calculate ★★★
+  let storageLimitGB = 0;
+
+  if (userData.role === UserRole.instructor) {
+    if (!activeSubscription) {
+      storageLimitGB = 0.5;
+    } else if (activeSubscription.type === SubscriptionType.standard) {
+      storageLimitGB = 5;
+    } else if (activeSubscription.type === SubscriptionType.premium) {
+      storageLimitGB = 10;
+    }
+  } else if (
+    userData.role === UserRole.company_admin ||
+    userData.role === UserRole.business_instructors
+  ) {
+    if (activeSubscription) {
+      switch (activeSubscription.type) {
+        case SubscriptionType.ngo:
+          storageLimitGB = 10;
+          break;
+        case SubscriptionType.sme:
+          storageLimitGB = 20;
+          break;
+        case SubscriptionType.enterprise:
+          storageLimitGB = 50;
+          break;
+        default:
+          storageLimitGB = 0;
+      }
+    }
+  }
+
+  const storageLimitMB = storageLimitGB * 1024;
+
   return {
     ...userData,
     ...profileData,
     isActiveSubscription: Boolean(activeSubscription),
     subscriptionType: activeSubscription?.type ?? null,
+    storageLimitMB,
   };
 };
 
