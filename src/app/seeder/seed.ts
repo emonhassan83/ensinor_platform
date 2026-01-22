@@ -5,12 +5,13 @@ import {
   ChatType,
   ChatStatus,
   ChatRole,
-  CourseGrade,
+  CourseGrade
 } from '@prisma/client';
 import config from '../config';
 import prisma from '../utils/prisma';
 import { findAdmin } from '../utils/findAdmin';
 import { hashedPassword } from '../helpers/hashPasswordHelper';
+import { batchData, packageData } from '../utils/initialSeedData';
 
 const seedAdmin = async () => {
   // check if super_admin already exists
@@ -193,7 +194,7 @@ const seedInitialChats = async () => {
     instructorGroupChat: instructorGroupChat.id,
     studentGroupChat: studentGroupChat.id,
   });
-}
+};
 
 const seedDefaultGradingSystem = async () => {
   console.log('\n📊 Checking default grading system...');
@@ -267,9 +268,110 @@ const seedDefaultGradingSystem = async () => {
   console.log('✅ Default Grading System seeded with A, B, C, D, FAIL grades!');
 };
 
+// Batch seed function (duplication prevent)
+const seedBatches = async () => {
+  console.log('\n🚀 Seeding Batches...');
+
+  let seededCount = 0;
+  let skippedCount = 0;
+
+  for (const batch of batchData) {
+    // Check batch title exist or not
+    const existing = await prisma.batch.findFirst({
+      where: { title: batch.title, isDeleted: false },
+    });
+
+    if (existing) {
+      skippedCount++;
+      console.log(`ℹ️ Batch "${batch.title}" already exists. Skipping...`);
+      continue;
+    }
+
+    // super_admin
+    const admin = await prisma.user.findFirst({
+      where: { role: UserRole.super_admin, isDeleted: false },
+    });
+
+    if (!admin) {
+      console.error('❌ No super_admin found. Cannot seed batches.');
+      return;
+    }
+
+    await prisma.batch.create({
+      data: {
+        authorId: admin.id,
+        title: batch.title,
+        description: batch.description,
+        logo: batch.logo,
+        category: batch.category,
+        rarity: batch.rarity,
+        popularity: 0,
+        isDeleted: false,
+      },
+    });
+
+    seededCount++;
+    console.log(`✅ Batch "${batch.title}" seeded successfully!`);
+  }
+
+  console.log(
+    `\n📊 Batch Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
+  );
+};
+
+// Package seed function (duplication prevent)
+const seedPackages = async () => {
+  console.log('\n🚀 Seeding Packages...');
+
+  let seededCount = 0;
+  let skippedCount = 0;
+
+  for (const pkg of packageData) {
+    // Check title + type + audience
+    const existing = await prisma.package.findFirst({
+      where: {
+        title: pkg.title,
+        type: pkg.type,
+        audience: pkg.audience,
+        isDeleted: false,
+      },
+    });
+
+    if (existing) {
+      skippedCount++;
+      console.log(
+        `ℹ️ Package "${pkg.title}" (${pkg.type}, ${pkg.audience}) already exists. Skipping...`,
+      );
+      continue;
+    }
+
+    await prisma.package.create({
+      data: {
+        title: pkg.title,
+        type: pkg.type,
+        audience: pkg.audience,
+        features: pkg.features,
+        billingCycle: pkg.billingCycle,
+        price: pkg.price,
+        popularity: pkg.popularity || 0,
+        isDeleted: false,
+      },
+    });
+
+    seededCount++;
+    console.log(`✅ Package "${pkg.title}" (${pkg.type}) seeded successfully!`);
+  }
+
+  console.log(
+    `\n📊 Package Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
+  );
+};
+
 export const seeder = {
   seedAdmin,
   seedContents,
   seedInitialChats,
-  seedDefaultGradingSystem
+  seedDefaultGradingSystem,
+  seedBatches,
+  seedPackages
 };

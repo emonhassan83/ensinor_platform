@@ -14,22 +14,29 @@ import colors from 'colors';
 const main = async () => {
   try {
     // default task added
-    seeder.seedAdmin();
-    seeder.seedContents();
-    seeder.seedInitialChats();
-    seeder.seedDefaultGradingSystem();
+    await Promise.all([
+      seeder.seedAdmin(),
+      seeder.seedContents(),
+      seeder.seedInitialChats(),
+      seeder.seedDefaultGradingSystem(),
+      seeder.seedBatches(),
+      seeder.seedPackages(),
+    ]);
+    console.log('🎉 All seeders completed!');
+
+    // Run Corn job
     initializeCleanupJobs();
     newsletterScheduleCron();
 
     server = app.listen(PORT, HOST, () => {
-     console.log(
+      console.log(
         colors.italic.green.bold(
           `💫 Simple Server Listening on  http://${config?.ip}:${config.port} `,
         ),
       );
-    })
+    });
 
-    io.listen(Number(config.socket_port))
+    io.listen(Number(config.socket_port));
     console.log(
       colors.yellow.bold(
         `⚡Socket.io running on  http://${config.ip}:${config.socket_port}`,
