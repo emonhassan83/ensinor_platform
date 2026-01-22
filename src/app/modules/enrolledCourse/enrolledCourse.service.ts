@@ -27,6 +27,7 @@ import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import {
   checkAndAwardAllEligibleBadges,
+  checkAndAwardDailyLearningBadges,
   sendCourseCompleteNotifYToAuthor,
 } from './enrolledCourse.utils';
 import { sendCourseEnrollmentEmail } from '../../utils/email/courseEnrolledmentEmail';
@@ -1775,6 +1776,15 @@ const watchLectureIntoDB = async (payload: {
       where: { id: enrolledCourseId },
       data: { completedRate },
     });
+  }
+
+  if (enrolledCourse.userId) {
+    const awardedBadges = await checkAndAwardDailyLearningBadges(
+      enrolledCourse.userId,
+    );
+
+    if (awardedBadges.length > 0)
+      console.log(`Awarded daily badges: ${awardedBadges.join(', ')}`);
   }
 
   return finalUpdate;

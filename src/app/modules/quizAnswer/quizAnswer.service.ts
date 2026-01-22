@@ -7,6 +7,7 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import { isShortAnswerCorrect } from '../../utils/answerAnalyzer';
+import { checkAndAwardQuizBadges } from './quizAnswer.utils';
 
 const insertIntoDB = async (payload: IQuizAnswer) => {
   const { attemptId, questionId, optionId, shortAnswer } = payload;
@@ -98,7 +99,7 @@ const completeAttemptIntoDB = async (
   attemptId: string,
   payload: { timeTaken: number },
 ) => {
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async tx => {
     // 1. Fetch attempt + answers + quiz
     const attempt = await tx.quizAttempt.findUnique({
       where: { id: attemptId, isDeleted: false },
@@ -125,12 +126,14 @@ const completeAttemptIntoDB = async (
     });
 
     // 3. Correct answers count
-    const correctAnswers = attempt.quizAnswer.filter((a) => a.isCorrect).length;
+    const correctAnswers = attempt.quizAnswer.filter(a => a.isCorrect).length;
 
     // 4. Calculate marks & correctRate
-    const marksPerQuestion = totalQuestions > 0 ? quiz.marks / totalQuestions : 0;
+    const marksPerQuestion =
+      totalQuestions > 0 ? quiz.marks / totalQuestions : 0;
     const marksObtained = Math.round(correctAnswers * marksPerQuestion);
-    const correctRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+    const correctRate =
+      totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 
     // 5. Determine if passed
     const isPassed = marksObtained >= quiz.passingScore;
@@ -140,16 +143,20 @@ const completeAttemptIntoDB = async (
 
     if (isPassed) {
       // Grading system
-      const gradingSystem = await tx.gradingSystem.findFirst({
-        where: { courseId: quiz.courseId, isDeleted: false },
-        include: { grades: true },
-      }) || await tx.gradingSystem.findFirst({
-        where: { isDefault: true, isDeleted: false },
-        include: { grades: true },
-      });
+      const gradingSystem =
+        (await tx.gradingSystem.findFirst({
+          where: { courseId: quiz.courseId, isDeleted: false },
+          include: { grades: true },
+        })) ||
+        (await tx.gradingSystem.findFirst({
+          where: { isDefault: true, isDeleted: false },
+          include: { grades: true },
+        }));
 
       if (gradingSystem && gradingSystem.grades.length > 0) {
-        const sortedGrades = gradingSystem.grades.sort((a, b) => b.minScore - a.minScore);
+        const sortedGrades = gradingSystem.grades.sort(
+          (a, b) => b.minScore - a.minScore,
+        );
         const matchedGrade = sortedGrades.find(g => correctRate >= g.minScore);
         if (matchedGrade) {
           grade = matchedGrade.gradeLabel as CourseGrade;
@@ -182,6 +189,19 @@ const completeAttemptIntoDB = async (
       where: { id: quiz.id },
       data: { totalAttempt: { increment: 1 } },
     });
+
+    // 9. check quiz related badges related work
+    if (updatedAttempt.isCompleted && updatedAttempt.userId) {
+      const awardedBadges = await checkAndAwardQuizBadges(
+        updatedAttempt.userId,
+        quiz.id,
+        attemptId,
+      );
+
+      if (awardedBadges.length > 0) {
+        console.log(`Awarded quiz badges: ${awardedBadges.join(', ')}`);
+      }
+    }
 
     return updatedAttempt;
   });
@@ -258,24 +278,35 @@ const getByIdFromDB = async (id: string) => {
   return result;
 };
 
-const updateIntoDB = async (id: string, payload: { optionId?: string; shortAnswer?: string }) => {
-  return await prisma.$transaction(async (tx) => {
+const updateIntoDB = async (
+  id: string,
+  payload: { optionId?: string; shortAnswer?: string },
+) => {
+  return await prisma.$transaction(async tx => {
     const answer = await tx.quizAnswer.findUnique({
       where: { id },
       include: { question: true },
     });
 
-    if (!answer) throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
+    if (!answer)
+      throw new ApiError(httpStatus.NOT_FOUND, 'Quiz answer not found!');
 
     const attempt = await tx.quizAttempt.findFirst({
       where: { id: answer.attemptId, isCompleted: false, isDeleted: false },
     });
-    if (!attempt) throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot update completed attempt!');
+    if (!attempt)
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Cannot update completed attempt!',
+      );
 
     let isCorrect = false;
 
     if (payload.shortAnswer && answer.question.type === 'short_answer') {
-      isCorrect = isShortAnswerCorrect(payload.shortAnswer, answer.question.expectedAnswer);
+      isCorrect = isShortAnswerCorrect(
+        payload.shortAnswer,
+        answer.question.expectedAnswer,
+      );
       return tx.quizAnswer.update({
         where: { id },
         data: { shortAnswer: payload.shortAnswer, isCorrect },
@@ -286,7 +317,8 @@ const updateIntoDB = async (id: string, payload: { optionId?: string; shortAnswe
       const option = await tx.options.findFirst({
         where: { id: payload.optionId, questionId: answer.questionId },
       });
-      if (!option) throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid option!');
+      if (!option)
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid option!');
 
       isCorrect = option.isCorrect;
       return tx.quizAnswer.update({
@@ -295,7 +327,10 @@ const updateIntoDB = async (id: string, payload: { optionId?: string; shortAnswe
       });
     }
 
-    throw new ApiError(httpStatus.BAD_REQUEST, 'No valid update data provided!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'No valid update data provided!',
+    );
   });
 };
 

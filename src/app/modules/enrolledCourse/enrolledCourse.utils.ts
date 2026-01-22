@@ -300,6 +300,106 @@ async function check3Months5Courses(userId: string): Promise<boolean> {
   return count >= 5;
 }
 
+/**
+ *  Consistent Learner and Streak Champion badge
+ */
+export async function checkAndAwardDailyLearningBadges(userId: string): Promise<string[]> {
+  const awarded: string[] = [];
+
+  // ১. Consistent Learner 10 days active
+  const CONSISTENT_TITLE = "Consistent Learner";
+  const REQUIRED_UNIQUE_DAYS = 10;
+
+  const consistentBadgeId = await findBatchIdByTitle(CONSISTENT_TITLE);
+  if (consistentBadgeId && !(await hasBatch(userId, consistentBadgeId))) {
+    const logs = await prisma.courseLogs.findMany({
+      where: { userId },
+      select: { createdAt: true },
+    });
+
+    const uniqueDays = new Set(
+      logs.map(log => log.createdAt.toISOString().split('T')[0])
+    );
+
+    if (uniqueDays.size >= REQUIRED_UNIQUE_DAYS) {
+      await prisma.achievement.update({
+        where: { userId },
+        data: { badges: { connect: { id: consistentBadgeId } } },
+      });
+
+      await prisma.achievementLogs.create({
+        data: {
+          userId,
+          badgeId: consistentBadgeId,
+          modelType: AchievementModelType.badges
+        },
+      });
+
+      awarded.push(CONSISTENT_TITLE);
+    }
+  }
+
+  // ২. Streak Champion 60 days active
+  const STREAK_TITLE = "Streak Champion";
+  const REQUIRED_STREAK = 60;
+
+  const streakBadgeId = await findBatchIdByTitle(STREAK_TITLE);
+  if (streakBadgeId && !(await hasBatch(userId, streakBadgeId))) {
+    const logs = await prisma.courseLogs.findMany({
+      where: { userId },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (logs.length > 0) {
+      const dates = [...new Set(
+        logs.map(log => log.createdAt.toISOString().split('T')[0])
+      )].sort();
+
+      let currentStreak = 1;
+      let maxStreak = 1;
+
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diffDays = Math.floor((curr.getTime() - prev.getTime()) / 86400000);
+
+        if (diffDays === 1) {
+          currentStreak++;
+          maxStreak = Math.max(maxStreak, currentStreak);
+        } else {
+          currentStreak = 1;
+        }
+      }
+
+      // checked 
+      const today = new Date().toISOString().split('T')[0];
+      if (dates[dates.length - 1] !== today) {
+        currentStreak = 0;
+      }
+
+      if (currentStreak >= REQUIRED_STREAK) {
+        await prisma.achievement.update({
+          where: { userId },
+          data: { badges: { connect: { id: streakBadgeId } } },
+        });
+
+        await prisma.achievementLogs.create({
+          data: {
+            userId,
+            badgeId: streakBadgeId,
+            modelType: AchievementModelType.badges
+          },
+        });
+
+        awarded.push(STREAK_TITLE);
+      }
+    }
+  }
+
+  return awarded;
+}
+
 // Course Completed Notification → Admin
 export const sendCourseCompleteNotifYToAuthor = async (
   user: Partial<User>,
