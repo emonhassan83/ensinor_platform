@@ -18,6 +18,7 @@ import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
 import { generateEnrollmentId } from '../../utils/generateEnrollmentId';
+import { tryAwardCertificateCollectorIfEligible } from './certificate.utils';
 
 const insertIntoDB = async (payload: ICertificate) => {
   const { userId, enrolledCourseId } = payload;
@@ -244,6 +245,9 @@ const insertIntoDB = async (payload: ICertificate) => {
 
   if (!result)
     throw new ApiError(httpStatus.BAD_REQUEST, 'Certificate creation failed!');
+
+  // For Certificate collector badges
+  await tryAwardCertificateCollectorIfEligible(payload.userId);
 
   return result;
 };
