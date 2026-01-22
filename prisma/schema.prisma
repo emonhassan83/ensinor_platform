@@ -850,6 +850,11 @@ model EnrolledCourse {
   courseFinishTime DateTime     @default(now())
   lastActivity     DateTime     @default(now())
   isComplete       Boolean      @default(false)
+
+  // Added for badge
+  percentile Float?
+  isTop10 Boolean? @default(false)
+
   isDeleted        Boolean      @default(false)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt

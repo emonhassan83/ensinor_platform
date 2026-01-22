@@ -25,7 +25,11 @@ import { enrolledCourseSearchAbleFields } from './enrolledCourse.constant';
 import prisma from '../../utils/prisma';
 import ApiError from '../../errors/ApiError';
 import httpStatus from 'http-status';
-import { sendCourseCompleteNotifYToAuthor } from './enrolledCourse.utils';
+import {
+  sendCourseCompleteNotifYToAuthor,
+  tryAwardScholarIfEligible,
+  tryAwardTimeMasterIfEligible,
+} from './enrolledCourse.utils';
 import { sendCourseEnrollmentEmail } from '../../utils/email/courseEnrolledmentEmail';
 import { calculateAchievementLevel } from '../../utils/achievementLevel';
 
@@ -1512,7 +1516,7 @@ const getByIdFromDB = async (id: string, userId: string) => {
             },
           },
           assignment: {
-            where: { isDeleted: false }
+            where: { isDeleted: false },
           },
         },
       },
@@ -1877,6 +1881,57 @@ const completeCourseIntoDB = async (id: string) => {
         data: { courseCompleted: { increment: 1 } },
       });
     }
+  }
+
+  // For badges
+  if (result.isComplete) {
+    const userId = result.user.id;
+    const courseId = result.course.id;
+    const userMark = result.courseMark ?? 0;
+
+    // 1. check top course 10% + EnrolledCourse updated
+    const allCompletions = await prisma.enrolledCourse.findMany({
+      where: {
+        courseId,
+        isComplete: true,
+        isDeleted: false,
+      },
+      select: { courseMark: true },
+    });
+
+    let isTop10 = false;
+
+    if (allCompletions.length >= 10) {
+      const validScores = allCompletions
+        .map(e => e.courseMark ?? 0)
+        .filter(score => score > 0);
+
+      if (validScores.length >= 10) {
+        const sorted = [...validScores].sort((a, b) => b - a);
+        const top10Index = Math.ceil(validScores.length * 0.1) - 1;
+        const threshold = sorted[top10Index] ?? 0;
+
+        isTop10 = userMark >= threshold && userMark > 0;
+
+        await prisma.enrolledCourse.update({
+          where: { id: result.id },
+          data: {
+            isTop10,
+            percentile: isTop10
+              ? Math.round(100 - (threshold / (userMark || 1)) * 100 * 10) / 10
+              : null,
+          },
+        });
+      }
+    }
+
+    // if have top 10% then check→ Scholar and award
+    if (isTop10) {
+      await tryAwardScholarIfEligible(userId, courseId);
+    }
+
+    // Time Master badge check
+    await tryAwardTimeMasterIfEligible(userId);
   }
 
   return result;
