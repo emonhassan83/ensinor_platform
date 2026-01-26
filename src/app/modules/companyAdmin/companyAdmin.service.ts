@@ -275,7 +275,7 @@ const changedBranding = async (
   payload: IBranding,
   file?: Express.Multer.File,
 ) => {
-  // 1️⃣ Find user and linked company admin
+  // 1️ Find user and linked company admin
   const user = await prisma.user.findUnique({
     where: { id: userId, isDeleted: false },
     include: { companyAdmin: true },
@@ -287,7 +287,7 @@ const changedBranding = async (
 
   const companyAdmin = user.companyAdmin;
 
-  // 2️⃣ Check if company exists
+  // 2️ Check if company exists
   const existingCompany = await prisma.company.findUnique({
     where: { userId: companyAdmin.id },
   });
@@ -296,25 +296,35 @@ const changedBranding = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'No company record found for this admin!');
   }
 
-  // 3️⃣ Handle logo upload
+  // 3. New data create
+  const updateData: Partial<Prisma.CompanyUpdateInput> = {
+    updatedAt: new Date(),
+  };
+
+  if (payload.name) updateData.name = payload.name;
+  if (payload.color) updateData.color = payload.color;
+
+  // 4. Logo file handle
+  let newLogoUrl: string | undefined;
+
   if (file) {
     const uploaded = await uploadToS3({
       file,
       fileName: `images/company/logo/${Math.floor(100000 + Math.random() * 900000)}`,
     });
 
-    if (uploaded) {
-      payload.logo = uploaded;
+    if (!uploaded) {
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload logo to S3');
     }
+
+    newLogoUrl = uploaded;
+    updateData.logo = newLogoUrl;
   }
 
-  // 4️⃣ Update branding details
+  // 5. Prisma to update
   const updated = await prisma.company.update({
     where: { userId: companyAdmin.id },
-    data: {
-      ...(payload ?? {}),
-      updatedAt: new Date(),
-    },
+    data: updateData,
   });
 
   return updated;
