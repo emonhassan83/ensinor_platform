@@ -5,7 +5,7 @@ import emailSender from '../../utils/emailSender';
 
 // User Status Change Notification → User
 export const sendWithdrawStatusNotifYToUser = async (
-  status: 'approved' | 'completed' | 'cancelled',
+  status: 'approved' | 'completed' | 'cancelled' | 'failed',
   user: Partial<User>,
   amount?: number,
 ) => {
@@ -25,6 +25,10 @@ export const sendWithdrawStatusNotifYToUser = async (
     case 'cancelled':
       message = `Withdrawal cancelled`;
       description = `Your withdrawal request of $${amount?.toFixed(2)} has been cancelled. Contact support if you need assistance.`;
+      break;
+    case 'failed':
+      message = `Withdrawal failed`;
+      description = `Your withdrawal request of $${amount?.toFixed(2)} has failed. Please try again or contact support.`;
       break;
   }
   // Create a notification entry

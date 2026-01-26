@@ -1925,6 +1925,7 @@ enum WithdrawStatus {
   approved
   completed
   cancelled
+  failed
 }
 
 enum CourseLevel {

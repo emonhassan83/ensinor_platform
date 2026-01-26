@@ -38,6 +38,19 @@ const stripLinkAccount = async (userId: string) => {
   }
 };
 
+const checkStripeConnected = async (userId: string): Promise<boolean> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { stripeAccountId: true },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  return !!user.stripeAccountId;
+};
+
 // Handle Stripe OAuth and save the connected account ID
 const handleStripeOAuth = async (
   query: Record<string, any>,
@@ -112,4 +125,5 @@ export const stripeService = {
   stripLinkAccount,
   refresh,
   returnUrl,
+  checkStripeConnected
 };

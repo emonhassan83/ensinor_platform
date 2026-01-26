@@ -10,8 +10,19 @@ const stripLinkAccount = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
-    data: result,
     message: 'Account creation URL generated successfully.',
+    data: result,
+  });
+});
+
+// checked stripe connected
+const checkStripeConnected = catchAsync(async (req: Request, res: Response) => {
+  const result = await stripeService.checkStripeConnected(req?.user?._id);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: 'Check stripe connection status.',
+    data: result,
   });
 });
 
@@ -31,7 +42,7 @@ const refresh = catchAsync(async (req: Request, res: Response) => {
 
 const returnUrl = catchAsync(async (req: Request, res: Response) => {
   const result = await stripeService.returnUrl(req.query);
-  res.redirect(`${config.payment_success_url}/account` );
+  res.redirect(`${config.payment_success_url}/account`);
   // sendResponse(res, {
   //   success: true,
   //   statusCode: httpStatus.OK,
@@ -42,6 +53,7 @@ const returnUrl = catchAsync(async (req: Request, res: Response) => {
 
 export const stripeController = {
   stripLinkAccount,
+  checkStripeConnected,
   handleStripeOAuth,
   refresh,
   returnUrl,

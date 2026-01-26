@@ -23,6 +23,12 @@ import {
   sendWithdrawStatusNotifYToUser,
 } from './withdrawRequest.utils';
 import httpStatus from 'http-status';
+import Stripe from 'stripe';
+import config from '../../config';
+
+const stripe = new Stripe(config.stripe.stripe_api_secret!, {
+  apiVersion: '2025-08-27.basil',
+});
 
 const insertIntoDB = async (payload: IWithdrawRequest) => {
   const { userId, paymentMethod, amount } = payload;
@@ -368,58 +374,116 @@ const updateIntoDB = async (
 ): Promise<WithdrawRequest> => {
   const { status } = payload;
 
-  // 1️⃣ Find the withdraw request
+  // 1. Find withdraw request with full user details
   const withdrawRequest = await prisma.withdrawRequest.findUnique({
     where: { id },
-    include: { user: true },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          balance: true,
+          stripeAccountId: true,
+        },
+      },
+    },
   });
+
   if (!withdrawRequest) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Withdraw request not found!');
   }
 
-  // 2️⃣ Prevent redundant updates
+  // 2. Prevent redundant updates
   if (withdrawRequest.status === status) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      `Withdraw is already ${status}!`,
-    );
+    throw new ApiError(httpStatus.BAD_REQUEST, `Withdraw is already ${status}!`);
   }
 
-  // 3️⃣ Handle status transitions
   switch (status) {
-    // ✅ Super Admin approves the withdraw request
-    case 'approved':
-      if (withdrawRequest.status !== 'pending') {
+    // Super Admin approves → initiate payout
+    case WithdrawStatus.approved:
+      if (withdrawRequest.status !== WithdrawStatus.pending) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Only pending requests can be approved!');
+      }
+
+      // If payment method is not Stripe → simple approve (manual bank transfer case)
+      if (withdrawRequest.paymentMethod !== PaymentMethod.Stripe) {
+        const approved = await prisma.withdrawRequest.update({
+          where: { id },
+          data: { status: WithdrawStatus.approved },
+        });
+
+        await sendWithdrawApprovedEmail(withdrawRequest.user, withdrawRequest.amount);
+        await sendWithdrawStatusNotifYToUser('approved', withdrawRequest.user, withdrawRequest.amount);
+
+        return approved;
+      }
+
+      // Stripe case: Check connected account
+      if (!withdrawRequest.user.stripeAccountId) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          'Only pending requests can be approved!',
+          'User has not connected Stripe account. Cannot process payout.'
         );
       }
 
-      await prisma.withdrawRequest.update({
-        where: { id },
-        data: { status },
-      });
+      // Attempt Stripe Transfer
+      try {
+        const transfer = await stripe.transfers.create({
+          amount: Math.round(withdrawRequest.amount * 100), // cents
+          currency: 'usd',
+          destination: withdrawRequest.user.stripeAccountId,
+          description: `Payout for ${withdrawRequest.payoutType} - $${withdrawRequest.amount}`,
+          metadata: { withdrawRequestId: id, userId: withdrawRequest.userId },
+        });
 
-      // sent notification and email
-      await sendWithdrawApprovedEmail(
-        withdrawRequest.user,
-        withdrawRequest.amount,
-      );
-      await sendWithdrawStatusNotifYToUser(
-        'approved',
-        withdrawRequest.user,
-        withdrawRequest.amount,
-      );
-      break;
+        // Transfer success → complete everything
+        const completed = await prisma.withdrawRequest.update({
+          where: { id },
+          data: {
+            status: WithdrawStatus.completed,
+            stripeTransferId: transfer.id,
+          },
+        });
 
-    // ✅ Payout completed
-    case 'completed':
-      if (withdrawRequest.status !== 'approved') {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Only approved requests can be completed!',
+        // Deduct balance
+        await prisma.user.update({
+          where: { id: withdrawRequest.userId },
+          data: { balance: { decrement: withdrawRequest.amount } },
+        });
+
+        // Notifications
+        await sendWithdrawCompletedEmail(
+          withdrawRequest.user,
+          withdrawRequest.amount,
+          withdrawRequest.user.balance - withdrawRequest.amount
         );
+        await sendWithdrawStatusNotifYToUser(
+          'completed',
+          withdrawRequest.user,
+          withdrawRequest.amount
+        );
+
+        return completed;
+      } catch (stripeError: any) {
+        console.error('Stripe transfer failed:', stripeError);
+
+        // Transfer failed → mark as failed (or keep approved and notify admin)
+        const failed = await prisma.withdrawRequest.update({
+          where: { id },
+          data: { status: WithdrawStatus.failed },
+        });
+
+        // Notify admin & user
+        await sendWithdrawStatusNotifYToUser('failed', withdrawRequest.user, withdrawRequest.amount);
+
+        return failed;
+      }
+
+    // Manual complete (for Bank Transfer or override)
+    case WithdrawStatus.completed:
+      if (withdrawRequest.status !== WithdrawStatus.approved) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Only approved requests can be manually completed!');
       }
 
       const userBalance = withdrawRequest.user?.balance ?? 0;
@@ -432,55 +496,39 @@ const updateIntoDB = async (
         data: { balance: { decrement: withdrawRequest.amount } },
       });
 
-      const completedResult = await prisma.withdrawRequest.update({
+      const completed = await prisma.withdrawRequest.update({
         where: { id },
-        data: { status },
+        data: { status: WithdrawStatus.completed },
       });
 
-      // sent email and notification
       await sendWithdrawCompletedEmail(
         withdrawRequest.user,
         withdrawRequest.amount,
-        userBalance - withdrawRequest.amount,
+        userBalance - withdrawRequest.amount
       );
-      await sendWithdrawStatusNotifYToUser(
-        'completed',
-        withdrawRequest.user,
-        withdrawRequest.amount,
-      );
-      return completedResult;
+      await sendWithdrawStatusNotifYToUser('completed', withdrawRequest.user, withdrawRequest.amount);
 
-    // ✅ Cancelled by user or admin
-    case 'cancelled':
-      if (withdrawRequest.status === 'completed') {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          'Completed withdrawals cannot be cancelled!',
-        );
+      return completed;
+
+    // Cancel
+    case WithdrawStatus.cancelled:
+      if (withdrawRequest.status === WithdrawStatus.completed) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Completed withdrawals cannot be cancelled!');
       }
 
-      const cancelledResult = await prisma.withdrawRequest.update({
+      const cancelled = await prisma.withdrawRequest.update({
         where: { id },
-        data: { status },
+        data: { status: WithdrawStatus.cancelled },
       });
 
-      // sent email and notification
-      await sendWithdrawCancelledEmail(
-        withdrawRequest.user,
-        withdrawRequest.amount,
-      );
-      await sendWithdrawStatusNotifYToUser(
-        'cancelled',
-        withdrawRequest.user,
-        withdrawRequest.amount,
-      );
-      return cancelledResult;
+      await sendWithdrawCancelledEmail(withdrawRequest.user, withdrawRequest.amount);
+      await sendWithdrawStatusNotifYToUser('cancelled', withdrawRequest.user, withdrawRequest.amount);
+
+      return cancelled;
 
     default:
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid status update!');
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid status!');
   }
-
-  return withdrawRequest;
 };
 
 const deleteFromDB = async (id: string): Promise<WithdrawRequest> => {
