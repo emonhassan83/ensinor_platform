@@ -227,7 +227,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 
 const getPopularCoursesFromDB = async () => {
   const andConditions: Prisma.CourseWhereInput[] = [
-    { isDeleted: false, isPublished: true, status: CoursesStatus.approved },
+    { isDeleted: false, isPublished: true, status: CoursesStatus.approved, type: CourseType.external },
   ];
 
   const whereConditions: Prisma.CourseWhereInput = {
