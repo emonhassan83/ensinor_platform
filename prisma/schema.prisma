@@ -1014,7 +1014,7 @@ model Event {
   platform       PlatformType @default(admin)
   title          String
   type           EventType    @default(in_person)
-  slogan         String
+  slogan         String?
   category       String
   thumbnail      String
   organizedBy    String
@@ -1025,8 +1025,8 @@ model Event {
   startTime      String
   endTime        String
   description    String
-  speakerSlogan  String
-  scheduleSlogan String
+  speakerSlogan  String?
+  scheduleSlogan String?
   registered     Int          @default(0)
   isDeleted      Boolean      @default(false)
   createdAt      DateTime     @default(now())
@@ -1051,7 +1051,7 @@ model Event {
 model EventSchedule {
   id        String   @id @default(uuid())
   eventId   String
-  day       String
+  day       String?
   date      String
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())

@@ -12,7 +12,7 @@ const createValidationSchema = z.object({
     platform: z.nativeEnum(PlatformType),
     slogan: z.string({
       required_error: 'Short slogan is required!',
-    }),
+    }).optional(),
     category: z.string({ required_error: 'Category is required!' }),
     language: z.string({ required_error: 'Language is required!' }),
     thumbnail: z
@@ -32,10 +32,10 @@ const createValidationSchema = z.object({
     }),
     speakerSlogan: z.string({
       required_error: 'Event speakerSlogan is required!',
-    }),
+    }).optional(),
     scheduleSlogan: z.string({
       required_error: 'Event scheduleSlogan is required!',
-    }),
+    }).optional(),
   }),
 });
 
