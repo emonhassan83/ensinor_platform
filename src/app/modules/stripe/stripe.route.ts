@@ -5,7 +5,7 @@ import { UserRole } from '@prisma/client';
 
 const router = Router();
 
-router.patch(
+router.post(
   '/connect',
   auth(
     UserRole.super_admin,
