@@ -304,31 +304,30 @@ const getCombineCoursesFromDB = async (
   options: IPaginationOptions,
   filterBy?: { userId?: string; authorId?: string },
 ) => {
-  const { page, limit } = paginationHelpers.calculatePagination(options);
-  const { searchTerm, ...filterData } = params;
+  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { searchTerm, type, ...filterData } = params;
 
-  // ====== WHERE CONDITIONS ======
-  const andConditions: Prisma.CourseWhereInput[] = [
-    {
-      isDeleted: false,
-      isPublished: true,
-      status: CoursesStatus.approved,
-      type: CourseType.external,
-    },
+  // ====== BASE CONDITIONS ======
+  const courseConditions: Prisma.CourseWhereInput[] = [
+    { isDeleted: false },
+    { isPublished: true },
+    { status: CoursesStatus.approved },
+    { type: CourseType.external },
   ];
+
   const bundleConditions: Prisma.CourseBundleWhereInput[] = [
     { isDeleted: false },
   ];
 
-  // --- Filter by authorId ---
+  // ====== AUTHOR FILTER ======
   if (filterBy?.authorId) {
-    andConditions.push({ authorId: filterBy.authorId });
+    courseConditions.push({ authorId: filterBy.authorId });
     bundleConditions.push({ authorId: filterBy.authorId });
   }
 
-  // --- Search filter ---
+  // ====== SEARCH FILTER ======
   if (searchTerm) {
-    andConditions.push({
+    courseConditions.push({
       OR: courseSearchAbleFields.map(field => ({
         [field]: { contains: searchTerm, mode: 'insensitive' },
       })),
@@ -342,42 +341,48 @@ const getCombineCoursesFromDB = async (
     });
   }
 
-  // ====== DYNAMIC FILTERS (UPDATED) ======
+  // ====== TYPE FILTER ======
+  if (type) {
+    if (type === 'bundle') {
+      // If bundle then empty course query
+      courseConditions.push({ id: '00000000-0000-0000-0000-000000000000' }); // invalid ID
+    } else if (type === 'course') {
+      // If course then empty bundle query
+      bundleConditions.push({ id: '00000000-0000-0000-0000-000000000000' });
+    }
+  }
+
+  // ====== EXTRA FILTERS =====/
   if (Object.keys(filterData).length > 0) {
     const extraFilters = {
       AND: Object.keys(filterData).map(key => {
         const value = (filterData as any)[key];
 
-        // 🔹 Boolean filter handling (true/false)
-        if (
-          typeof value === 'boolean' ||
-          value === 'true' ||
-          value === 'false'
-        ) {
+        if (typeof value === 'boolean' || value === 'true' || value === 'false') {
           return { [key]: value === true || value === 'true' };
         }
 
-        // 🔹 Numeric values
         if (!isNaN(Number(value))) {
           return { [key]: { equals: Number(value) } };
         }
 
-        // 🔹 Default equals for string
         return { [key]: { equals: value } };
       }),
     };
 
-    andConditions.push(extraFilters);
+    courseConditions.push(extraFilters);
     bundleConditions.push(extraFilters);
   }
 
-  const whereCourse: Prisma.CourseWhereInput = { AND: andConditions };
+  const whereCourse: Prisma.CourseWhereInput = { AND: courseConditions };
   const whereBundle: Prisma.CourseBundleWhereInput = { AND: bundleConditions };
 
   // ====== FETCH DATA ======
   const [courses, bundles] = await Promise.all([
     prisma.course.findMany({
       where: whereCourse,
+      skip,
+      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -417,6 +422,8 @@ const getCombineCoursesFromDB = async (
 
     prisma.courseBundle.findMany({
       where: whereBundle,
+      skip,
+      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -443,17 +450,15 @@ const getCombineCoursesFromDB = async (
     }),
   ]);
 
-  // ====== MERGE ======
+  // ====== MERGE & ENRICH ======
   const combined = [
     ...courses.map(c => {
       const coupon = c.coupon?.[0];
       const promo = c.promoCode?.[0];
-
       const activeDiscount = coupon || promo;
       const discount = activeDiscount ? activeDiscount.discount : 0;
       const expiry = activeDiscount ? activeDiscount.expireAt : null;
-      const discountPrice =
-        discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
+      const discountPrice = discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
 
       return {
         id: c.id,
@@ -495,64 +500,58 @@ const getCombineCoursesFromDB = async (
   const sortKey = options.sortBy || 'createdAt';
   combined.sort((a, b) => {
     const order = options.sortOrder === 'asc' ? 1 : -1;
-    if ((a as any)[sortKey] > (b as any)[sortKey]) return order;
-    if ((a as any)[sortKey] < (b as any)[sortKey]) return -order;
+    const aVal = (a as any)[sortKey];
+    const bVal = (b as any)[sortKey];
+    if (aVal > bVal) return order;
+    if (aVal < bVal) return -order;
     return 0;
   });
 
   // ====== PAGINATION ======
   const total = combined.length;
-  const start = (page - 1) * limit;
-  const end = start + limit;
+  const start = skip;
+  const paginated = combined.slice(start, start + limit);
 
-  const paginated = combined.slice(start, end);
+  // ====== WISHLIST & ENROLLED ======
+  let wishlistIds = new Set<string>();
+  let enrolledIds = new Set<string>();
 
-  // ====== WISHLIST ======
-  let wishlistIds: Set<string> = new Set();
   if (filterBy?.userId) {
-    const wishlists = await prisma.wishlist.findMany({
-      where: {
-        userId: filterBy.userId,
-        OR: [
-          { courseId: { in: courses.map(c => c.id) } },
-          { courseBundleId: { in: bundles.map(b => b.id) } },
-        ],
-      },
-      select: { courseId: true, courseBundleId: true },
-    });
+    const [wishlists, enrolledLogs] = await Promise.all([
+      prisma.wishlist.findMany({
+        where: {
+          userId: filterBy.userId,
+          OR: [
+            { courseId: { in: courses.map(c => c.id) } },
+            { courseBundleId: { in: bundles.map(b => b.id) } },
+          ],
+        },
+        select: { courseId: true, courseBundleId: true },
+      }),
+      prisma.enrolledLogs.findMany({
+        where: { userId: filterBy.userId },
+        select: { courseId: true, bundleId: true },
+      }),
+    ]);
+
     wishlistIds = new Set(wishlists.map(w => w.courseId || w.courseBundleId!));
-  }
-
-  // ====== ENROLLED ======
-  let enrolledCourseIds = new Set<string>();
-  let enrolledBundleIds = new Set<string>();
-
-  if (filterBy?.userId) {
-    const enrolledLogs = await prisma.enrolledLogs.findMany({
-      where: { userId: filterBy.userId },
-      select: { courseId: true, bundleId: true },
-    });
-
-    enrolledCourseIds = new Set(
-      enrolledLogs.map(e => e.courseId).filter(Boolean) as string[],
-    );
-    enrolledBundleIds = new Set(
-      enrolledLogs.map(e => e.bundleId).filter(Boolean) as string[],
-    );
+    enrolledIds = new Set(enrolledLogs.map(e => e.courseId || e.bundleId!));
   }
 
   // ====== FINAL RESPONSE ======
   const finalData = paginated.map(item => ({
     ...item,
     isWishlist: wishlistIds.has(item.id),
-    isEnrolled:
-      item.type === 'course'
-        ? enrolledCourseIds.has(item.id)
-        : enrolledBundleIds.has(item.id),
+    isEnrolled: enrolledIds.has(item.id),
   }));
 
   return {
-    meta: { page, limit, total, totalPage: Math.ceil(total / limit) },
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage: Math.ceil(total / limit),
+    },
     data: finalData,
   };
 };

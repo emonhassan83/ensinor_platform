@@ -57,7 +57,7 @@ const createValidationSchema = z.object({
           .min(1),
       )
       .optional(),
-    feedback: z.string({ required_error: 'Question feedback is required' }),
+    feedback: z.string({ required_error: 'Question feedback is required' }).optional(),
     options: z
       .array(optionCreate, {
         required_error: 'Options are required',

@@ -283,7 +283,7 @@ const seedBatches = async () => {
 
     if (existing) {
       skippedCount++;
-      console.log(`ℹ️ Batch "${batch.title}" already exists. Skipping...`);
+      // console.log(`ℹ️ Batch "${batch.title}" already exists. Skipping...`);
       continue;
     }
 
@@ -293,7 +293,7 @@ const seedBatches = async () => {
     });
 
     if (!admin) {
-      console.error('❌ No super_admin found. Cannot seed batches.');
+      // console.error('❌ No super_admin found. Cannot seed batches.');
       return;
     }
 
@@ -311,12 +311,12 @@ const seedBatches = async () => {
     });
 
     seededCount++;
-    console.log(`✅ Batch "${batch.title}" seeded successfully!`);
+    // console.log(`✅ Batch "${batch.title}" seeded successfully!`);
   }
 
-  console.log(
-    `\n📊 Batch Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
-  );
+  // console.log(
+  //   `\n📊 Batch Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
+  // );
 };
 
 // Package seed function (duplication prevent)
@@ -339,9 +339,9 @@ const seedPackages = async () => {
 
     if (existing) {
       skippedCount++;
-      console.log(
-        `ℹ️ Package "${pkg.title}" (${pkg.type}, ${pkg.audience}) already exists. Skipping...`,
-      );
+      // console.log(
+      //   `ℹ️ Package "${pkg.title}" (${pkg.type}, ${pkg.audience}) already exists. Skipping...`,
+      // );
       continue;
     }
 
@@ -359,12 +359,12 @@ const seedPackages = async () => {
     });
 
     seededCount++;
-    console.log(`✅ Package "${pkg.title}" (${pkg.type}) seeded successfully!`);
+    // console.log(`✅ Package "${pkg.title}" (${pkg.type}) seeded successfully!`);
   }
 
-  console.log(
-    `\n📊 Package Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
-  );
+  // console.log(
+  //   `\n📊 Package Seeding Summary: ${seededCount} new, ${skippedCount} skipped`,
+  // );
 };
 
 export const seeder = {

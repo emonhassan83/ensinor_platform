@@ -761,7 +761,7 @@ model Question {
   type           QuestionType
   point          Int
   expectedAnswer String[]     @default([])
-  feedback       String
+  feedback       String?
   isDeleted      Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

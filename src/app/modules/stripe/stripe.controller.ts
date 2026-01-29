@@ -27,10 +27,13 @@ const checkStripeConnected = catchAsync(async (req: Request, res: Response) => {
 });
 
 const handleStripeOAuth = catchAsync(async (req: Request, res: Response) => {
-  await stripeService.handleStripeOAuth(req.query, req.user?.userId);
-
-  // Redirect to home or a specific page after successful OAuth
-  res.redirect('/');
+  try {
+    await stripeService.handleStripeOAuth(req.query, req.user?.userId);
+    res.redirect(`${config.client_dashboard_url}/dashboard?stripe=connected`);
+  } catch (error: any) {
+    console.error('OAuth error:', error);
+    res.redirect(`${config.client_dashboard_url}/dashboard?stripe=error`);
+  }
 });
 
 const refresh = catchAsync(async (req: Request, res: Response) => {
@@ -41,14 +44,13 @@ const refresh = catchAsync(async (req: Request, res: Response) => {
 });
 
 const returnUrl = catchAsync(async (req: Request, res: Response) => {
-  const result = await stripeService.returnUrl(req.query);
-  res.redirect(`${config.payment_success_url}/account`);
-  // sendResponse(res, {
-  //   success: true,
-  //   statusCode: httpStatus.OK,
-  //   data: result,
-  //   message: 'Stripe account updated successfully.',
-  // });
+  try {
+    const result = await stripeService.returnUrl(req.query);
+    res.redirect(result.url);
+  } catch (error: any) {
+    console.error('Return URL error:', error);
+    res.redirect(`${config.client_dashboard_url}/dashboard?stripe=error`);
+  }
 });
 
 export const stripeController = {
