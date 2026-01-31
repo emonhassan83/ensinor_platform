@@ -177,70 +177,97 @@ const invitationCompanyAdmin = async (
 ): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
-  const result = await prisma.$transaction(async transactionClient => {
-    const isExist = await prisma.user.findFirst({
-      where: {
-        email: payload.organizationEmail,
-      },
-    });
-    if (isExist) {
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        'This email already exist in this platform!',
-      );
-    }
 
-    // 1️⃣ Create User
-    const user = await transactionClient.user.create({
-      data: {
-        name: payload.name, // Company admin name (you can separate if needed)
-        email: payload.organizationEmail,
-        contactNo: payload.phoneNumber,
-        password: hashPassword,
-        role: UserRole.company_admin,
-        bio: payload.description,
-        registerWith: RegisterWith.credentials,
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+  return await prisma.$transaction(async tx => {
+    // Step 1: Find user by email
+    const existingUser = await tx.user.findFirst({
+      where: { email: payload.organizationEmail },
+    });
+
+    let user;
+
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user on the platform!',
+        );
+      }
+
+      // Step 2: Soft-deleted user → re-activate
+      console.log(
+        `Re-activating soft-deleted user with email: ${payload.organizationEmail}`,
+      );
+
+      user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: payload.name,
+          contactNo: payload.phoneNumber,
+          password: hashPassword,
+          bio: payload.description,
+          role: UserRole.company_admin,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          passwordChangedAt: new Date(),
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: { otp: '', expiresAt: null, status: true },
+            },
           },
         },
-        status: UserStatus.active,
-      },
+      });
+    } else {
+      // Step 3: New user create
+      user = await tx.user.create({
+        data: {
+          name: payload.name,
+          email: payload.organizationEmail,
+          contactNo: payload.phoneNumber,
+          password: hashPassword,
+          role: UserRole.company_admin,
+          bio: payload.description,
+          registerWith: RegisterWith.credentials,
+          verification: {
+            create: {
+              otp: '',
+              expiresAt: null,
+              status: true,
+            },
+          },
+          status: UserStatus.active,
+        },
+      });
+    }
+
+    // Step 4: CompanyAdmin + Company create
+    let companyAdmin = await tx.companyAdmin.findUnique({
+      where: { userId: user.id },
     });
 
-    // 2️⃣ Create CompanyAdmin
-    const companyAdmin = await transactionClient.companyAdmin.create({
-      data: {
-        userId: user.id,
-      },
-    });
+    if (!companyAdmin) {
+      companyAdmin = await tx.companyAdmin.create({
+        data: { userId: user.id },
+      });
 
-    // 3️⃣ Create Company
-    await transactionClient.company.create({
-      data: {
-        userId: companyAdmin.id, // relation: Company → CompanyAdmin.id
-        name: payload.name,
-        industryType: payload.industryType,
-      },
-    });
+      await tx.company.create({
+        data: {
+          userId: companyAdmin.id,
+          name: payload.name,
+          industryType: payload.industryType,
+        },
+      });
+    }
 
-    // 4️⃣ Send email with credentials
+    // Step 5: Email + Notification
     await sendCompanyApprovalEmail(user.email, user.name, password);
-
-    // 4️⃣ Auto-join company announcements chat (SAFE)
-    await joinInitialAnnouncementChat(
-      user.id,
-      UserRole.company_admin,
-      transactionClient,
-    );
+    await joinInitialAnnouncementChat(user.id, UserRole.company_admin, tx);
 
     return user;
   });
-
-  return result;
 };
 
 const createBusinessInstructor = async (
@@ -289,7 +316,6 @@ const createBusinessInstructor = async (
      2️⃣ Enforce Industry-based Instructor Limit
   --------------------------------------------- */
   const instructorLimit = INSTRUCTOR_LIMIT_BY_INDUSTRY[company.industryType];
-
   if (company.instructor >= instructorLimit) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
@@ -298,85 +324,93 @@ const createBusinessInstructor = async (
     );
   }
 
-  /* --------------------------------------------
-     3️⃣ Email uniqueness check
-  --------------------------------------------- */
-  const isExist = await prisma.user.findFirst({
-    where: {
-      email: user.email,
-      isDeleted: false,
-    },
-  });
+  return await prisma.$transaction(async tx => {
+    // Email check
+    const existingUser = await tx.user.findFirst({
+      where: { email: user.email },
+    });
 
-  if (isExist) {
-    throw new ApiError(
-      httpStatus.CONFLICT,
-      'This email already exists on the platform!',
-    );
-  }
+    let userData;
 
-  /* --------------------------------------------
-     4️⃣ Transaction: Create Instructor
-  --------------------------------------------- */
-  const result = await prisma.$transaction(async tx => {
-    // Create user
-    const userData = await tx.user.create({
-      data: {
-        name: user.name,
-        email: user.email,
-        password: hashPassword,
-        role: UserRole.business_instructors,
-        registerWith: RegisterWith.credentials,
-        status: UserStatus.active,
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!',
+        );
+      }
+
+      // Re-activate
+      userData = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: user.name,
+          password: hashPassword,
+          role: UserRole.business_instructors,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: { otp: '', expiresAt: null, status: true },
+            },
           },
         },
-      },
+      });
+    } else {
+      userData = await tx.user.create({
+        data: {
+          name: user.name,
+          email: user.email,
+          password: hashPassword,
+          role: UserRole.business_instructors,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          verification: {
+            create: { otp: '', expiresAt: null, status: true },
+          },
+        },
+      });
+    }
+
+    // Business Instructor create (if not exists)
+    const existingInstructor = await tx.businessInstructor.findUnique({
+      where: { userId: userData.id },
     });
 
-    // Create business instructor
-    await tx.businessInstructor.create({
-      data: {
-        userId: userData.id,
-        authorId: businessInstructor.authorId,
-        companyId: company.id,
-        designation: businessInstructor.designation,
-      },
-    });
+    if (!existingInstructor) {
+      await tx.businessInstructor.create({
+        data: {
+          userId: userData.id,
+          authorId: businessInstructor.authorId,
+          companyId: company.id,
+          designation: businessInstructor.designation,
+        },
+      });
 
-    // Update company counters
-    await tx.company.update({
-      where: { id: company.id },
-      data: {
-        instructor: { increment: 1 },
-        size: { increment: 1 },
-      },
-    });
+      await tx.company.update({
+        where: { id: company.id },
+        data: { instructor: { increment: 1 }, size: { increment: 1 } },
+      });
+    }
 
-    // Send invitation email
     await sendBusinessInstructorInvitation(
       userData.email,
       userData.name,
       password,
     );
 
+    // Send Notification
+    await sendInvitationNotification(
+      companyAdmin,
+      userData.id,
+      'business-instructor',
+    );
+
     return userData;
   });
-
-  /* --------------------------------------------
-     5️⃣ Send Notification
-  --------------------------------------------- */
-  await sendInvitationNotification(
-    companyAdmin,
-    result.id,
-    'business-instructor',
-  );
-
-  return result;
 };
 
 const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
@@ -430,59 +464,77 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
     );
   }
 
-  const isExist = await prisma.user.findFirst({
-    where: {
-      email: payload.user.email,
-      status: UserStatus.active,
-      isDeleted: false,
-    },
-  });
-  if (isExist) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'This email already exist in this platform!',
-    );
-  }
+  return await prisma.$transaction(async tx => {
+    const existingUser = await tx.user.findFirst({
+      where: { email: userPayload.email },
+    });
 
-  const result = await prisma.$transaction(async transactionClient => {
-    const user = await transactionClient.user.create({
-      data: {
-        name: userPayload.name,
-        email: userPayload.email,
-        password: hashPassword,
-        role: UserRole.employee,
-        registerWith: RegisterWith.credentials,
-        status: UserStatus.active,
-        // Create verification record at the same time
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+    let user;
+
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!',
+        );
+      }
+
+      user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: userPayload.name,
+          email: userPayload.email,
+          password: hashPassword,
+          role: UserRole.employee,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: { otp: '', expiresAt: null, status: true },
+            },
           },
         },
-      },
+      });
+    } else {
+      user = await tx.user.create({
+        data: {
+          name: userPayload.name,
+          email: userPayload.email,
+          password: hashPassword,
+          role: UserRole.employee,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          verification: {
+            create: { otp: '', expiresAt: null, status: true },
+          },
+        },
+      });
+    }
+
+    // Employee create (if not exists)
+    const existingEmployee = await tx.employee.findUnique({
+      where: { userId: user.id },
     });
 
-    await transactionClient.employee.create({
-      data: {
-        userId: user.id,
-        authorId: employee.authorId,
-        companyId: company.companyAdmin!.company!.id,
-        departmentId: employee.departmentId,
-      },
-    });
+    if (!existingEmployee) {
+      await tx.employee.create({
+        data: {
+          userId: user.id,
+          authorId: employee.authorId,
+          companyId: company.companyAdmin!.company!.id,
+          departmentId: employee.departmentId,
+        },
+      });
 
-    // here updated company info
-    await prisma.company.update({
-      where: { id: company.companyAdmin!.company!.id },
-      data: {
-        employee: { increment: 1 },
-        size: { increment: 1 },
-      },
-    });
+      await tx.company.update({
+        where: { id: company.companyAdmin!.company!.id },
+        data: { employee: { increment: 1 }, size: { increment: 1 } },
+      });
+    }
 
-    // 4️⃣ Send email with credentials
     await sendEmployeeInvitationEmail(
       user.email,
       user.name,
@@ -491,15 +543,13 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
       company.companyAdmin!.user.name,
     );
 
+    // 4️⃣ Send notify to invitee
+    if (company && user) {
+      await sendInvitationNotification(company, user.id, 'employee');
+    }
+
     return user;
   });
-
-  // 4️⃣ Send notify to invitee
-  if (company && result) {
-    await sendInvitationNotification(company, result.id, 'employee');
-  }
-
-  return result;
 };
 
 const createInstructor = async (
@@ -508,61 +558,104 @@ const createInstructor = async (
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
-  const isExist = await prisma.user.findFirst({
-    where: {
-      email: payload.user.email,
-    },
-  });
-  if (isExist) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'This email already exist in this platform!',
-    );
-  }
+  return await prisma.$transaction(async tx => {
+    // Step 1: find user by email
+    const existingUser = await tx.user.findFirst({
+      where: { email: payload.user.email },
+    });
 
-  const result = await prisma.$transaction(async transactionClient => {
-    const user = await transactionClient.user.create({
-      data: {
-        name: payload.user.name,
-        email: payload.user.email,
-        password: hashPassword,
-        role: UserRole.instructor,
-        registerWith: RegisterWith.credentials,
-        // Create verification record at the same time
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+    let user;
+
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user on the platform!',
+        );
+      }
+
+      // Step 2: Soft-deleted → re-activate
+      console.log(
+        `Re-activating soft-deleted instructor: ${payload.user.email}`,
+      );
+
+      user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: payload.user.name,
+          contactNo: payload.user.contactNo || existingUser.contactNo,
+          bio: payload.user.bio || existingUser.bio,
+          password: hashPassword,
+          role: UserRole.instructor,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          passwordChangedAt: new Date(),
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: {
+                otp: '',
+                expiresAt: null,
+                status: true,
+              },
+            },
           },
         },
-      },
+      });
+    } else {
+      // Step 3: create new user
+      user = await tx.user.create({
+        data: {
+          name: payload.user.name,
+          email: payload.user.email,
+          contactNo: payload.user.contactNo,
+          bio: payload.user.bio,
+          password: hashPassword,
+          role: UserRole.instructor,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          verification: {
+            create: {
+              otp: '',
+              expiresAt: null,
+              status: true,
+            },
+          },
+        },
+      });
+    }
+
+    // Step 4: Instructor profile create/update
+    const existingInstructor = await tx.instructor.findUnique({
+      where: { userId: user.id },
     });
 
-    await transactionClient.instructor.create({
-      data: {
-        userId: user.id,
-        ...payload.instructor,
-      },
-    });
+    if (!existingInstructor) {
+      await tx.instructor.create({
+        data: {
+          userId: user.id,
+          ...payload.instructor,
+        },
+      });
+    } else {
+      // Optional: if you want to update
+      await tx.instructor.update({
+        where: { userId: user.id },
+        data: { ...payload.instructor },
+      });
+    }
 
-    // Auto-join company announcements chat
-    await joinInitialAnnouncementChat(
-      user.id,
-      UserRole.instructor,
-      transactionClient,
-    );
+    // Step 5: Auto-join announcement chat
+    await joinInitialAnnouncementChat(user.id, UserRole.instructor, tx);
 
-    // 4️⃣ Send email with credentials
+    // Step 6: Emails & Notifications
     await sendInstructorRequestEmail(user.email, user.name, password);
-
-    // sent admin tp invitee notify
     await sendInstructorRequestNotification(user, 'instructor');
 
     return user;
   });
-
-  return result;
 };
 
 const invitationInstructor = async (
@@ -584,66 +677,99 @@ const invitationInstructor = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
-  const isExist = await prisma.user.findFirst({
-    where: {
-      email: payload.user.email,
-    },
-  });
-  if (isExist) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'This email already exist in this platform!',
-    );
-  }
+  return await prisma
+    .$transaction(async tx => {
+      // Step 1: Email check
+      const existingUser = await tx.user.findFirst({
+        where: { email: payload.user.email },
+      });
 
-  const result = await prisma.$transaction(async transactionClient => {
-    const user = await transactionClient.user.create({
-      data: {
-        name: payload.user.name,
-        email: payload.user.email,
-        contactNo: payload.user.contactNo,
-        bio: payload.user.bio,
-        password: hashPassword,
-        role: UserRole.instructor,
-        registerWith: RegisterWith.credentials,
-        status: UserStatus.active,
-        // Create verification record at the same time
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+      let user;
+
+      if (existingUser) {
+        if (!existingUser.isDeleted) {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            'This email is already in use by an active user!',
+          );
+        }
+
+        console.log(
+          `Re-activating soft-deleted instructor: ${payload.user.email}`,
+        );
+
+        user = await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name: payload.user.name,
+            contactNo: payload.user.contactNo || existingUser.contactNo,
+            bio: payload.user.bio || existingUser.bio,
+            password: hashPassword,
+            role: UserRole.instructor,
+            registerWith: RegisterWith.credentials,
+            status: UserStatus.active,
+            isDeleted: false,
+            needsPasswordChange: false,
+            passwordChangedAt: new Date(),
+            verification: {
+              update: {
+                where: { userId: existingUser.id },
+                data: { otp: '', expiresAt: null, status: true },
+              },
+            },
           },
-        },
-      },
+        });
+      } else {
+        user = await tx.user.create({
+          data: {
+            name: payload.user.name,
+            email: payload.user.email,
+            contactNo: payload.user.contactNo,
+            bio: payload.user.bio,
+            password: hashPassword,
+            role: UserRole.instructor,
+            registerWith: RegisterWith.credentials,
+            status: UserStatus.active,
+            verification: {
+              create: {
+                otp: '',
+                expiresAt: null,
+                status: true,
+              },
+            },
+          },
+        });
+      }
+
+      // Step 2: Instructor profile
+      const existingInstructor = await tx.instructor.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!existingInstructor) {
+        await tx.instructor.create({
+          data: {
+            userId: user.id,
+            ...payload.instructor,
+          },
+        });
+      }
+
+      // Step 3: Auto-join chat
+      await joinInitialAnnouncementChat(user.id, UserRole.instructor, tx);
+
+      // Step 4: Email
+      await sendInstructorInvitationEmail(user.email, user.name, password);
+
+      return user;
+    })
+    .then(async user => {
+      // Step 5: Notification (after transaction)
+      if (author) {
+        await sendInvitationNotification(author, user.id, 'instructor');
+      }
+      return user;
     });
-
-    await transactionClient.instructor.create({
-      data: {
-        userId: user.id,
-        ...payload.instructor,
-      },
-    });
-
-    // Auto-join company instructor chat
-    await joinInitialAnnouncementChat(
-      user.id,
-      UserRole.instructor,
-      transactionClient,
-    );
-
-    // 4️⃣ Send email with credentials
-    await sendInstructorInvitationEmail(user.email, user.name, password);
-
-    return user;
-  });
-
-  // 4️⃣ Send notify to invitee
-  if (author && result) {
-    await sendInvitationNotification(author, result.id, 'instructor');
-  }
-
-  return result;
 };
 
 const createStudent = async (
@@ -665,65 +791,92 @@ const createStudent = async (
     throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
-  const isExist = await prisma.user.findFirst({
-    where: {
-      email: payload.user.email,
-    },
-  });
-  if (isExist) {
-    throw new ApiError(
-      httpStatus.NOT_FOUND,
-      'This email already exist in this platform!',
-    );
-  }
+  return await prisma.$transaction(async tx => {
+    // Step 1: Email check
+    const existingUser = await tx.user.findFirst({
+      where: { email: payload.user.email },
+    });
 
-  const result = await prisma.$transaction(async transactionClient => {
-    const user = await transactionClient.user.create({
-      data: {
-        name: payload.user.name,
-        email: payload.user.email,
-        contactNo: payload.user.contactNo,
-        password: hashPassword,
-        role: UserRole.student,
-        registerWith: RegisterWith.credentials,
-        status: UserStatus.active,
-        // Create verification record at the same time
-        verification: {
-          create: {
-            otp: '',
-            expiresAt: null,
-            status: true,
+    let user;
+
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!'
+        );
+      }
+
+      console.log(`Re-activating soft-deleted student: ${payload.user.email}`);
+
+      user = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: payload.user.name,
+          contactNo: payload.user.contactNo || existingUser.contactNo,
+          password: hashPassword,
+          role: UserRole.student,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          passwordChangedAt: new Date(),
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: { otp: '', expiresAt: null, status: true },
+            },
           },
         },
-      },
+      });
+    } else {
+      user = await tx.user.create({
+        data: {
+          name: payload.user.name,
+          email: payload.user.email,
+          contactNo: payload.user.contactNo,
+          password: hashPassword,
+          role: UserRole.student,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          verification: {
+            create: {
+              otp: '',
+              expiresAt: null,
+              status: true,
+            },
+          },
+        },
+      });
+    }
+
+    // Step 2: Student profile
+    const existingStudent = await tx.student.findUnique({
+      where: { userId: user.id },
     });
 
-    await transactionClient.student.create({
-      data: {
-        userId: user.id,
-        ...payload.student,
-      },
-    });
+    if (!existingStudent) {
+      await tx.student.create({
+        data: {
+          userId: user.id,
+          ...payload.student,
+        },
+      });
+    }
 
-    // ✅ FIX: pass transaction client
-    await joinInitialAnnouncementChat(
-      user.id,
-      UserRole.student,
-      transactionClient,
-    );
+    // Step 3: Auto-join chat
+    await joinInitialAnnouncementChat(user.id, UserRole.student, tx);
 
-    // 4️⃣ Send email with credentials
+    // Step 4: Email
     await sendStudentInvitationEmail(user.email, user.name, password);
 
     return user;
+  }).then(async user => {
+    if (author) {
+      await sendInvitationNotification(author, user.id, 'student');
+    }
+    return user;
   });
-
-  // 4️⃣ Send notify to invitee
-  if (author && result) {
-    await sendInvitationNotification(author, result.id, 'student');
-  }
-
-  return result;
 };
 
 const getAllUser = async (

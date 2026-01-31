@@ -89,8 +89,6 @@ router.put(
   UserController.updateAProfile,
 );
 
-router.delete('/:id', auth(UserRole.super_admin), UserController.deleteAUser);
-
 router.delete(
   '/my-profile',
   auth(
@@ -103,6 +101,8 @@ router.delete(
   ),
   UserController.deleteMyProfile,
 );
+
+router.delete('/:id', auth(UserRole.super_admin), UserController.deleteAUser);
 
 router.get(
   '/my-profile',
