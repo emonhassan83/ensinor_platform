@@ -20,4 +20,5 @@ export type ICV = {
   refDesignation?: string | undefined;
   refEmail?: string | undefined;
   refPhone?: string | undefined;
+  languages?: string[];
 };

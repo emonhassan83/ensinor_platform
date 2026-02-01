@@ -61,6 +61,15 @@ const createValidationSchema = z.object({
         required_error: 'Reference phone is required!',
       })
       .optional(),
+    languages: z
+      .array(
+        z
+          .string({
+            required_error: 'Language is required!',
+          })
+          .optional(),
+      )
+      .optional(),
   }),
 });
 
@@ -127,6 +136,15 @@ const updateValidationSchema = z.object({
       .string({
         required_error: 'Reference phone is required!',
       })
+      .optional(),
+    languages: z
+      .array(
+        z
+          .string({
+            required_error: 'Language is required!',
+          })
+          .optional(),
+      )
       .optional(),
   }),
 });

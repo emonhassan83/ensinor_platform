@@ -336,8 +336,10 @@ const getCombineCoursesFromDB = async (
   options: IPaginationOptions,
   filterBy?: { userId?: string; authorId?: string },
 ) => {
-  const { page, limit, skip } = paginationHelpers.calculatePagination(options);
+  const { page, limit } = paginationHelpers.calculatePagination(options);
   const { searchTerm, type, ...filterData } = params;
+
+  // console.log('Filter Params Received:', { page, limit, searchTerm, type, filterData });
 
   // ====== BASE CONDITIONS ======
   const courseConditions: Prisma.CourseWhereInput[] = [
@@ -375,50 +377,69 @@ const getCombineCoursesFromDB = async (
 
   // ====== TYPE FILTER ======
   if (type) {
-    if (type === 'bundle') {
-      // If bundle then empty course query
-      courseConditions.push({ id: '00000000-0000-0000-0000-000000000000' }); // invalid ID
-    } else if (type === 'course') {
-      // If course then empty bundle query
+    const normalizedType = type.toLowerCase();
+    if (normalizedType === 'bundle') {
+      // Only bundles → make course query return nothing
+      courseConditions.push({ id: '00000000-0000-0000-0000-000000000000' });
+      console.log('Filtering: only bundles');
+    } else if (normalizedType === 'course') {
+      // Only courses → make bundle query return nothing
       bundleConditions.push({ id: '00000000-0000-0000-0000-000000000000' });
+      console.log('Filtering: only courses');
     }
+    // If type is anything else → show both (no restriction)
   }
 
-  // ====== EXTRA FILTERS =====/
+  // ====== DYNAMIC FILTERS (category, level, language, price, isFreeCourse, etc.) ======
   if (Object.keys(filterData).length > 0) {
-    const extraFilters = {
-      AND: Object.keys(filterData).map(key => {
-        const value = (filterData as any)[key];
+    const extraConditions: any[] = [];
 
-        if (
-          typeof value === 'boolean' ||
-          value === 'true' ||
-          value === 'false'
-        ) {
-          return { [key]: value === true || value === 'true' };
-        }
+    Object.entries(filterData).forEach(([key, rawValue]) => {
+      if (rawValue === undefined || rawValue === null) return;
 
-        if (!isNaN(Number(value))) {
-          return { [key]: { equals: Number(value) } };
-        }
+      let value: string | number | boolean = rawValue;
 
-        return { [key]: { equals: value } };
-      }),
-    };
+      // Handle boolean-like values
+      if (value === 'true' || value === 'false') {
+        value = value === 'true';
+      }
 
-    courseConditions.push(extraFilters);
-    bundleConditions.push(extraFilters);
+      // Number comparison (exact match for simplicity)
+      if (!isNaN(Number(value))) {
+        extraConditions.push({ [key]: { equals: Number(value) } });
+        return;
+      }
+
+      // String exact match
+      if (typeof value === 'string') {
+        extraConditions.push({ [key]: { equals: value } });
+        return;
+      }
+
+      // Boolean
+      if (typeof value === 'boolean') {
+        extraConditions.push({ [key]: value });
+      }
+    });
+
+    if (extraConditions.length > 0) {
+      const filterBlock = { AND: extraConditions };
+      courseConditions.push(filterBlock);
+      bundleConditions.push(filterBlock);
+      console.log('Applied dynamic filters:', extraConditions);
+    }
   }
 
   const whereCourse: Prisma.CourseWhereInput = { AND: courseConditions };
   const whereBundle: Prisma.CourseBundleWhereInput = { AND: bundleConditions };
 
-  // ====== FETCH DATA ======
+  // console.log('Final Prisma Course Where:', JSON.stringify(whereCourse, null, 2));
+  // console.log('Final Prisma Bundle Where:', JSON.stringify(whereBundle, null, 2));
+
+  // ====== FETCH ALL MATCHING DATA (NO skip/take here) ======
   const [courses, bundles] = await Promise.all([
     prisma.course.findMany({
       where: whereCourse,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -458,8 +479,6 @@ const getCombineCoursesFromDB = async (
 
     prisma.courseBundle.findMany({
       where: whereBundle,
-      skip,
-      take: limit,
       orderBy:
         options.sortBy && options.sortOrder
           ? { [options.sortBy]: options.sortOrder }
@@ -494,8 +513,7 @@ const getCombineCoursesFromDB = async (
       const activeDiscount = coupon || promo;
       const discount = activeDiscount ? activeDiscount.discount : 0;
       const expiry = activeDiscount ? activeDiscount.expireAt : null;
-      const discountPrice =
-        discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
+      const discountPrice = discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
 
       return {
         id: c.id,
@@ -535,18 +553,23 @@ const getCombineCoursesFromDB = async (
 
   // ====== SORTING ======
   const sortKey = options.sortBy || 'createdAt';
-  combined.sort((a, b) => {
-    const order = options.sortOrder === 'asc' ? 1 : -1;
-    const aVal = (a as any)[sortKey];
-    const bVal = (b as any)[sortKey];
-    if (aVal > bVal) return order;
-    if (aVal < bVal) return -order;
+  const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
+
+  combined.sort((a: any, b: any) => {
+    const aVal = a[sortKey];
+    const bVal = b[sortKey];
+
+    if (aVal === undefined || aVal === null) return 1;
+    if (bVal === undefined || bVal === null) return -1;
+
+    if (aVal > bVal) return sortOrder;
+    if (aVal < bVal) return -sortOrder;
     return 0;
   });
 
-  // ====== PAGINATION ======
+  // ====== PAGINATION ON MERGED & SORTED ARRAY ======
   const total = combined.length;
-  const start = skip;
+  const start = (page - 1) * limit;
   const paginated = combined.slice(start, start + limit);
 
   // ====== WISHLIST & ENROLLED ======
@@ -587,7 +610,7 @@ const getCombineCoursesFromDB = async (
       page,
       limit,
       total,
-      totalPage: Math.ceil(total / limit),
+      totalPage: Math.ceil(total / limit) || 1,
     },
     data: finalData,
   };

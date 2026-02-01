@@ -1393,6 +1393,7 @@ model CV {
   refDesignation String?
   refEmail       String?
   refPhone       String?
+  languages      String[] @default([])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
