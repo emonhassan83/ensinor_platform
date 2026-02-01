@@ -41,10 +41,10 @@ const insertIntoDB = async (payload: ICV, file: any) => {
   const result = await prisma.cV.create({
     data: payload,
   });
-
   if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'CV creation failed!');
   }
+  
   return result;
 };
 

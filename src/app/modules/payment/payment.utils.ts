@@ -25,7 +25,7 @@ export const createCheckoutSession = async (payload: TPayload) => {
     line_items: [
       {
         price_data: {
-          currency: 'usd',
+          currency: 'eur',
           product_data: {
             name: payload?.product?.name,
           },

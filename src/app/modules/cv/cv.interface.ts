@@ -16,4 +16,8 @@ export type ICV = {
   location: string;
   aboutMe: string;
   skills: string[];
+  refName?: string | undefined;
+  refDesignation?: string | undefined;
+  refEmail?: string | undefined;
+  refPhone?: string | undefined;
 };

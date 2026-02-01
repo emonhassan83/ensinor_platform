@@ -853,11 +853,11 @@ model EnrolledCourse {
 
   // Added for badge
   percentile Float?
-  isTop10 Boolean? @default(false)
+  isTop10    Boolean? @default(false)
 
-  isDeleted        Boolean      @default(false)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user   User   @relation("EnrolledUser", fields: [userId], references: [id])
   author User   @relation("CourseAuthor", fields: [authorId], references: [id])
@@ -1377,20 +1377,24 @@ model WithdrawRequest {
 }
 
 model CV {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  name        String
-  designation String?
-  photo       String?
-  phone       String
-  email       String
-  linkedin    String?
-  website     String?
-  location    String
-  aboutMe     String
-  skills      String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  name           String
+  designation    String?
+  photo          String?
+  phone          String
+  email          String
+  linkedin       String?
+  website        String?
+  location       String
+  aboutMe        String
+  skills         String[]
+  refName    String?
+  refDesignation String?
+  refEmail       String?
+  refPhone       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 

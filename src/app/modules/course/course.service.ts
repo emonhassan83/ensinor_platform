@@ -9,6 +9,7 @@ import {
   PlatformType,
   Prisma,
   SubscriptionStatus,
+  SubscriptionType,
   User,
   UserRole,
   UserStatus,
@@ -32,7 +33,12 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   let companyAuthor: User | null = null;
   let company: Company | null = null;
 
-  // CASE: PLATFORM = ADMIN (Instructor / User)
+  // Default status = pending
+  let courseStatus: CoursesStatus = CoursesStatus.pending;
+
+  // ────────────────────────────────────────────────
+  // CASE: PLATFORM = ADMIN (Instructor / Individual)
+  // ────────────────────────────────────────────────
   if (platform === PlatformType.admin) {
     const author = await prisma.user.findFirst({
       where: {
@@ -45,12 +51,12 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
           where: {
             status: SubscriptionStatus.active,
             isExpired: false,
-            expiredAt: {
-              gt: new Date(),
-            },
+            expiredAt: { gt: new Date() },
             isDeleted: false,
           },
+          select: { type: true },
         },
+        instructor: true,
       },
     });
 
@@ -58,7 +64,25 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
     }
 
-    // 🔴 BLOCK PAID COURSE IF NO ACTIVE SUBSCRIPTION
+    // Auto-approve only for instructors with active standard/premium
+    if (
+      author.role === UserRole.instructor &&
+      author.instructor &&
+      author.subscription.length > 0
+    ) {
+      const activeSub = author.subscription[0];
+      if (
+        activeSub.type === SubscriptionType.standard ||
+        activeSub.type === SubscriptionType.premium
+      ) {
+        courseStatus = CoursesStatus.approved;
+        console.log(
+          `Auto-approving course for instructor ${author.id} with ${activeSub.type} subscription`,
+        );
+      }
+    }
+
+    // Block paid course if no active subscription (basic instructors)
     if (
       author.role === UserRole.instructor &&
       typeof price === 'number' &&
@@ -74,7 +98,9 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     resolvedAuthorId = author.id;
   }
 
-  // 🔹 CASE: Platform = Company
+  // ────────────────────────────────────────────────
+  // CASE: PLATFORM = COMPANY
+  // ────────────────────────────────────────────────
   if (platform === PlatformType.company) {
     const actor = await prisma.user.findFirst({
       where: {
@@ -89,10 +115,6 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
             company: { include: { author: { include: { user: true } } } },
           },
         },
-        subscription: {
-          where: { isExpired: false, status: SubscriptionStatus.active },
-          select: { type: true },
-        },
       },
     });
 
@@ -101,11 +123,13 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     }
 
     if (actor.role === UserRole.company_admin) {
-      // company admin → author = self
       resolvedAuthorId = actor.id;
       resolvedCompanyId = actor.companyAdmin?.company?.id ?? undefined;
+
+      // Company admin course → AUTO APPROVED
+      courseStatus = CoursesStatus.approved;
+      console.log(`Auto-approving company course by company admin ${actor.id}`);
     } else if (actor.role === UserRole.business_instructors) {
-      // business instructor → company admin becomes author
       resolvedCompanyId = actor.businessInstructor?.company?.id;
 
       const companyAdminUser = actor.businessInstructor?.company?.author?.user;
@@ -118,6 +142,12 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 
       resolvedAuthorId = actor.id;
       companyAuthor = companyAdminUser;
+
+      // Business instructor course → PENDING (needs approval)
+      courseStatus = CoursesStatus.pending;
+      console.log(
+        `Business instructor course set to pending (user ${actor.id})`,
+      );
     } else {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
@@ -125,19 +155,18 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       );
     }
 
-    // validate company
+    // Validate company
     company = await prisma.company.findFirst({
       where: { id: resolvedCompanyId, isDeleted: false },
       include: { author: { include: { user: true } } },
     });
+
     if (!company)
       throw new ApiError(httpStatus.NOT_FOUND, 'Your company not found!');
     if (!company.isActive)
       throw new ApiError(httpStatus.BAD_REQUEST, 'Your company is not active!');
 
-    /* --------------------------------------------
-       🔴 NGO PAID COURSE BLOCK
-    --------------------------------------------- */
+    // NGO paid course block (still applies)
     if (
       company.industryType === CompanyType.ngo &&
       typeof payload.price === 'number' &&
@@ -150,7 +179,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     }
   }
 
-  // 🔹 Upload thumbnail (if file provided)
+  // Upload thumbnail
   if (file) {
     payload.thumbnail = (await uploadToS3({
       file,
@@ -158,17 +187,20 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     })) as string;
   }
 
-  // 🔹 Set free flag if price = 0
+  // Set free course flag
   if (typeof payload.price === 'number' && payload.price === 0) {
     payload.isFreeCourse = true;
   }
 
-  // fetch author user (for notifications)
+  // Attach final status
+  payload.status = courseStatus;
+
+  // Fetch author user for notifications
   const authorUser = await prisma.user.findUnique({
     where: { id: resolvedAuthorId },
   });
 
-  // 🔹 Create transaction
+  // Create course in transaction
   const result = await prisma.$transaction(async tx => {
     const newCourse = await tx.course.create({
       data: {
@@ -178,7 +210,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       },
     });
 
-    // update counters
+    // Update counters
     if (company) {
       await tx.company.update({
         where: { id: company.id },
@@ -186,23 +218,18 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
       });
     }
 
-    // 🔹 Update author profile counters
     if (platform === PlatformType.admin) {
-      // If platform = admin → Instructor profile update
       await tx.instructor.updateMany({
         where: { userId: resolvedAuthorId },
         data: { courses: { increment: 1 } },
       });
     } else if (platform === PlatformType.company) {
-      // If platform = company → check role
       if (companyAuthor) {
-        // created by business instructor → increment businessInstructor.courses
         await tx.businessInstructor.updateMany({
           where: { userId: inputAuthorId },
           data: { courses: { increment: 1 } },
         });
       } else {
-        // created by company admin → increment companyAdmin.courses
         await tx.companyAdmin.updateMany({
           where: { userId: resolvedAuthorId },
           data: { courses: { increment: 1 } },
@@ -213,7 +240,7 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
     return newCourse;
   });
 
-  // 🔹 Send notifications
+  // Send notifications
   if (platform === PlatformType.admin) {
     const admin = await findAdmin();
     if (!admin) throw new Error('Super admin not found!');
@@ -227,7 +254,12 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
 
 const getPopularCoursesFromDB = async () => {
   const andConditions: Prisma.CourseWhereInput[] = [
-    { isDeleted: false, isPublished: true, status: CoursesStatus.approved, type: CourseType.external },
+    {
+      isDeleted: false,
+      isPublished: true,
+      status: CoursesStatus.approved,
+      type: CourseType.external,
+    },
   ];
 
   const whereConditions: Prisma.CourseWhereInput = {
@@ -358,7 +390,11 @@ const getCombineCoursesFromDB = async (
       AND: Object.keys(filterData).map(key => {
         const value = (filterData as any)[key];
 
-        if (typeof value === 'boolean' || value === 'true' || value === 'false') {
+        if (
+          typeof value === 'boolean' ||
+          value === 'true' ||
+          value === 'false'
+        ) {
           return { [key]: value === true || value === 'true' };
         }
 
@@ -458,7 +494,8 @@ const getCombineCoursesFromDB = async (
       const activeDiscount = coupon || promo;
       const discount = activeDiscount ? activeDiscount.discount : 0;
       const expiry = activeDiscount ? activeDiscount.expireAt : null;
-      const discountPrice = discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
+      const discountPrice =
+        discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
 
       return {
         id: c.id,
