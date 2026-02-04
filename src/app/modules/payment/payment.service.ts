@@ -159,6 +159,10 @@ const initiatePayment = async (payload: IPayment) => {
 
       quantity: 1,
     },
+    customer: {
+      name: user.name,
+      email: user.email,
+    },
     paymentId: paymentData.id,
   });
 
@@ -284,7 +288,7 @@ const confirmPayment = async (query: Record<string, any>) => {
           updatedOrder.orderItem
             ?.filter(item => item.modelType === 'book' && item.book?.file)
             ?.map(item => item.book!.file) || [];
-            
+
         if (bookFiles.length > 0) {
           await sendOrderConfirmationAndDocumentsEmail(updatedOrder.user, {
             ...updatedOrder,
