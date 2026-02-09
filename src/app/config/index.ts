@@ -43,6 +43,12 @@ export default {
     bucket: process.env.AWS_BUCKET_NAME,
     endpoint: process.env.SPACES_API,  
   },
+  ses: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_SES_REGION,
+    email: process.env.SES_FROM_EMAIL
+  },
   zoom: {
     client_id: process.env.ZOOM_CLIENT_ID,
     client_secret: process.env.ZOOM_CLIENT_SECRET,
