@@ -1,14 +1,14 @@
-import emailSender from '../emailSender';
+import { sendEmail } from '../sendEmail';
 
 export const sendCompanyApprovalEmail = async (
   email: string,
   name: string,
   password: string,
 ) => {
-  await emailSender(
-    email,
-    '🎉 Congratulations! Your Company Admin Account is Approved',
-    `
+  await sendEmail({
+    to: email,
+    subject: '🎉 Congratulations! Your Company Admin Account is Approved',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
         <p style="color: #555;">Your company admin profile has been <strong>approved</strong>.</p>
@@ -25,14 +25,15 @@ export const sendCompanyApprovalEmail = async (
         <p style="color: #555;">Cheers,<br/>Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Your Company Admin Account is Approved',
+  });
 };
 
 export const sendCompanyDenialEmail = async (email: string, name: string) => {
-  await emailSender(
-    email,
-    '❌ Company Request Denied',
-    `
+  await sendEmail({
+    to: email,
+    subject: '❌ Company Request Denied',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #d9534f;">Hello ${name},</h2>
         <p style="color: #555;">We regret to inform you that your company request has been <strong>denied</strong>.</p>
@@ -40,17 +41,19 @@ export const sendCompanyDenialEmail = async (email: string, name: string) => {
         <p style="color: #555;">Thank you for your interest,<br/>Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Company Request Denied',
+  });
 };
+
 export const sendCompanyAdminInvitationEmail = async (
   email: string,
   name: string,
   password: string,
 ) => {
-  await emailSender(
-    email,
-    'Company Admin Account Invitation Submitted',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'Company Admin Account Invitation Submitted',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
         <p>You have been invited by our <strong>Super Admin</strong> to join the Ensinor platform as an Company Admin.</p>
@@ -69,5 +72,6 @@ export const sendCompanyAdminInvitationEmail = async (
         <p style="color:#555;">Welcome aboard!<br/>— Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Company Admin Account Invitation Submitted',
+  });
 };

@@ -1,15 +1,15 @@
-import emailSender from "../emailSender";
+import { sendEmail } from '../sendEmail';
 
 export const sendCourseEnrollmentEmail = async (
   email: string,
   name: string,
   courseTitle: string,
-  dashboardUrl: string
+  dashboardUrl: string,
 ) => {
-  await emailSender(
-    email,
-    `🎉 Congratulations! You are enrolled in ${courseTitle}`,
-    `
+  await sendEmail({
+    to: email,
+    subject: `🎉 Congratulations! You are enrolled in ${courseTitle}`,
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Hello ${name},</h2>
         <h3 style="color: #28a745;">🎉 Congratulations on Enrolling in <em>${courseTitle}</em>!</h3>
@@ -45,6 +45,7 @@ export const sendCourseEnrollmentEmail = async (
 
         <p style="color: #555;">Best regards,<br/>Ensinor Team</p>
       </div>
-    `
-  );
+    `,
+    text: `You are enrolled in ${courseTitle}`,
+  });
 };

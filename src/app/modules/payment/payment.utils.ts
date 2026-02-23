@@ -4,7 +4,7 @@ import { findAdmin } from '../../utils/findAdmin';
 import { messages } from '../notification/notification.constant';
 import { NotificationModeType, Payment } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
-import emailSender from '../../utils/emailSender';
+import { sendEmail } from '../../utils/sendEmail';
 
 const stripe: Stripe = new Stripe(config.stripe?.stripe_api_secret as string, {
   apiVersion: '2025-08-27.basil',
@@ -25,7 +25,7 @@ interface TPayload {
 
 export const createCheckoutSession = async (payload: TPayload) => {
   const { customer: customerData } = payload;
-  
+
   const customer = await stripe.customers.create({
     name: customerData.name,
     email: customerData.email,
@@ -140,5 +140,10 @@ export const sendOrderConfirmationAndDocumentsEmail = async (
     </div>
   `;
 
-  await emailSender(user.email, subject, htmlContent);
+  await sendEmail({
+    to: user.email,
+    subject,
+    html: htmlContent,
+    text: subject,
+  });
 };

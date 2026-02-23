@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { addDays, addWeeks, addMonths } from 'date-fns';
 import prisma from '../../utils/prisma';
-import emailSender from '../../utils/emailSender';
+import { sendEmail } from '../../utils/sendEmail';
 
 // ----------------------------
 // Helper: Next schedule date
@@ -82,11 +82,12 @@ export const newsletterScheduleCron = () => {
         // 5️⃣ Send emails concurrently (safe batch)
         await Promise.all(
           newsletters.map(n =>
-            emailSender(
-              sub.email,
-              `📰 ${n.title}`,
-              `<h2>${n.title}</h2><p>${n.content}</p>`,
-            ),
+            sendEmail({
+              to: sub.email,
+              subject: `📰 ${n.title}`,
+              html: `<h2>${n.title}</h2><p>${n.content}</p>`,
+              text: `📰 ${n.title}`,
+            }),
           ),
         );
 

@@ -4,9 +4,9 @@ import moment from 'moment';
 import config from '../../config';
 import ApiError from '../../errors/ApiError';
 import { generateOtp } from '../../utils/generateOtp';
-import emailSender from '../../utils/emailSender';
 import { createToken, TExpiresIn } from '../auth/auth.utils';
 import prisma from '../../utils/prisma';
+import { sendEmail } from '../../utils/sendEmail';
 
 const verifyOtp = async (token: string, otp: string | number) => {
   if (!token) {
@@ -127,10 +127,10 @@ const resendOtp = async (email: string) => {
     expiresIn: '5m',
   });
 
-  await emailSender(
-    user?.email,
-    'Your One-Time OTP',
-    `
+  await sendEmail({
+    to: user?.email,
+    subject: 'Your One-Time OTP',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <div style="text-align: left; padding: 10px 20px;">
           <h2 style="color: #333;">Your One-Time OTP</h2>
@@ -150,7 +150,8 @@ const resendOtp = async (email: string) => {
         </div>
       </div>
     `,
-  );
+    text: 'Your One-Time OTP',
+  });
 
   return { token };
 };

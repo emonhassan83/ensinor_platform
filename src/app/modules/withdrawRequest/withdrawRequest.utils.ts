@@ -1,7 +1,7 @@
 import { NotificationModeType, User } from '@prisma/client';
 import { messages } from '../notification/notification.constant';
 import { NotificationService } from '../notification/notification.service';
-import emailSender from '../../utils/emailSender';
+import { sendEmail } from '../../utils/sendEmail';
 
 // User Status Change Notification → User
 export const sendWithdrawStatusNotifYToUser = async (
@@ -40,7 +40,10 @@ export const sendWithdrawStatusNotifYToUser = async (
   });
 };
 
-export const sendWithdrawApprovedEmail = async (user: Partial<User>, amount: number) => {
+export const sendWithdrawApprovedEmail = async (
+  user: Partial<User>,
+  amount: number,
+) => {
   if (!user?.email) return;
 
   const subject = 'Withdrawal Approved ✅';
@@ -53,7 +56,7 @@ export const sendWithdrawApprovedEmail = async (user: Partial<User>, amount: num
   Thank you for using our platform!
   `;
 
-  await emailSender(user.email, subject, body);
+  await sendEmail({ to: user.email, subject, html: body, text: subject });
 };
 
 export const sendWithdrawCompletedEmail = async (
@@ -74,10 +77,13 @@ export const sendWithdrawCompletedEmail = async (
   Thank you for using our platform!
   `;
 
-  await emailSender(user.email, subject, body);
+  await sendEmail({ to: user.email, subject, html: body, text: subject });
 };
 
-export const sendWithdrawCancelledEmail = async (user: Partial<User>, amount: number) => {
+export const sendWithdrawCancelledEmail = async (
+  user: Partial<User>,
+  amount: number,
+) => {
   if (!user?.email) return;
 
   const subject = 'Withdrawal Cancelled ❌';
@@ -90,5 +96,5 @@ export const sendWithdrawCancelledEmail = async (user: Partial<User>, amount: nu
   Thank you for using our platform!
   `;
 
-  await emailSender(user.email, subject, body);
+  await sendEmail({ to: user.email, subject, html: body, text: subject });
 };

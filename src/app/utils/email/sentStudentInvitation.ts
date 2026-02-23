@@ -1,14 +1,14 @@
-import emailSender from "../emailSender";
+import { sendEmail } from '../sendEmail';
 
 export const sendStudentInvitationEmail = async (
   email: string,
   name: string,
   password: string,
 ) => {
-  await emailSender(
-    email,
-    'Student Account Invitation Submitted',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'Student Account Invitation Submitted',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
         <p style="color: #555;">You have been invited by our <strong>Super Admin</strong> to join the Ensinor platform as an Student.</p>
@@ -27,5 +27,6 @@ export const sendStudentInvitationEmail = async (
         <p style="color: #555;">Welcome aboard!<br/>— Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Student Account Invitation Submitted',
+  });
 };

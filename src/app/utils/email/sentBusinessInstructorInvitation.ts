@@ -1,10 +1,14 @@
-import emailSender from "../emailSender";
+import { sendEmail } from '../sendEmail';
 
-export const sendBusinessInstructorInvitation = async (email: string, name: string, password: string) => {
-await emailSender(
-    email,
-    "📢 Invitation: Your Business Instructor Account is Ready",
-    `
+export const sendBusinessInstructorInvitation = async (
+  email: string,
+  name: string,
+  password: string,
+) => {
+  await sendEmail({
+    to: email,
+    subject: '📢 Invitation: Your Business Instructor Account is Ready',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Hello ${name}, Welcome to Ensinor! 🎓</h2>
         
@@ -29,6 +33,7 @@ await emailSender(
 
         <p style="color: #555;">Best regards,<br/>Ensinor Team</p>
       </div>
-    `
-  );
+    `,
+    text: 'Your Business Instructor Account is Ready',
+  });
 };

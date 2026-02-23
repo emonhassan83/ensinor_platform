@@ -1,14 +1,14 @@
-import emailSender from '../emailSender';
+import { sendEmail } from '../sendEmail';
 
 export const sendInstructorRequestEmail = async (
   email: string,
   name: string,
   password: string,
 ) => {
-  await emailSender(
-    email,
-    'Instructor Account Request Submitted',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'Instructor Account Request Submitted',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
          <p>Thank you for submitting your instructor request on our platform.</p>
@@ -29,7 +29,8 @@ export const sendInstructorRequestEmail = async (
         <p style="color: #555;">Cheers,<br/>Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Instructor Account Request Submitted',
+  });
 };
 
 export const sendInstructorInvitationEmail = async (
@@ -37,10 +38,10 @@ export const sendInstructorInvitationEmail = async (
   name: string,
   password: string,
 ) => {
-  await emailSender(
-    email,
-    'Instructor Account Invitation Submitted',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'Instructor Account Invitation Submitted',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Welcome Aboard, ${name}!</h2>
         <p>You have been invited by our <strong>Super Admin</strong> to join the Ensinor platform as an Instructor.</p>
@@ -59,5 +60,6 @@ export const sendInstructorInvitationEmail = async (
         <p>Welcome aboard!<br/>— Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Instructor Account Invitation Submitted',
+  });
 };

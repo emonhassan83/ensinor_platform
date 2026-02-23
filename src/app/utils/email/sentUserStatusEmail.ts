@@ -1,13 +1,10 @@
-import emailSender from '../emailSender';
+import { sendEmail } from '../sendEmail';
 
-export const sendUserActiveEmail = async (
-  email: string,
-  name: string
-) => {
-  await emailSender(
-    email,
-    '🎉 Congratulations! Your Account Has Been Active',
-    `
+export const sendUserActiveEmail = async (email: string, name: string) => {
+  await sendEmail({
+    to: email,
+    subject: '🎉 Congratulations! Your Account Has Been Active',
+    html: `
       <div style="font-family: Arial, sans-serif; padding: 20px; background: #ffffff;">
           <h2 style="color: #333; margin-bottom: 16px;">Congratulations, ${name}!</h2>
           <p style="font-size: 15px; color: #444; line-height: 1.6;">
@@ -28,17 +25,15 @@ export const sendUserActiveEmail = async (
           </p>
       </div>
     `,
-  );
+    text: 'Your Account Has Been Active',
+  });
 };
 
-export const sendUserDeniedEmail = async (
-  email: string,
-  name: string
-) => {
-  await emailSender(
-    email,
-    '📢 Invitation: Your Business Instructor Account is Ready',
-    `
+export const sendUserDeniedEmail = async (email: string, name: string) => {
+  await sendEmail({
+    to: email,
+    subject: '📢 Invitation: Your Business Instructor Account is Ready',
+    html: `
       < style="font-family: Arial, sans-serif; padding: 20px; background: #ffffff;">
           <h2 style="color: #333; margin-bottom: 16px;">Hello ${name},</h2>
           <p style="font-size: 15px; color: #444; line-height: 1.6;">
@@ -55,5 +50,6 @@ export const sendUserDeniedEmail = async (
           </p>
     </div>
     `,
-  );
+    text: 'Your Business Instructor Account is Ready',
+  });
 };

@@ -1,4 +1,4 @@
-import emailSender from '../emailSender';
+import { sendEmail } from '../sendEmail';
 
 export const sendEmployeeInvitationEmail = async (
   email: string,
@@ -7,10 +7,10 @@ export const sendEmployeeInvitationEmail = async (
   companyName: string,
   inviterName: string,
 ) => {
-  await emailSender(
-    email,
-    `🎉 Congratulations! Welcome to ${name}`,
-    `
+  await sendEmail({
+    to: email,
+    subject: `🎉 Congratulations! Welcome to ${name}`,
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
          <h2 style="color: #333;">Welcome aboard, ${name}!</h2>
           <p style="color: #555; line-height: 1.6;">
@@ -34,5 +34,6 @@ export const sendEmployeeInvitationEmail = async (
            <p>Ensinor Team</p>
       </div>
     `,
-  );
+    text: `🎉 Congratulations! Welcome to ${name}`,
+  });
 };

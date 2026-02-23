@@ -1,4 +1,4 @@
-import emailSender from '../emailSender';
+import { sendEmail } from '../sendEmail';
 
 export const sendCoInstructorInvitationEmail = async (
   email: string,
@@ -6,10 +6,10 @@ export const sendCoInstructorInvitationEmail = async (
   inviterName: string,
   courseTitle: string,
 ) => {
-  await emailSender(
-    email,
-    'Invitation to Join as Co-Instructor',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'Invitation to Join as Co-Instructor',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #333;">Hello ${name},</h2>
         <p>You have been invited by <strong>${inviterName}</strong> to join the course <strong>"${courseTitle}"</strong> as a Co-Instructor.</p>
@@ -23,5 +23,6 @@ export const sendCoInstructorInvitationEmail = async (
         <p>— Ensinor Team</p>
       </div>
     `,
-  );
+    text: 'Invitation to Join as Co-Instructor',
+  });
 };
