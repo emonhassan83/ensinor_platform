@@ -19,6 +19,8 @@ router.post(
   UserController.registerAUser,
 );
 
+router.post('/send-test-email', UserController.testEmail);
+
 router.post(
   '/company-admin-invitation',
   validateRequest(UserValidation.createCompanyAdmin),

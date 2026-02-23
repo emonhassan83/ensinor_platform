@@ -8,6 +8,7 @@ import pick from '../../utils/pick';
 import { otpServices } from '../otp/otp.service';
 import { uploadToS3 } from '../../utils/s3';
 import ApiError from '../../errors/ApiError';
+import { sendEmail } from '../../utils/sendEmail';
 
 const registerAUser = catchAsync(async (req: Request, res: Response) => {
   if (req?.file) {
@@ -242,6 +243,29 @@ const deleteMyProfile = catchAsync(async (req, res) => {
   });
 });
 
+const testEmail = catchAsync(async (req, res) => {
+  try {
+    const result = await sendEmail({
+      to: 'emonhasan7650@gmail.com',
+      subject: 'Welcome to Ensinor',
+      html: `
+    <h2>Welcome 🎓</h2>
+    <p>Your account has been successfully created.</p>
+  `,
+      text: 'Welcome to Ensinor',
+    });
+
+    sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: 'Send test email send successfully!',
+    data: result,
+  });
+  } catch (error: any) {
+    console.log(error.message);
+  }
+});
+
 export const UserController = {
   registerAUser,
   invitationCompanyAdmin,
@@ -258,4 +282,5 @@ export const UserController = {
   updateAProfile,
   deleteAUser,
   deleteMyProfile,
+  testEmail,
 };
