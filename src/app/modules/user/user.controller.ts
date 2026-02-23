@@ -256,11 +256,11 @@ const testEmail = catchAsync(async (req, res) => {
     });
 
     sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: 'Send test email send successfully!',
-    data: result,
-  });
+      success: true,
+      statusCode: 200,
+      message: 'Send test email send successfully!',
+      data: result,
+    });
   } catch (error: any) {
     console.log(error.message);
   }

@@ -1,6 +1,6 @@
 import { NotificationModeType } from '@prisma/client';
 import { NotificationService } from '../notification/notification.service';
-import emailSender from '../../utils/emailSender';
+import { sendEmail } from '../../utils/sendEmail';
 
 interface MeetingDetails {
   topic: string;
@@ -13,26 +13,32 @@ interface MeetingDetails {
 }
 
 export const sendMeetingAssignmentNotification = async (
-  recipients: { id: string; email: string; fcmToken?: string | null; name?: string }[],
+  recipients: {
+    id: string;
+    email: string;
+    fcmToken?: string | null;
+    name?: string;
+  }[],
   meeting: MeetingDetails,
-  assignType: 'course' | 'event' | 'user'
+  assignType: 'course' | 'event' | 'user',
 ) => {
-  const now = new Date().toLocaleString('en-US', { timeZone: meeting.timezone || 'UTC' });
+  const now = new Date().toLocaleString('en-US', {
+    timeZone: meeting.timezone || 'UTC',
+  });
 
-  const notifications = recipients.map(async (rec) => {
+  const notifications = recipients.map(async rec => {
     // 1. DB Notification
-      await NotificationService.createNotificationIntoDB({
-        receiverId: rec.id,
-        message: `New Zoom Meeting Assigned (${assignType})`,
-        description:`Topic: ${meeting.topic} | Starts: ${now}`,
-        modeType: NotificationModeType.meeting,
-      });
-    
+    await NotificationService.createNotificationIntoDB({
+      receiverId: rec.id,
+      message: `New Zoom Meeting Assigned (${assignType})`,
+      description: `Topic: ${meeting.topic} | Starts: ${now}`,
+      modeType: NotificationModeType.meeting,
+    });
   });
 
   // Run in background (no await)
   Promise.allSettled(notifications).catch(err =>
-    console.error('Meeting notification failed:', err)
+    console.error('Meeting notification failed:', err),
   );
 };
 
@@ -40,7 +46,7 @@ export const sendMeetingAssignmentEmail = async (
   recipientEmail: string,
   recipientName: string | null | undefined,
   meeting: MeetingDetails,
-  assignType: 'course' | 'event' | 'user'
+  assignType: 'course' | 'event' | 'user',
 ) => {
   const startDateTime = new Date(meeting.startTime).toLocaleString('en-US', {
     timeZone: meeting.timezone || 'UTC',
@@ -72,9 +78,10 @@ export const sendMeetingAssignmentEmail = async (
     </div>
   `;
 
-  await emailSender(
-    recipientEmail,
-    `Zoom Meeting Invitation: ${meeting.topic}`,
-    htmlContent
-  );
+  await sendEmail({
+    to: recipientEmail,
+    subject: `Zoom Meeting Invitation: ${meeting.topic}`,
+    html: htmlContent,
+    text: `Zoom Meeting Invitation received`,
+  });
 };

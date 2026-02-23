@@ -10,7 +10,7 @@ import {
   INewsletterFilterRequest,
   ISubscriber,
 } from './newsletter.interface';
-import emailSender from '../../utils/emailSender';
+import { sendEmail } from '../../utils/sendEmail';
 
 const subscribeUser = async (payload: ISubscriber) => {
   const { email } = payload;
@@ -36,10 +36,10 @@ const subscribeUser = async (payload: ISubscriber) => {
   }
 
   // ✉️ Send congratulation email
-  await emailSender(
-    email,
-    '🎉 Welcome to Our Newsletter!',
-    `
+  await sendEmail({
+    to: email,
+    subject: '🎉 Welcome to Our Newsletter!',
+    html: `
       <div style="font-family:sans-serif; line-height:1.6;">
         <h2 style="color:#2b6cb0;">Welcome to the Family!</h2>
         <p>Hi there,</p>
@@ -49,7 +49,8 @@ const subscribeUser = async (payload: ISubscriber) => {
         <p>Warm regards,<br/>The Team</p>
       </div>
     `,
-  );
+    text: 'Welcome to Our Newsletter',
+  });
 
   return result;
 };
@@ -75,10 +76,10 @@ const unsubscribeUser = async (payload: { email: string }) => {
   }
 
   // ✉️ Send goodbye email
-  await emailSender(
-    email,
-    'We’re sad to see you go 💔',
-    `
+  await sendEmail({
+    to: email,
+    subject: 'We’re sad to see you go 💔',
+    html: `
       <div style="font-family:sans-serif; line-height:1.6;">
         <h2 style="color:#e53e3e;">Goodbye for now!</h2>
         <p>Hi there,</p>
@@ -89,7 +90,8 @@ const unsubscribeUser = async (payload: { email: string }) => {
         <p>Take care,<br/>The Team</p>
       </div>
     `,
-  );
+    text: 'We’re sad to see you go',
+  });
 
   return result;
 };

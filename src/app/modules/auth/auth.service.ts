@@ -2,7 +2,6 @@ import bcrypt from 'bcrypt';
 import httpStatus from 'http-status';
 import config from '../../config';
 import { JwtPayload } from 'jsonwebtoken';
-import emailSender from '../../utils/emailSender';
 import {
   authNotify,
   createToken,
@@ -18,6 +17,7 @@ import ApiError from '../../errors/ApiError';
 import { RegisterWith, UserRole, UserStatus } from '@prisma/client';
 import { IUser } from '../user/user.interface';
 import prisma from '../../utils/prisma';
+import { sendEmail } from '../../utils/sendEmail';
 
 const socialLogin = async (
   payload: SocialLoginPayload,
@@ -188,7 +188,10 @@ const loginUser = async (payload: TLoginUser) => {
 const registerWithGoogle = (payload: SocialLoginPayload) =>
   socialLogin(payload, RegisterWith.google);
 
-const registerWithLinkedIn = async (payload: { code: string; fcmToken?: string }) => {
+const registerWithLinkedIn = async (payload: {
+  code: string;
+  fcmToken?: string;
+}) => {
   const { code, fcmToken } = payload;
   if (!code) {
     throw new Error('Authorization code is required');
@@ -345,10 +348,10 @@ const forgetPassword = async (payload: { email: string }) => {
   });
 
   // sent forgot email
-  await emailSender(
-    user?.email,
-    'Your One-Time OTP',
-    `
+  await sendEmail({
+    to: user?.email,
+    subject: 'Your One-Time OTP',
+    html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <div style="text-align: left; padding: 10px 20px;">
           <h2 style="color: #333;">Your One-Time OTP</h2>
@@ -368,7 +371,8 @@ const forgetPassword = async (payload: { email: string }) => {
         </div>
       </div>
     `,
-  );
+    text: 'Your One-Time OTP',
+  });
 
   return { token: resetToken };
 };
