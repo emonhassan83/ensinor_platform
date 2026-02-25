@@ -89,6 +89,14 @@ const enrollUser = async (tx: any, user: User, course: Course) => {
     });
   }
 
+  // 3.5 Increment Course enrollments count
+  await tx.course.update({
+    where: { id: course.id },
+    data: {
+      enrollments: { increment: 1 },
+    },
+  });
+
   // 4️⃣ Add enrolled log
   await tx.enrolledLogs.create({
     data: {
@@ -270,6 +278,14 @@ const insertIntoDB = async (payload: IEnrolledCourse) => {
         });
       }
     }
+
+    // 3.5 Increment Course enrollments count
+    await tx.course.update({
+      where: { id: course.id },
+      data: {
+        enrollments: { increment: 1 },
+      },
+    });
 
     // 🧾  Add enrollment log (for audit/history)
     await tx.enrolledLogs.create({
@@ -552,6 +568,14 @@ const enrollBundleCourses = async (payload: {
       skipDuplicates: true,
     });
 
+    // Increment course enrollments for each course
+    for (const c of filteredCourses) {
+      await tx.course.update({
+        where: { id: c.id },
+        data: { enrollments: { increment: 1 } },
+      });
+    }
+
     // Increment course counts for student or employee
     const incrementCount = filteredCourses.length;
     if (user.student) {
@@ -777,6 +801,16 @@ const bundleEnrollBundleCourses = async (payload: {
           data: enrollData,
           skipDuplicates: true,
         });
+
+        // Course enrollments increment
+        for (const c of filteredCourses) {
+          await tx.course.update({
+            where: { id: c.id },
+            data: {
+              enrollments: { increment: 1 },
+            },
+          });
+        }
 
         // Update counters
         const incrementCount = filteredCourses.length;
@@ -1796,118 +1830,139 @@ const completeCourseIntoDB = async (id: string) => {
     include: { user: true, course: true },
   });
 
-  if (!enrollCourse)
+  if (!enrollCourse) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Enrolled course not found!');
-
-  const result = await prisma.enrolledCourse.update({
-    where: { id },
-    data: { isComplete: true, courseFinishTime: new Date() },
-    include: { user: true, course: true },
-  });
-
-  if (result.isComplete && result.course?.authorId) {
-    await sendCourseCompleteNotifYToAuthor(
-      result.user,
-      result.course,
-      enrollCourse.authorId,
-    );
   }
 
-  const durationMins = result.learningTime ?? 0;
-  const price = result.course?.price ?? 0;
-  const userId = result.user.id;
+  // Transaction শুরু করা (যাতে সব অপারেশন atomic হয়)
+  const result = await prisma.$transaction(async tx => {
+    // 1. Enrolled course কে complete করা
+    const updatedEnroll = await tx.enrolledCourse.update({
+      where: { id },
+      data: { 
+        isComplete: true, 
+        courseFinishTime: new Date() 
+      },
+      include: { user: true, course: true },
+    });
 
-  const achievement = await prisma.achievement.upsert({
-    where: { userId },
-    update: {},
-    create: { userId },
-  });
-
-  let awardedPoints = 0;
-
-  if (price > 0) {
-    awardedPoints = durationMins >= 600 || price >= 30 ? 200 : 100;
-
-    await prisma.achievement.update({
-      where: { id: achievement.id },
+    // 2. 🔥 IMPORTANT: Course-এর totalCompleted increment করা
+    await tx.course.update({
+      where: { id: enrollCourse.courseId },
       data: {
-        totalPoints: { increment: awardedPoints },
-        paidCoursePoints: { increment: awardedPoints },
+        totalCompleted: { increment: 1 },
       },
     });
-  } else {
-    const remainingCap = 250 - achievement.freeCoursePoints;
-    const pointsToAdd = Math.min(50, remainingCap > 0 ? remainingCap : 0);
-    awardedPoints = pointsToAdd;
 
-    if (pointsToAdd > 0) {
-      await prisma.achievement.update({
+    // 3. Author-কে নোটিফিকেশন পাঠানো
+    if (updatedEnroll.isComplete && updatedEnroll.course?.authorId) {
+      await sendCourseCompleteNotifYToAuthor(
+        updatedEnroll.user,
+        updatedEnroll.course,
+        updatedEnroll.course.authorId,
+      );
+    }
+
+    // 4. Achievement & points logic
+    const durationMins = updatedEnroll.learningTime ?? 0;
+    const price = updatedEnroll.course?.price ?? 0;
+    const userId = updatedEnroll.user.id;
+
+    const achievement = await tx.achievement.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+
+    let awardedPoints = 0;
+
+    if (price > 0) {
+      awardedPoints = durationMins >= 600 || price >= 30 ? 200 : 100;
+
+      await tx.achievement.update({
         where: { id: achievement.id },
         data: {
-          totalPoints: { increment: pointsToAdd },
-          freeCoursePoints: { increment: pointsToAdd },
+          totalPoints: { increment: awardedPoints },
+          paidCoursePoints: { increment: awardedPoints },
         },
       });
+    } else {
+      const remainingCap = 250 - achievement.freeCoursePoints;
+      const pointsToAdd = Math.min(50, remainingCap > 0 ? remainingCap : 0);
+      awardedPoints = pointsToAdd;
+
+      if (pointsToAdd > 0) {
+        await tx.achievement.update({
+          where: { id: achievement.id },
+          data: {
+            totalPoints: { increment: pointsToAdd },
+            freeCoursePoints: { increment: pointsToAdd },
+          },
+        });
+      }
     }
-  }
 
-  await prisma.achievementLogs.create({
-    data: {
-      userId,
-      courseId: result.course.id,
-      modelType: AchievementModelType.course,
-    },
-  });
-
-  const { level } = calculateAchievementLevel(
-    achievement.totalPoints + awardedPoints,
-  );
-  await prisma.achievement.update({ where: { userId }, data: { level } });
-
-  if (
-    result.course.platform === PlatformType.company &&
-    result.course.companyId
-  ) {
-    await prisma.company.update({
-      where: { id: result.course.companyId },
-      data: { completed: { increment: 1 } },
+    await tx.achievementLogs.create({
+      data: {
+        userId,
+        courseId: updatedEnroll.course.id,
+        modelType: AchievementModelType.course,
+      },
     });
-  }
 
-  const employee = await prisma.employee.findUnique({
-    where: { userId },
-  });
-  if (employee) {
-    await prisma.employee.update({
+    const { level } = calculateAchievementLevel(
+      achievement.totalPoints + awardedPoints,
+    );
+    await tx.achievement.update({ where: { userId }, data: { level } });
+
+    // 5. Company-এর completed increment
+    if (
+      updatedEnroll.course.platform === PlatformType.company &&
+      updatedEnroll.course.companyId
+    ) {
+      await tx.company.update({
+        where: { id: updatedEnroll.course.companyId },
+        data: { completed: { increment: 1 } },
+      });
+    }
+
+    // 6. Employee/Student-এর courseCompleted increment
+    const employee = await tx.employee.findUnique({
       where: { userId },
-      data: { courseCompleted: { increment: 1 } },
     });
-  } else {
-    const student = await prisma.student.findUnique({ where: { userId } });
-    if (student) {
-      await prisma.student.update({
+    if (employee) {
+      await tx.employee.update({
         where: { userId },
         data: { courseCompleted: { increment: 1 } },
       });
+    } else {
+      const student = await tx.student.findUnique({ where: { userId } });
+      if (student) {
+        await tx.student.update({
+          where: { userId },
+          data: { courseCompleted: { increment: 1 } },
+        });
+      }
     }
-  }
 
-  // Checked all badges
-  if (result.isComplete) {
-    const awardedBadges = await checkAndAwardAllEligibleBadges(
-      userId,
-      result.course.id,
-      enrollCourse.courseStartTime,
-      durationMins,
-    );
-
-    if (awardedBadges.length > 0) {
-      console.log(
-        `Awarded ${awardedBadges.length} badges: ${awardedBadges.join(', ')}`,
+    // 7. Badges check (আগের মতোই)
+    if (updatedEnroll.isComplete) {
+      const awardedBadges = await checkAndAwardAllEligibleBadges(
+        userId,
+        updatedEnroll.course.id,
+        enrollCourse.courseStartTime,
+        durationMins,
       );
-      // optional: ইউজারকে নোটিফাই করা
+
+      if (awardedBadges.length > 0) {
+        console.log(
+          `Awarded ${awardedBadges.length} badges: ${awardedBadges.join(', ')}`,
+        );
+      }
     }
-  }
+
+    return updatedEnroll;
+  });
 
   return result;
 };

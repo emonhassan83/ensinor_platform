@@ -110,7 +110,7 @@ const courseReports = async (
 
   const andConditions: Prisma.CourseWhereInput[] = [
     {
-      type: CourseType.external,
+      // type: CourseType.external,
       status: CoursesStatus.approved,
       isDeleted: false,
     },
@@ -467,6 +467,9 @@ const eventReports = async (
       id: true,
       title: true,
       price: true,
+      date: true,
+      startTime: true,
+      endTime: true,
       registered: true,
       isDeleted: true,
       createdAt: true,
@@ -497,16 +500,25 @@ const eventReports = async (
 const quizReports = async (
   params: IQuizFilterRequest,
   options: IPaginationOptions,
-  courseId?: string,
+  companyId?: string,
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = params;
 
   const andConditions: Prisma.QuizWhereInput[] = [
-    { courseId, isDeleted: false },
+    { isDeleted: false },
   ];
 
-  // Search across Package and nested User fields
+  // 1. যদি companyId দেওয়া থাকে 
+  if (companyId) {
+    andConditions.push({
+      course: {
+        companyId: companyId, 
+      },
+    });
+  }
+
+  // 3. Search Term
   if (searchTerm) {
     andConditions.push({
       OR: quizSearchAbleFields.map(field => ({
@@ -518,14 +530,16 @@ const quizReports = async (
     });
   }
 
-  // Filters
+  // 4. others filtering
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
-      AND: Object.keys(filterData).map(key => ({
-        [key]: {
-          equals: (filterData as any)[key],
-        },
-      })),
+      AND: Object.keys(filterData)
+        .filter(key => key !== 'courseId')
+        .map(key => ({
+          [key]: {
+            equals: (filterData as any)[key],
+          },
+        })),
     });
   }
 
@@ -533,20 +547,27 @@ const quizReports = async (
     AND: andConditions,
   };
 
+  // 5. Fetch quizzes
   const result = await prisma.quiz.findMany({
     where: whereConditions,
     skip,
     take: limit,
     orderBy:
       options.sortBy && options.sortOrder
-        ? {
-            [options.sortBy]: options.sortOrder,
-          }
-        : {
-            createdAt: 'desc',
-          },
+        ? { [options.sortBy]: options.sortOrder }
+        : { createdAt: 'desc' },
+    include: {
+      course: {
+        select: {
+          id: true,
+          title: true,
+          companyId: true,
+        },
+      },
+    },
   });
 
+  // 6. Total count
   const total = await prisma.quiz.count({
     where: whereConditions,
   });
