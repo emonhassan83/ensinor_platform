@@ -665,6 +665,7 @@ const invitationInstructor = async (
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
+  // Step 1: Super admin check (transaction-এর বাইরে)
   const author = await prisma.user.findFirst({
     where: {
       id: userId,
@@ -673,103 +674,106 @@ const invitationInstructor = async (
       isDeleted: false,
     },
   });
+
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Invitee author not found!');
   }
 
-  return await prisma
-    .$transaction(async tx => {
-      // Step 1: Email check
-      const existingUser = await tx.user.findFirst({
-        where: { email: payload.user.email },
-      });
-
-      let user;
-
-      if (existingUser) {
-        if (!existingUser.isDeleted) {
-          throw new ApiError(
-            httpStatus.CONFLICT,
-            'This email is already in use by an active user!',
-          );
-        }
-
-        console.log(
-          `Re-activating soft-deleted instructor: ${payload.user.email}`,
-        );
-
-        user = await tx.user.update({
-          where: { id: existingUser.id },
-          data: {
-            name: payload.user.name,
-            contactNo: payload.user.contactNo || existingUser.contactNo,
-            bio: payload.user.bio || existingUser.bio,
-            password: hashPassword,
-            role: UserRole.instructor,
-            registerWith: RegisterWith.credentials,
-            status: UserStatus.active,
-            isDeleted: false,
-            needsPasswordChange: false,
-            passwordChangedAt: new Date(),
-            verification: {
-              update: {
-                where: { userId: existingUser.id },
-                data: { otp: '', expiresAt: null, status: true },
-              },
-            },
-          },
-        });
-      } else {
-        user = await tx.user.create({
-          data: {
-            name: payload.user.name,
-            email: payload.user.email,
-            contactNo: payload.user.contactNo,
-            bio: payload.user.bio,
-            password: hashPassword,
-            role: UserRole.instructor,
-            registerWith: RegisterWith.credentials,
-            status: UserStatus.active,
-            verification: {
-              create: {
-                otp: '',
-                expiresAt: null,
-                status: true,
-              },
-            },
-          },
-        });
-      }
-
-      // Step 2: Instructor profile
-      const existingInstructor = await tx.instructor.findUnique({
-        where: { userId: user.id },
-      });
-
-      if (!existingInstructor) {
-        await tx.instructor.create({
-          data: {
-            userId: user.id,
-            ...payload.instructor,
-          },
-        });
-      }
-
-      // Step 3: Auto-join chat
-      await joinInitialAnnouncementChat(user.id, UserRole.instructor, tx);
-
-      // Step 4: Email
-      await sendInstructorInvitationEmail(user.email, user.name, password);
-
-      return user;
-    })
-    .then(async user => {
-      // Step 5: Notification (after transaction)
-      if (author) {
-        await sendInvitationNotification(author, user.id, 'instructor');
-      }
-      return user;
+  // Step 2: Transaction শুধু DB operations-এর জন্য
+  const user = await prisma.$transaction(async tx => {
+    // Email check
+    const existingUser = await tx.user.findFirst({
+      where: { email: payload.user.email },
     });
+
+    let createdOrUpdatedUser;
+
+    if (existingUser) {
+      if (!existingUser.isDeleted) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!'
+        );
+      }
+
+      console.log(`Re-activating soft-deleted instructor: ${payload.user.email}`);
+
+      createdOrUpdatedUser = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: payload.user.name,
+          contactNo: payload.user.contactNo || existingUser.contactNo,
+          bio: payload.user.bio || existingUser.bio,
+          password: hashPassword,
+          role: UserRole.instructor,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          isDeleted: false,
+          needsPasswordChange: false,
+          passwordChangedAt: new Date(),
+          verification: {
+            update: {
+              where: { userId: existingUser.id },
+              data: { otp: '', expiresAt: null, status: true },
+            },
+          },
+        },
+      });
+    } else {
+      createdOrUpdatedUser = await tx.user.create({
+        data: {
+          name: payload.user.name,
+          email: payload.user.email,
+          contactNo: payload.user.contactNo,
+          bio: payload.user.bio,
+          password: hashPassword,
+          role: UserRole.instructor,
+          registerWith: RegisterWith.credentials,
+          status: UserStatus.active,
+          verification: {
+            create: {
+              otp: '',
+              expiresAt: null,
+              status: true,
+            },
+          },
+        },
+      });
+    }
+
+    // Instructor profile create (if not exists)
+    const existingInstructor = await tx.instructor.findUnique({
+      where: { userId: createdOrUpdatedUser.id },
+    });
+
+    if (!existingInstructor) {
+      await tx.instructor.create({
+        data: {
+          userId: createdOrUpdatedUser.id,
+          ...payload.instructor,
+        },
+      });
+    }
+
+    // Auto-join chat (DB operation)
+    await joinInitialAnnouncementChat(
+      createdOrUpdatedUser.id,
+      UserRole.instructor,
+      tx
+    );
+
+    return createdOrUpdatedUser;
+  });
+
+  // Step 3: Transaction-এর বাইরে email & notification send করো
+  await sendInstructorInvitationEmail(user.email, user.name, password);
+
+  // Notification (যদি author থাকে)
+  if (author) {
+    await sendInvitationNotification(author, user.id, 'instructor');
+  }
+
+  return user;
 };
 
 const createStudent = async (
