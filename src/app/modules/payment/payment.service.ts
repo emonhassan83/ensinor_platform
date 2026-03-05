@@ -171,262 +171,258 @@ const initiatePayment = async (payload: IPayment) => {
 
 const confirmPayment = async (query: Record<string, any>) => {
   const { sessionId, paymentId } = query;
-  if (!sessionId || !paymentId)
+
+  if (!sessionId || !paymentId) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'sessionId and paymentId are required',
+      'sessionId and paymentId are required'
     );
+  }
 
-  // retrieve session from stripe
+  // Retrieve Stripe session
   const stripeSession = await stripe.checkout.sessions.retrieve(sessionId);
   const paymentIntentId = stripeSession.payment_intent as string;
 
   if (stripeSession.status !== 'complete') {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      'Payment session is not completed',
+      'Payment session is not completed'
     );
   }
 
-  // Prisma transaction
   try {
-    const result = await prisma.$transaction(async tx => {
-      // 1. Update payment record
-      const payment = await tx.payment.update({
-        where: { id: paymentId },
-        data: {
-          isPaid: true,
-          status: PaymentStatus.paid,
-          paymentIntentId,
-          updatedAt: new Date(),
-        },
-      });
-      if (!payment)
-        throw new ApiError(httpStatus.NOT_FOUND, 'Payment Not Found!');
-
-      // handle each modelType
-      if (payment.modelType === PaymentModelType.order) {
-        // 2️. Handle Order Payment Logic
-        const order = await tx.order.findUnique({
-          where: { id: payment.orderId ?? undefined },
-        });
-        if (!order)
-          throw new ApiError(httpStatus.NOT_FOUND, 'Order not found!');
-
-        // --- (1a) Platform owner (Super Admin) balance update ---
-        const superAdmin = await tx.user.findFirst({
-          where: { role: UserRole.super_admin, isDeleted: false },
-        });
-        if (superAdmin) {
-          await tx.user.update({
-            where: { id: superAdmin.id },
-            data: {
-              balance: {
-                increment: Math.round(payment.platformShare * 10) / 10 || 0,
-              },
-            },
-          });
-        }
-
-        // --- (1b) Author balance update ---
-        if (payment.authorId) {
-          await tx.user.update({
-            where: { id: payment.authorId },
-            data: {
-              balance: {
-                increment: Math.round((payment.instructorShare || 0) * 10) / 10,
-              },
-            },
-          });
-        }
-
-        // --- (1c) Co-instructors balance update (if any) ---
-        if (order.coInstructorIds && order.coInstructorIds.length > 0) {
-          const coInstructors = order.coInstructorIds;
-          const totalCoShare = payment.coInstructorsShare || 0;
-          const individualShare =
-            coInstructors.length > 0
-              ? Math.round((totalCoShare / coInstructors.length) * 10) / 10
-              : 0;
-
-          // Update each co-instructor balance
-          for (const coId of coInstructors) {
-            await tx.user.update({
-              where: { id: coId },
-              data: { balance: { increment: individualShare } },
-            });
-
-            // (2️⃣) Insert CoInstructorEarning record
-            await tx.coInstructorEarning.create({
-              data: {
-                coInstructorId: coId,
-                paymentId: payment.id,
-                amount: individualShare,
-              },
-            });
-          }
-        }
-
-        // --- 3️. Update order status ---
-        const updatedOrder = await tx.order.update({
-          where: { id: order.id },
+    // ────────────────────────────────────────────────
+    // Critical DB operations – keep inside transaction
+    // ────────────────────────────────────────────────
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // 1. Update payment record
+        const updatedPayment = await tx.payment.update({
+          where: { id: paymentId },
           data: {
-            transactionId: payment.transactionId,
-            paymentStatus: PaymentStatus.paid,
-            status: OrderStatus.completed,
-            isDeleted: false,
+            isPaid: true,
+            status: PaymentStatus.paid,
+            paymentIntentId,
+            updatedAt: new Date(),
           },
           include: {
-            orderItem: { include: { book: true } },
-            user: true,
+            order: {
+              include: { orderItem: { include: { book: true } }, user: true },
+            },
+            subscription: {
+              include: { package: true, user: true },
+            },
           },
         });
-        console.log(JSON.stringify(updatedOrder, null, 2));
 
-        // --- 4️. Send email with book PDFs (if any) ---
-        const bookFiles =
-          updatedOrder.orderItem
-            ?.filter(item => item.modelType === 'book' && item.book?.file)
-            ?.map(item => item.book!.file) || [];
+        if (!updatedPayment) {
+          throw new ApiError(httpStatus.NOT_FOUND, 'Payment record not found');
+        }
 
-        if (bookFiles.length > 0) {
-          await sendOrderConfirmationAndDocumentsEmail(updatedOrder.user, {
-            ...updatedOrder,
-            documents: bookFiles,
+        // ── Order payment logic ────────────────────────
+        if (updatedPayment.modelType === PaymentModelType.order && updatedPayment.order) {
+          const order = updatedPayment.order;
+
+          // Platform owner (super admin) balance
+          const superAdmin = await tx.user.findFirst({
+            where: { role: UserRole.super_admin, isDeleted: false },
+          });
+
+          if (superAdmin) {
+            await tx.user.update({
+              where: { id: superAdmin.id },
+              data: {
+                balance: {
+                  increment: Math.round((updatedPayment.platformShare || 0) * 10) / 10,
+                },
+              },
+            });
+          }
+
+          // Author balance
+          if (updatedPayment.authorId) {
+            await tx.user.update({
+              where: { id: updatedPayment.authorId },
+              data: {
+                balance: {
+                  increment: Math.round((updatedPayment.instructorShare || 0) * 10) / 10,
+                },
+              },
+            });
+          }
+
+          // Co-instructors balance & earnings
+          if (order.coInstructorIds && order.coInstructorIds.length > 0) {
+            const coInstructors = order.coInstructorIds;
+            const totalCoShare = updatedPayment.coInstructorsShare || 0;
+            const individualShare =
+              coInstructors.length > 0
+                ? Math.round((totalCoShare / coInstructors.length) * 10) / 10
+                : 0;
+
+            for (const coId of coInstructors) {
+              await tx.user.update({
+                where: { id: coId },
+                data: { balance: { increment: individualShare } },
+              });
+
+              await tx.coInstructorEarning.create({
+                data: {
+                  coInstructorId: coId,
+                  paymentId: updatedPayment.id,
+                  amount: individualShare,
+                },
+              });
+            }
+          }
+
+          // Update order status
+          await tx.order.update({
+            where: { id: order.id },
+            data: {
+              transactionId: updatedPayment.transactionId,
+              paymentStatus: PaymentStatus.paid,
+              status: OrderStatus.completed,
+              isDeleted: false,
+            },
           });
         }
-      } else if (payment.modelType === PaymentModelType.subscription) {
-        const sub = await tx.subscription.update({
-          where: { id: payment.subscriptionId ?? undefined },
-          data: {
-            transactionId: payment.transactionId,
-            paymentStatus: PaymentStatus.paid,
-            status: SubscriptionStatus.active,
-            isExpired: false,
-          },
-          include: { package: true, user: true },
-        });
 
-        if (!sub)
-          throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found!');
+        // ── Subscription payment logic ─────────────────
+        else if (updatedPayment.modelType === PaymentModelType.subscription && updatedPayment.subscription) {
+          const sub = updatedPayment.subscription;
 
-        // compute expiry based on package.billingCycle
-        const now = new Date();
-        const billingCycleDays =
-          sub.package?.billingCycle === 'annually'
-            ? 365
-            : sub.package?.billingCycle === 'halfYearly'
-              ? 180
-              : 30;
+          // Compute expiry
+          const now = new Date();
+          const billingCycleDays =
+            sub.package?.billingCycle === 'annually' ? 365 :
+            sub.package?.billingCycle === 'halfYearly' ? 180 : 30;
 
-        let newExpiry = new Date(
-          now.getTime() + billingCycleDays * 24 * 60 * 60 * 1000,
-        );
+          let newExpiry = new Date(now.getTime() + billingCycleDays * 24 * 60 * 60 * 1000);
 
-        // --- Find if user already has active subscription ---
-        const existingSub = await tx.subscription.findFirst({
-          where: {
-            userId: sub.userId,
-            id: { not: sub.id },
-            isExpired: false,
-            isDeleted: false,
-            paymentStatus: PaymentStatus.paid,
-          },
-        });
-
-        if (existingSub) {
-          const remainingDays =
-            existingSub.expiredAt && existingSub.expiredAt > now
-              ? Math.ceil(
-                  (existingSub.expiredAt.getTime() - now.getTime()) /
-                    (1000 * 60 * 60 * 24),
-                )
-              : 0;
-
-          const totalDays = billingCycleDays + remainingDays;
-          const extendedExpiry = new Date(
-            now.getTime() + totalDays * 24 * 60 * 60 * 1000,
-          );
-
-          // Mark previous as expired but preserve for record
-          await tx.subscription.update({
-            where: { id: existingSub.id },
-            data: {
-              isExpired: true,
-              isDeleted: true,
-              status: SubscriptionStatus.expired,
+          // Handle existing active subscription
+          const existingSub = await tx.subscription.findFirst({
+            where: {
+              userId: sub.userId,
+              id: { not: sub.id },
+              isExpired: false,
+              isDeleted: false,
+              paymentStatus: PaymentStatus.paid,
             },
           });
 
-          // Update new subscription expiry
-          newExpiry = extendedExpiry;
+          if (existingSub) {
+            const remainingDays =
+              existingSub.expiredAt && existingSub.expiredAt > now
+                ? Math.ceil((existingSub.expiredAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                : 0;
+
+            const totalDays = billingCycleDays + remainingDays;
+            newExpiry = new Date(now.getTime() + totalDays * 24 * 60 * 60 * 1000);
+
+            await tx.subscription.update({
+              where: { id: existingSub.id },
+              data: {
+                isExpired: true,
+                isDeleted: true,
+                status: SubscriptionStatus.expired,
+              },
+            });
+          }
+
+          // Update new subscription
           await tx.subscription.update({
             where: { id: sub.id },
-            data: { expiredAt: newExpiry },
-          });
-        } else {
-          // Set expiry for first-time subscription
-          await tx.subscription.update({
-            where: { id: sub.id },
-            data: { expiredAt: newExpiry },
-          });
-        }
-
-        // --- 1️⃣ Company activation logic ---
-        if (sub.package.audience === PackageAudience.company_admin) {
-          const companyAdmin = await tx.companyAdmin.findUnique({
-            where: { userId: sub.userId },
-            include: { company: true },
+            data: {
+              transactionId: updatedPayment.transactionId,
+              paymentStatus: PaymentStatus.paid,
+              status: SubscriptionStatus.active,
+              isExpired: false,
+              expiredAt: newExpiry,
+            },
           });
 
-          if (companyAdmin?.company) {
-            await tx.company.update({
-              where: { id: companyAdmin.company.id },
-              data: { industryType: sub.type as any, isActive: true },
+          // Company activation (if package is for company admin)
+          if (sub.package.audience === 'company_admin') {
+            const companyAdmin = await tx.companyAdmin.findUnique({
+              where: { userId: sub.userId },
+              include: { company: true },
+            });
+
+            if (companyAdmin?.company) {
+              await tx.company.update({
+                where: { id: companyAdmin.company.id },
+                data: { industryType: sub.type as any, isActive: true },
+              });
+            }
+          }
+
+          // Update user package expiry
+          await tx.user.update({
+            where: { id: sub.userId },
+            data: { packageExpiry: newExpiry },
+          });
+
+          // Increment package popularity
+          if (sub.packageId) {
+            await tx.package.update({
+              where: { id: sub.packageId },
+              data: { popularity: { increment: 1 } },
             });
           }
         }
 
-        // --- Update user's package expiry ---
-        await tx.user.update({
-          where: { id: sub.userId },
-          data: { packageExpiry: newExpiry },
-        });
-
-        // --- Increment package popularity ---
-        if (sub.packageId) {
-          await tx.package.update({
-            where: { id: sub.packageId },
-            data: { popularity: { increment: 1 } },
-          });
-        }
+        return updatedPayment;
+      },
+      {
+        timeout: 30000,      // 30 seconds – prevents timeout error
+        maxWait: 10000,      // wait up to 10s for connection
       }
+    );
 
-      // notify users & admin
-      await paymentNotifyToUser('SUCCESS', payment);
-      await paymentNotifyToAdmin('SUCCESS', payment);
+    // ────────────────────────────────────────────────
+    // Non-critical operations – outside transaction
+    // ────────────────────────────────────────────────
 
-      return payment;
-    });
+    // Notifications & emails
+    await Promise.all([
+      paymentNotifyToUser('SUCCESS', result),
+      paymentNotifyToAdmin('SUCCESS', result),
+    ]);
+
+    // Order-specific email with documents
+    if (result.modelType === PaymentModelType.order && result.order) {
+      const bookFiles = result.order.orderItem
+        ?.filter(item => item.modelType === 'book' && item.book?.file)
+        ?.map(item => item.book!.file) || [];
+
+      if (bookFiles.length > 0) {
+        await sendOrderConfirmationAndDocumentsEmail(result.order.user, {
+          ...result.order,
+          documents: bookFiles,
+        });
+      }
+    }
 
     return result;
   } catch (error: any) {
-    // attempt to refund the intent if available
+    // Optional refund attempt (only if payment intent exists)
     try {
-      if ((error as any).paymentIntentId) {
+      if (error.paymentIntentId || paymentIntentId) {
         await stripe.refunds.create({
-          payment_intent: (error as any).paymentIntentId,
+          payment_intent: error.paymentIntentId || paymentIntentId,
         });
+        console.log('Refund attempted after failure');
       }
     } catch (refundErr) {
-      console.error(
-        'Refund attempt failed after processing error:',
-        (refundErr as Error).message,
-      );
+      console.error('Refund attempt failed after error:', refundErr);
     }
+
+    console.error('Payment confirmation error:', error);
+
     throw new ApiError(
       httpStatus.BAD_GATEWAY,
-      error.message || 'Payment confirmation failed',
+      error.message || 'Payment confirmation failed'
     );
   }
 };
