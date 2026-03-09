@@ -333,6 +333,7 @@ const seedPackages = async () => {
         title: pkg.title,
         type: pkg.type,
         audience: pkg.audience,
+        billingCycle: pkg.billingCycle,
         isDeleted: false,
       },
     });
