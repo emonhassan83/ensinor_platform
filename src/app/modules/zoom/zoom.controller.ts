@@ -24,9 +24,13 @@ const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
     JSON.stringify({ userId: currentUserId, timestamp: Date.now() }),
   ).toString('base64');
 
-  const authUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${config.zoom.client_id}&redirect_uri=${encodeURIComponent(config.zoom.redirect_url)}&state=${state}`;
+  // scopes নির্ধারণ করুন (আপনার প্রয়োজন অনুযায়ী পরিবর্তন করতে পারেন)
+  const scopes = 'user:read:user user:read:user:admin';  // স্পেস দিয়ে আলাদা করা scopes
 
-  // Frontend-এ authUrl পাঠাও (redirect না করে)
+  // authUrl-এ scopes যোগ করা হলো
+  const authUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${config.zoom.client_id}&redirect_uri=${encodeURIComponent(config.zoom.redirect_url)}&state=${state}&scope=${encodeURIComponent(scopes)}`;
+
+  // Frontend-এ authUrl পাঠানো
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
