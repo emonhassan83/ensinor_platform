@@ -25,7 +25,7 @@ const redirectToZoomAuth = catchAsync(async (req: Request, res: Response) => {
   ).toString('base64');
 
   // UPDATED SCOPES (সঠিক ও minimal)
-  const scopes = 'user:read meeting:write:meeting';
+  const scopes = 'user:read:user meeting:write:meeting';
 
   const authUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${config.zoom.client_id}&redirect_uri=${encodeURIComponent(config.zoom.redirect_url)}&state=${state}&scope=${encodeURIComponent(scopes)}`;
 
