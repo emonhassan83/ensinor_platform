@@ -43,7 +43,7 @@ const bulkInsertValidationSchema = z.object({
     email: z.string({ required_error: 'Event booking email is required!' }),
     organization: z.string({
       required_error: 'Event booking organization is required!',
-    }),
+    }).optional(),
     profession: z.string({
       required_error: 'Event booking profession is required!',
     }),

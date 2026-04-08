@@ -386,7 +386,8 @@ const eventFilterData = async () => {
   };
 };
 
-const getByIdFromDB = async (id: string) => {
+const getByIdFromDB = async (id: string, userId?: string) => {
+  // Event fetch with necessary relations
   const event = await prisma.event.findUnique({
     where: { id, isDeleted: false },
     include: {
@@ -414,6 +415,22 @@ const getByIdFromDB = async (id: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Event not found!');
   }
 
+  // ====================== isBooked Logic ======================
+  let isBooked = false;
+
+  if (userId) {
+    const existingBooking = await prisma.eventBooking.findFirst({
+      where: {
+        eventId: id,
+        userId: userId,
+        isDeleted: false,
+      },
+    });
+
+    isBooked = !!existingBooking;   // true if booking exists
+  }
+  // ===========================================================
+
   const coupon = event.coupon?.[0];
   const promo = event.promoCode?.[0];
 
@@ -435,12 +452,13 @@ const getByIdFromDB = async (id: string) => {
   const discountPrice =
     discount > 0 ? event.price - (event.price * discount) / 100 : event.price;
 
-  // ✅ Add status
+  // Event status
   const parsedDate = parseEventDate(event.date);
   const status =
     parsedDate && parsedDate > new Date() ? 'upcoming' : 'completed';
 
   const { coupon: _c, promoCode: _p, ...rest } = event;
+
   return {
     ...rest,
     couponCode,
@@ -449,6 +467,7 @@ const getByIdFromDB = async (id: string) => {
     discount,
     discountPrice,
     status,
+    isBooked
   };
 };
 

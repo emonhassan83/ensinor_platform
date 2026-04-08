@@ -305,6 +305,7 @@ model CompanyRequest {
 model Department {
   id        String   @id @default(uuid())
   authorId  String
+  companyId String
   name      String
   image     String?
   joined    Int      @default(0)
@@ -955,18 +956,19 @@ model AssignmentSubmission {
 }
 
 model CertificateBuilder {
-  id              String   @id @default(uuid())
-  authorId        String
-  company         String?
-  logo            String?
-  logoHeight      Float?
-  logoWidth       Float?
-  mainLogoHeight  Float?
-  mainLogoWidth   Float?
-  isVisibleTopics Boolean  @default(true)
-  isDeleted       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(uuid())
+  authorId         String
+  company          String?
+  logo             String?
+  logoHeight       Float?
+  logoWidth        Float?
+  mainLogoHeight   Float?
+  mainLogoWidth    Float?
+  authorProfession String?
+  isVisibleTopics  Boolean  @default(true)
+  isDeleted        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
   author User @relation(fields: [authorId], references: [id])
@@ -1087,7 +1089,7 @@ model EventBooking {
   name         String
   phone        String
   email        String
-  organization String
+  organization String?
   profession   String
   city         String
   country      String
@@ -1389,7 +1391,7 @@ model CV {
   location       String
   aboutMe        String
   skills         String[]
-  refName    String?
+  refName        String?
   refDesignation String?
   refEmail       String?
   refPhone       String?

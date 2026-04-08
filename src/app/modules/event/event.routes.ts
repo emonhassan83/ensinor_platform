@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client';
 import { EventValidation } from './event.validation';
 import parseData from '../../middlewares/parseData';
 import multer, { memoryStorage } from 'multer';
+import { optionalAuth } from '../../middlewares/optionalAuth';
 
 const router = express.Router();
 const storage = memoryStorage();
@@ -48,7 +49,11 @@ router.get(
   EventController.getCompanyEventFromDB,
 );
 
-router.get('/:id', EventController.getByIdFromDB);
+router.get(
+  '/:id',
+  optionalAuth(UserRole.student, UserRole.employee),
+  EventController.getByIdFromDB,
+);
 
 router.put(
   '/:id',

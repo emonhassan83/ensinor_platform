@@ -146,7 +146,8 @@ const insertIntoDB = async (payload: ICertificate) => {
       allowBuilder = false;
     }
 
-    const companySub = author.businessInstructor?.company.author.user.subscription[0]
+    const companySub =
+      author.businessInstructor?.company.author.user.subscription[0];
     if (!companySub) {
       allowBuilder = false;
     }
@@ -224,19 +225,39 @@ const insertIntoDB = async (payload: ICertificate) => {
   }
 
   /* =====================================================
-     👨‍🏫 Instructor Name & Designation
+     👨‍🏫 Instructor Name & Designation (Corrected Logic)
   ===================================================== */
-  payload.instructor = author.name;
+  payload.instructor = author.name || 'Instructor';
 
   let insDesignation: string | null = null;
 
-  if (author.businessInstructor) {
-    insDesignation = author.businessInstructor.designation;
-  } else if (author.instructor) {
-    insDesignation = author.instructor.designation;
+  // Priority 1: Certificate Builder-এ authorProfession থাকলে (সবচেয়ে প্রায়োরিটি)
+  if (builder?.authorProfession?.trim()) {
+    insDesignation = builder.authorProfession.trim();
+  }
+  // Priority 2: Normal Instructor
+  else if (
+    author.role === UserRole.instructor &&
+    author.instructor?.designation?.trim()
+  ) {
+    insDesignation = author.instructor.designation.trim();
+  }
+  // Priority 3: Business Instructor
+  else if (
+    author.role === UserRole.business_instructors &&
+    author.businessInstructor?.designation?.trim()
+  ) {
+    insDesignation = author.businessInstructor.designation.trim();
+  }
+  // Priority 4: Company Admin Fallback
+  else if (
+    author.role === UserRole.company_admin &&
+    author.companyAdmin?.company?.name
+  ) {
+    insDesignation = `${author.companyAdmin.company.name} Admin`;
   }
 
-  (payload as any).insDesignation = insDesignation ?? '';
+  payload.insDesignation = insDesignation || '';
 
   /* =====================================================
      8️⃣ Create Certificate

@@ -1185,7 +1185,7 @@ const instructorMetaData = async (
       status: PaymentStatus.paid,
       isPaid: true,
       isDeleted: false,
-      authorId: user.id,
+      authorId: user.userId,
     },
   });
   const revenue = Math.round(totalRevenue._sum.amount ?? 0);

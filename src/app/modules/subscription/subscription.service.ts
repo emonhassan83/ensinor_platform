@@ -31,10 +31,15 @@ export const startSubscriptionCron = () => {
     tomorrow.setHours(23, 59, 59, 999);
 
     try {
+      const now = new Date();
+
       // 1) Notify about expiring today (paid & not expired)
       const expiringToday = await prisma.subscription.findMany({
         where: {
-          expiredAt: { gte: today, lte: tomorrow },
+          expiredAt: {
+            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+          },
           isExpired: false,
           paymentStatus: PaymentStatus.paid,
         },
@@ -54,7 +59,9 @@ export const startSubscriptionCron = () => {
       // 2) Mark as expired (expiredAt < today)
       const alreadyExpired = await prisma.subscription.findMany({
         where: {
-          expiredAt: { lt: today },
+          expiredAt: {
+            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+          },
           isExpired: false,
           paymentStatus: PaymentStatus.paid,
         },
@@ -69,7 +76,7 @@ export const startSubscriptionCron = () => {
               where: { id: s.id },
               data: {
                 isExpired: true,
-                isDeleted: true,
+                // isDeleted: true,
                 status: SubscriptionStatus.expired,
               },
             }),
@@ -292,19 +299,25 @@ const getAllSubscription = async (
     },
   }));
 
-  return  dataWithLevel
+  return dataWithLevel;
 };
 
 const getSubscriptionById = async (id: string) => {
   const result = await prisma.subscription.findUnique({
-    where: { id },
+    where: {
+      id,
+      isDeleted: false,
+      isExpired: false,
+      paymentStatus: PaymentStatus.paid,
+      status: SubscriptionStatus.active,
+    },
     include: {
       package: true,
       user: { select: { id: true, name: true, email: true, photoUrl: true } },
     },
   });
 
-  if (!result || result.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found !');
   }
 
@@ -315,8 +328,10 @@ const updateSubscription = async (
   id: string,
   payload: Partial<ISubscription>,
 ) => {
-  const subscription = await prisma.subscription.findUnique({ where: { id } });
-  if (!subscription || subscription.isDeleted)
+  const subscription = await prisma.subscription.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!subscription)
     throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found');
 
   const updated = await prisma.subscription.update({
@@ -334,8 +349,10 @@ const updateSubscription = async (
 };
 
 const deleteSubscription = async (id: string) => {
-  const subscription = await prisma.subscription.findUnique({ where: { id } });
-  if (!subscription || subscription?.isDeleted)
+  const subscription = await prisma.subscription.findUnique({
+    where: { id, isDeleted: false },
+  });
+  if (!subscription)
     throw new ApiError(httpStatus.NOT_FOUND, 'Subscription not found');
 
   const result = await prisma.subscription.update({

@@ -50,6 +50,19 @@ const insertIntoDB = async (payload: IEventBooking) => {
       ...(event.authorId ? { authorId: event.authorId } : {}),
       amount: event.price,
     },
+    include: {
+      event: {
+        select: {
+          id: true,
+          title: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          type: true,
+          location: true,
+        },
+      },
+    },
   });
 
   if (!result) {
@@ -71,10 +84,24 @@ const insertIntoDB = async (payload: IEventBooking) => {
 };
 
 const bulkInsertIntoDB = async (payload: IEventsBooking) => {
-  const { eventIds, userId, name, phone, email, organization, profession, city, country, document } = payload;
+  const {
+    eventIds,
+    userId,
+    name,
+    phone,
+    email,
+    organization,
+    profession,
+    city,
+    country,
+    document,
+  } = payload;
 
   if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'No events provided for booking!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'No events provided for booking!',
+    );
   }
 
   // ✅ Validate user
@@ -113,7 +140,10 @@ const bulkInsertIntoDB = async (payload: IEventsBooking) => {
     .map(e => e.id);
 
   if (!newEventIds.length) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'You already booked all selected events!');
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'You already booked all selected events!',
+    );
   }
 
   // ✅ Prepare data for bulk insert
@@ -152,7 +182,7 @@ const bulkInsertIntoDB = async (payload: IEventsBooking) => {
 
   return {
     result,
-    existingBookings
+    existingBookings,
   };
 };
 

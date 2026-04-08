@@ -24,6 +24,7 @@ export type ICertificate = {
   courseName: string;
   instructor: string;
   studyHour: number;
+  insDesignation: string;
   topics: string[];
   completeDate: string;
   reference: string;

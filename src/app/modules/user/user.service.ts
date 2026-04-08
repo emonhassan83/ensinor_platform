@@ -301,7 +301,10 @@ const createBusinessInstructor = async (
   });
 
   if (!companyAdmin?.companyAdmin?.company) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Company admin or company not found!');
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'Company admin or company not found!',
+    );
   }
 
   const company = companyAdmin.companyAdmin.company;
@@ -310,7 +313,7 @@ const createBusinessInstructor = async (
   if (company.instructor >= instructorLimit) {
     throw new ApiError(
       httpStatus.FORBIDDEN,
-      `${company.industryType.toUpperCase()} companies can invite up to ${instructorLimit} instructors.`
+      `${company.industryType.toUpperCase()} companies can invite up to ${instructorLimit} instructors.`,
     );
   }
 
@@ -323,7 +326,10 @@ const createBusinessInstructor = async (
 
     if (existingUser) {
       if (!existingUser.isDeleted) {
-        throw new ApiError(httpStatus.CONFLICT, 'This email is already in use by an active user!');
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!',
+        );
       }
 
       userData = await tx.user.update({
@@ -384,8 +390,16 @@ const createBusinessInstructor = async (
   });
 
   // Transaction-এর বাইরে
-  await sendBusinessInstructorInvitation(createdUser.email, createdUser.name, password);
-  await sendInvitationNotification(companyAdmin, createdUser.id, 'business-instructor');
+  await sendBusinessInstructorInvitation(
+    createdUser.email,
+    createdUser.name,
+    password,
+  );
+  await sendInvitationNotification(
+    companyAdmin,
+    createdUser.id,
+    'business-instructor',
+  );
 
   return createdUser;
 };
@@ -529,7 +543,9 @@ const createEmployee = async (payload: IEmployee): Promise<IUserResponse> => {
   });
 };
 
-const createInstructor = async (payload: IInstructor): Promise<IUserResponse> => {
+const createInstructor = async (
+  payload: IInstructor,
+): Promise<IUserResponse> => {
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
@@ -542,10 +558,15 @@ const createInstructor = async (payload: IInstructor): Promise<IUserResponse> =>
 
     if (existingUser) {
       if (!existingUser.isDeleted) {
-        throw new ApiError(httpStatus.CONFLICT, 'This email is already in use by an active user!');
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!',
+        );
       }
 
-      console.log(`Re-activating soft-deleted instructor: ${payload.user.email}`);
+      console.log(
+        `Re-activating soft-deleted instructor: ${payload.user.email}`,
+      );
 
       createdUser = await tx.user.update({
         where: { id: existingUser.id },
@@ -556,7 +577,7 @@ const createInstructor = async (payload: IInstructor): Promise<IUserResponse> =>
           password: hashPassword,
           role: UserRole.instructor,
           registerWith: RegisterWith.credentials,
-          status: UserStatus.active,
+          status: UserStatus.pending,
           isDeleted: false,
           needsPasswordChange: false,
           passwordChangedAt: new Date(),
@@ -578,7 +599,7 @@ const createInstructor = async (payload: IInstructor): Promise<IUserResponse> =>
           password: hashPassword,
           role: UserRole.instructor,
           registerWith: RegisterWith.credentials,
-          status: UserStatus.active,
+          status: UserStatus.pending,
           verification: {
             create: {
               otp: '',
@@ -654,11 +675,13 @@ const invitationInstructor = async (
       if (!existingUser.isDeleted) {
         throw new ApiError(
           httpStatus.CONFLICT,
-          'This email is already in use by an active user!'
+          'This email is already in use by an active user!',
         );
       }
 
-      console.log(`Re-activating soft-deleted instructor: ${payload.user.email}`);
+      console.log(
+        `Re-activating soft-deleted instructor: ${payload.user.email}`,
+      );
 
       createdOrUpdatedUser = await tx.user.update({
         where: { id: existingUser.id },
@@ -721,7 +744,7 @@ const invitationInstructor = async (
     await joinInitialAnnouncementChat(
       createdOrUpdatedUser.id,
       UserRole.instructor,
-      tx
+      tx,
     );
 
     return createdOrUpdatedUser;
@@ -767,7 +790,10 @@ const createStudent = async (
 
     if (existingUser) {
       if (!existingUser.isDeleted) {
-        throw new ApiError(httpStatus.CONFLICT, 'This email is already in use by an active user!');
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          'This email is already in use by an active user!',
+        );
       }
 
       console.log(`Re-activating soft-deleted student: ${payload.user.email}`);
@@ -847,7 +873,9 @@ const getAllUser = async (
   const { limit, page, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = filters;
 
-  const andConditions: Prisma.UserWhereInput[] = [{ isDeleted: false }];
+  const andConditions: Prisma.UserWhereInput[] = [
+    { isDeleted: false, role: { not: UserRole.super_admin } },
+  ];
 
   if (searchTerm) {
     andConditions.push({

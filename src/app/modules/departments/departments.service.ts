@@ -17,10 +17,24 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
       status: UserStatus.active,
       isDeleted: false,
     },
+    include: {
+      companyAdmin: {
+        include: {
+          company: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!author) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Author not found!');
   }
+
+  // attach companyId to payload
+  payload.companyId = author.companyAdmin?.company?.id as string
 
   // upload to image
   if (file) {
@@ -36,6 +50,7 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
       id: true,
       name: true,
       image: true,
+      companyId: true,
       createdAt: true,
       updatedAt: true,
       author: {
@@ -58,14 +73,17 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
 const getAllFromDB = async (
   filters: IDepartmentFilterRequest,
   options: IPaginationOptions,
-  userId?: string,
+  filterBy?: { userId?: string; companyId?: string },
 ) => {
   const { limit, page, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, ...filterData } = filters;
 
   const andConditions: Prisma.DepartmentWhereInput[] = [{ isDeleted: false }];
-  if (userId) {
-    andConditions.push({ authorId: userId });
+  if (filterBy?.userId) {
+    andConditions.push({ authorId: filterBy.userId });
+  }
+  if (filterBy?.companyId) {
+    andConditions.push({ companyId: filterBy.companyId });
   }
 
   if (searchTerm) {
@@ -134,7 +152,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string) => {
   const result = await prisma.department.findUnique({
-    where: { id },
+    where: { id , isDeleted: false },
     include: {
       author: {
         select: {
@@ -158,7 +176,7 @@ const getByIdFromDB = async (id: string) => {
     },
   });
 
-  if (!result || result.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Oops! Department not found');
   }
 
@@ -171,9 +189,9 @@ const updateIntoDB = async (
   file: any,
 ) => {
   const department = await prisma.department.findUnique({
-    where: { id },
+    where: { id , isDeleted: false },
   });
-  if (!department || department.isDeleted) {
+  if (!department) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Department not found!');
   }
 
@@ -188,7 +206,7 @@ const updateIntoDB = async (
   const result = await prisma.department.update({
     where: { id },
     data: payload,
-     select: {
+    select: {
       id: true,
       name: true,
       image: true,
@@ -210,9 +228,9 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string) => {
   const department = await prisma.department.findUnique({
-    where: { id },
+    where: { id , isDeleted: false },
   });
-  if (!department || department.isDeleted) {
+  if (!department) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Department not found!');
   }
 
@@ -220,8 +238,7 @@ const deleteFromDB = async (id: string) => {
     where: { id },
     data: { isDeleted: true },
   });
-
-  if (!result || result?.isDeleted) {
+  if (!result) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Department deletion failed');
   }
 

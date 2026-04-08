@@ -125,8 +125,12 @@ const loginUser = async (payload: TLoginUser) => {
     where: { email: payload.email, isDeleted: false },
     include: { verification: true },
   });
-  if (!user) {
+  if (!user || user?.isDeleted) {
     throw new ApiError(httpStatus.NOT_FOUND, 'This user is not found !');
+  }
+
+  if (user.status !== UserStatus.active) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'User account is not active');
   }
 
   const isPasswordMatched = await bcrypt.compare(

@@ -35,6 +35,12 @@ router.get(
   DepartmentController.getAllMyFromDB,
 );
 
+router.get(
+  '/company/:companyId',
+  auth(UserRole.company_admin, UserRole.business_instructors),
+  DepartmentController.getAllMyFromDB,
+);
+
 router.get('/:id', DepartmentController.getByIdFromDB);
 
 router.get('/', DepartmentController.getAllFromDB);

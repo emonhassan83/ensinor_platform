@@ -8,4 +8,5 @@ export type IDepartment = {
   name: string;
   image: string;
   authorId: string;
+  companyId: string; // Optional array of course IDs
 };

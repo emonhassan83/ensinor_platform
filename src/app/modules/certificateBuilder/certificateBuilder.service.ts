@@ -290,7 +290,7 @@ const getByIdFromDB = async (authorId: string): Promise<any> => {
   if (!result) {
     throw new ApiError(
       httpStatus.NOT_FOUND,
-      'Oops! Certificate request not found!',
+      'Oops! Certificate builder not found!',
     );
   }
 
