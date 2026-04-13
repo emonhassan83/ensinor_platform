@@ -10,6 +10,7 @@ import { IDepartment, IDepartmentFilterRequest } from './departments.interface';
 
 const insertIntoDB = async (payload: IDepartment, file: any) => {
   const { authorId } = payload;
+
   const author = await prisma.user.findUnique({
     where: {
       id: authorId,
@@ -34,7 +35,7 @@ const insertIntoDB = async (payload: IDepartment, file: any) => {
   }
 
   // attach companyId to payload
-  payload.companyId = author.companyAdmin?.company?.id as string
+  payload.companyId = author.companyAdmin?.company?.id as string;
 
   // upload to image
   if (file) {
@@ -152,7 +153,7 @@ const getAllFromDB = async (
 
 const getByIdFromDB = async (id: string) => {
   const result = await prisma.department.findUnique({
-    where: { id , isDeleted: false },
+    where: { id, isDeleted: false },
     include: {
       author: {
         select: {
@@ -189,7 +190,7 @@ const updateIntoDB = async (
   file: any,
 ) => {
   const department = await prisma.department.findUnique({
-    where: { id , isDeleted: false },
+    where: { id, isDeleted: false },
   });
   if (!department) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Department not found!');
@@ -228,7 +229,7 @@ const updateIntoDB = async (
 
 const deleteFromDB = async (id: string) => {
   const department = await prisma.department.findUnique({
-    where: { id , isDeleted: false },
+    where: { id, isDeleted: false },
   });
   if (!department) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Department not found!');

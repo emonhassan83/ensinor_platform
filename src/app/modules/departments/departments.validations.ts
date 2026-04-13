@@ -4,6 +4,8 @@ const createValidationSchema = z.object({
   body: z.object({
     authorId: z
       .string({ required_error: 'Department author is required' }),
+    companyId: z
+      .string({ required_error: 'Department company is required' }),
     name: z.string({ required_error: 'Department name is required' }),
   }),
 });
