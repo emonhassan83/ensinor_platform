@@ -38,12 +38,10 @@ router.get(
 router.get(
   '/company/:companyId',
   auth(UserRole.company_admin, UserRole.business_instructors),
-  DepartmentController.getAllMyFromDB,
+  DepartmentController.getCompanyDepartment,
 );
 
 router.get('/:id', DepartmentController.getByIdFromDB);
-
-router.get('/', DepartmentController.getAllFromDB);
 
 router.delete(
   '/:id',

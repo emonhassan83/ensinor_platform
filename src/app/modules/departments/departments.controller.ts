@@ -16,11 +16,13 @@ const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAllFromDB = catchAsync(async (req: Request, res: Response) => {
+const getCompanyDepartment = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, departmentFilterableFields);
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-  const result = await DepartmentServices.getAllFromDB(filters, options);
+  const result = await DepartmentServices.getAllFromDB(filters, options, {
+    companyId: req.params.companyId,
+  });
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -35,8 +37,7 @@ const getAllMyFromDB = catchAsync(async (req: Request, res: Response) => {
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
   const result = await DepartmentServices.getAllFromDB(filters, options, {
-    userId: req.user!.userId,
-    companyId: req.params.companyId,
+    userId: req.user!.userId
   });
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -85,7 +86,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const DepartmentController = {
   insertIntoDB,
-  getAllFromDB,
+  getCompanyDepartment,
   getAllMyFromDB,
   getByIdFromDB,
   updateIntoDB,

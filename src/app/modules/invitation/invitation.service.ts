@@ -26,49 +26,106 @@ const insertIntoDB = async (payload: IInvitation) => {
   const { userId, departmentId, name, email } = payload;
 
   return await prisma.$transaction(async tx => {
-    // 1. Check inviter (company admin)
+    // 1. Get inviter
     const inviter = await tx.user.findFirst({
-      where: { id: userId, status: UserStatus.active, isDeleted: false },
-      select: {
-        id: true,
-        name: true,
+      where: {
+        id: userId,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+      include: {
         companyAdmin: {
-          select: {
+          include: {
             company: {
-              select: { id: true, name: true, isActive: true, size: true },
+              include: {
+                author: {
+                  include: {
+                    user: {
+                      include: {
+                        subscription: {
+                          where: {
+                            isExpired: false,
+                            status: SubscriptionStatus.active,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
-        subscription: {
-          where: { isExpired: false, status: SubscriptionStatus.active },
-          select: { type: true },
+        businessInstructor: {
+          include: {
+            company: {
+              include: {
+                author: {
+                  include: {
+                    user: {
+                      include: {
+                        subscription: {
+                          where: {
+                            isExpired: false,
+                            status: SubscriptionStatus.active,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
 
-    if (!inviter)
+    if (!inviter) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
-    if (!inviter.companyAdmin?.company)
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Inviter is not linked to any company!',
-      );
-    if (!inviter.companyAdmin.company.isActive)
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        'Inviter company is inactive!',
-      );
+    }
 
-    // 2. Subscription & invite limit check
-    const activeSubscription = inviter.subscription[0];
-    if (!activeSubscription)
+    // ✅ ROLE BASED COMPANY RESOLVE
+    let company;
+    let activeSubscription;
+
+    if (inviter.role === UserRole.company_admin) {
+      company = inviter.companyAdmin?.company;
+      activeSubscription =
+        inviter.companyAdmin?.company?.author?.user?.subscription?.[0];
+    } else if (inviter.role === UserRole.business_instructors) {
+      company = inviter.businessInstructor?.company;
+      activeSubscription =
+        inviter.businessInstructor?.company?.author?.user?.subscription?.[0];
+    } else {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'You are not allowed to invite employees!',
+      );
+    }
+
+    // ✅ Validate company
+    if (!company) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'User is not linked to any company!',
+      );
+    }
+
+    if (!company.isActive) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Company is inactive!',
+      );
+    }
+
+    // ✅ Subscription check
+    if (!activeSubscription) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         'No active subscription found!',
       );
-
-    const companySize = inviter.companyAdmin.company.size;
-    const subscriptionType = activeSubscription.type;
+    }
 
     const subscriptionLimits: Partial<Record<SubscriptionType, number>> = {
       ngo: 500,
@@ -76,113 +133,109 @@ const insertIntoDB = async (payload: IInvitation) => {
       enterprise: 3000,
     };
 
-    const maxAllowed = subscriptionLimits[subscriptionType] ?? 0;
-    if (companySize >= maxAllowed) {
+    const maxAllowed = subscriptionLimits[activeSubscription.type];
+
+    if (company.size >= maxAllowed!) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Your subscription (${subscriptionType}) allows a maximum of ${maxAllowed} members. Upgrade to invite more.`,
+        `Your subscription (${activeSubscription.type}) allows max ${maxAllowed} members`,
       );
     }
 
     // 3. Department validation
     const department = await tx.department.findFirst({
-      where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
+      where: {
+        id: departmentId,
+        isDeleted: false,
+        companyId: company.id, // ✅ FIXED (important)
+      },
     });
-    if (!department)
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
 
-    // 4. Email check (with soft-delete support)
-    const existingUser = await tx.user.findFirst({
+    if (!department) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
+    }
+
+    // 4. Email check
+    const existingUser = await tx.user.findUnique({
       where: { email },
     });
 
     let newUser;
+    const generatedPassword = generateDefaultPassword(12);
 
     if (existingUser) {
       if (!existingUser.isDeleted) {
         throw new ApiError(
           httpStatus.CONFLICT,
-          `The email ${email} is already registered and active in the system.`,
+          `Email ${email} already exists`,
         );
       }
 
-      // Re-activate soft-deleted user
-      console.log(`Re-activating soft-deleted employee: ${email}`);
-
+      // Reactivate
       newUser = await tx.user.update({
         where: { id: existingUser.id },
         data: {
           name,
-          password: await hashedPassword(generateDefaultPassword(12)), // Reset password
+          password: await hashedPassword(generatedPassword),
           role: UserRole.employee,
           status: UserStatus.active,
           isDeleted: false,
-          needsPasswordChange: false,
-          passwordChangedAt: new Date(),
-          verification: {
-            update: {
-              where: { userId: existingUser.id },
-              data: { otp: '', expiresAt: null, status: true },
-            },
-          },
+          needsPasswordChange: true,
         },
-        select: { id: true, name: true, email: true },
       });
     } else {
-      // Create new user
       newUser = await tx.user.create({
         data: {
           name,
           email,
-          password: await hashedPassword(generateDefaultPassword(12)),
+          password: await hashedPassword(generatedPassword),
           role: UserRole.employee,
           status: UserStatus.active,
           registerWith: RegisterWith.credentials,
           verification: {
-            create: { otp: '', expiresAt: null, status: true },
+            create: { otp: '', status: true },
           },
         },
-        select: { id: true, name: true, email: true },
       });
     }
 
-    // 5. Employee profile create (if not exists)
-    const existingEmployee = await tx.employee.findUnique({
+    // 5. Employee create
+    const employeeExists = await tx.employee.findUnique({
       where: { userId: newUser.id },
     });
 
-    if (!existingEmployee) {
+    if (!employeeExists) {
       await tx.employee.create({
         data: {
           userId: newUser.id,
           authorId: inviter.id,
-          companyId: inviter.companyAdmin!.company!.id,
+          companyId: company.id,
           departmentId,
         },
       });
     }
 
-    // 6. Increment counters
+    // 6. Counters
     await tx.department.update({
       where: { id: departmentId },
       data: { joined: { increment: 1 } },
     });
 
     await tx.company.update({
-      where: { id: inviter.companyAdmin!.company!.id },
+      where: { id: company.id },
       data: {
         employee: { increment: 1 },
         size: { increment: 1 },
       },
     });
 
-    // 7. Send invitation email
+    // 7. Send email
     await sendEmployeeInvitationEmail(
       newUser.email,
       newUser.name,
-      generateDefaultPassword(12), // Note: You may want to send the original generated password
+      generatedPassword,
       inviter.name,
-      inviter.companyAdmin?.company?.name ?? '',
+      company.name,
     );
 
     return { user: newUser };
@@ -193,38 +246,106 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
   const { userId, departmentId, emails, groupName } = payload;
 
   return await prisma.$transaction(async tx => {
-    // 1. Validate inviter
+    // 1. Get inviter with both roles
     const inviter = await tx.user.findFirst({
-      where: { id: userId, status: UserStatus.active, isDeleted: false },
-      select: {
-        id: true,
-        name: true,
+      where: {
+        id: userId,
+        status: UserStatus.active,
+        isDeleted: false,
+      },
+      include: {
         companyAdmin: {
-          select: {
-            company: { select: { id: true, name: true, isActive: true, size: true } },
+          include: {
+            company: {
+              include: {
+                author: {
+                  include: {
+                    user: {
+                      include: {
+                        subscription: {
+                          where: {
+                            isExpired: false,
+                            status: SubscriptionStatus.active,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
-        subscription: {
-          where: { isExpired: false, status: SubscriptionStatus.active },
-          select: { type: true },
+        businessInstructor: {
+          include: {
+            company: {
+              include: {
+                author: {
+                  include: {
+                    user: {
+                      include: {
+                        subscription: {
+                          where: {
+                            isExpired: false,
+                            status: SubscriptionStatus.active,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
 
-    if (!inviter) throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
-    if (!inviter.companyAdmin?.company)
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter is not linked to any company!');
-    if (!inviter.companyAdmin.company.isActive)
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter company is inactive!');
+    if (!inviter) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Inviter not found!');
+    }
 
-    // 2. Subscription & invite limit check
-    const activeSubscription = inviter.subscription[0];
-    if (!activeSubscription) throw new ApiError(httpStatus.BAD_REQUEST, 'No active subscription found!');
+    // ✅ ROLE BASED RESOLVE
+    let company;
+    let activeSubscription;
 
-    const companySize = inviter.companyAdmin.company.size;
-    const subscriptionType = activeSubscription.type;
-    const newInvites = emails.length;
+    if (inviter.role === UserRole.company_admin) {
+      company = inviter.companyAdmin?.company;
+      activeSubscription =
+        inviter.companyAdmin?.company?.author?.user?.subscription?.[0];
+    } else if (inviter.role === UserRole.business_instructors) {
+      company = inviter.businessInstructor?.company;
+      activeSubscription =
+        inviter.businessInstructor?.company?.author?.user?.subscription?.[0];
+    } else {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        'You are not allowed to invite employees!',
+      );
+    }
 
+    if (!company) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'User is not linked to any company!',
+      );
+    }
+
+    if (!company.isActive) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'Company is inactive!',
+      );
+    }
+
+    if (!activeSubscription) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'No active subscription found!',
+      );
+    }
+
+    // 2. Subscription limit check
     const subscriptionLimits: Partial<Record<SubscriptionType, number>> = {
       standard: 0,
       ngo: 50,
@@ -232,84 +353,89 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
       enterprise: 3000,
     };
 
-    const maxAllowed = subscriptionLimits[subscriptionType] ?? 0;
-    if (companySize + newInvites > maxAllowed) {
+    const maxAllowed = subscriptionLimits[activeSubscription.type];
+    const newInvites = emails.length;
+
+    if (company.size + newInvites > maxAllowed!) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
-        `Your subscription (${subscriptionType}) allows only ${maxAllowed} total members. You already have ${companySize}, so you can invite ${maxAllowed - companySize} more.`
+        `Your subscription (${activeSubscription.type}) allows only ${maxAllowed} members. You can invite only ${
+          maxAllowed! - company.size
+        } more.`,
       );
     }
 
-    // 3. Validate department
+    // 3. Department validation (FIXED)
     const department = await tx.department.findFirst({
-      where: { id: departmentId, author: { id: inviter.id }, isDeleted: false },
+      where: {
+        id: departmentId,
+        companyId: company.id,
+        isDeleted: false,
+      },
     });
-    if (!department) throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
 
-    // 4. Check existing users (with soft-delete support)
+    if (!department) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Department not found!');
+    }
+
+    // 4. Existing users check
     const existingUsers = await tx.user.findMany({
       where: { email: { in: emails } },
-      select: { email: true, isDeleted: true },
+      select: { id: true, email: true, isDeleted: true },
     });
 
-    const activeEmails = existingUsers.filter(u => !u.isDeleted).map(u => u.email);
+    const activeEmails = existingUsers
+      .filter(u => !u.isDeleted)
+      .map(u => u.email);
+
     if (activeEmails.length > 0) {
       throw new ApiError(
         httpStatus.CONFLICT,
-        `The following emails are already registered and active: ${activeEmails.join(', ')}`
+        `Already registered emails: ${activeEmails.join(', ')}`,
       );
     }
 
-    // 5. Process invitations
     const invitedEmployees: any[] = [];
 
+    // 5. Process each email
     for (const email of emails) {
       const existingUser = existingUsers.find(u => u.email === email);
+
+      const generatedPassword = generateDefaultPassword(12); // ✅ once per user
 
       let newUser;
 
       if (existingUser && existingUser.isDeleted) {
-        // Re-activate soft-deleted user
-        console.log(`Re-activating soft-deleted employee: ${email}`);
-
         newUser = await tx.user.update({
-          where: { email },
+          where: { id: existingUser.id },
           data: {
-            name: groupName || 'Group Member', // Use groupName or default
-            password: await hashedPassword(generateDefaultPassword(12)),
+            name: groupName || 'Group Member',
+            password: await hashedPassword(generatedPassword),
             role: UserRole.employee,
             status: UserStatus.active,
             isDeleted: false,
-            needsPasswordChange: false,
-            passwordChangedAt: new Date(),
-            verification: {
-              update: {
-                where: { userId: (await tx.user.findUnique({ where: { email } }))!.id },
-                data: { otp: '', expiresAt: null, status: true },
-              },
-            },
+            needsPasswordChange: true,
           },
           select: { id: true, name: true, email: true },
         });
       } else {
-        // Create new user
         newUser = await tx.user.create({
           data: {
             name: groupName || 'Group Member',
             email,
-            password: await hashedPassword(generateDefaultPassword(12)),
+            password: await hashedPassword(generatedPassword),
             role: UserRole.employee,
             status: UserStatus.active,
             registerWith: RegisterWith.credentials,
             verification: {
-              create: { otp: '', expiresAt: null, status: true },
+              create: { otp: '', status: true },
             },
           },
           select: { id: true, name: true, email: true },
         });
       }
 
-      // Employee profile create (if not exists)
+      // Employee create
       const existingEmployee = await tx.employee.findUnique({
         where: { userId: newUser.id },
       });
@@ -319,7 +445,7 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
           data: {
             userId: newUser.id,
             authorId: inviter.id,
-            companyId: inviter.companyAdmin!.company!.id,
+            companyId: company.id,
             departmentId,
           },
         });
@@ -327,24 +453,24 @@ const bulkInsertIntoDB = async (payload: IGroupInvitation) => {
 
       invitedEmployees.push({ user: newUser });
 
-      // Queue email (non-blocking)
+      // async email (non-blocking)
       sendEmployeeInvitationEmail(
         newUser.email,
         newUser.name,
-        generateDefaultPassword(12),
+        generatedPassword,
         inviter.name,
-        inviter.companyAdmin?.company?.name ?? ''
+        company.name,
       ).catch(console.error);
     }
 
-    // 6. Increment counters
+    // 6. Counters
     await tx.department.update({
       where: { id: departmentId },
       data: { joined: { increment: emails.length } },
     });
 
     await tx.company.update({
-      where: { id: inviter.companyAdmin!.company!.id },
+      where: { id: company.id },
       data: {
         employee: { increment: emails.length },
         size: { increment: emails.length },

@@ -9,40 +9,40 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.company_admin),
+  auth(UserRole.company_admin, UserRole.business_instructors),
   validateRequest(InvitationValidation.createValidationSchema),
   InvitationController.insertIntoDB,
 );
 
 router.post(
   '/bulk-insert',
-  auth(UserRole.company_admin),
+ auth(UserRole.company_admin, UserRole.business_instructors),
   validateRequest(InvitationValidation.bulkCreateValidationSchema),
   InvitationController.bulkInsertIntoDB,
 );
 
 router.get(
   '/',
-  auth(UserRole.super_admin, UserRole.company_admin),
+  auth(UserRole.super_admin, UserRole.company_admin, UserRole.business_instructors),
   InvitationController.getAllFromDB,
 );
 
 router.get(
   '/:id',
-  auth(UserRole.company_admin),
+  auth(UserRole.company_admin, UserRole.business_instructors),
   InvitationController.getByIdFromDB,
 );
 
 router.put(
   '/:id',
-  auth(UserRole.company_admin),
+  auth(UserRole.company_admin, UserRole.business_instructors),
   validateRequest(InvitationValidation.updateValidationSchema),
   InvitationController.updateIntoDB,
 );
 
 router.delete(
   '/:id',
-  auth(UserRole.company_admin),
+  auth(UserRole.company_admin, UserRole.business_instructors),
   InvitationController.deleteFromDB,
 );
 
