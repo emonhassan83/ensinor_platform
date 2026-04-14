@@ -305,7 +305,7 @@ model CompanyRequest {
 model Department {
   id        String   @id @default(uuid())
   authorId  String
-  companyId String
+  companyId String?
   name      String
   image     String?
   joined    Int      @default(0)
