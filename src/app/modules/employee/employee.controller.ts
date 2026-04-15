@@ -5,22 +5,39 @@ import pick from '../../utils/pick';
 import { employeeFilterableFields } from './employee.constant';
 import sendResponse from '../../utils/sendResponse';
 
-const getAllFromDB = catchAsync(
-  async (req, res) => {
-    const filters = pick(req.query, employeeFilterableFields);
-    const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+const getAllFromDB = catchAsync(async (req, res) => {
+  const filters = pick(req.query, employeeFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
 
-    const result = await EmployeeService.getAllFromDB(filters, options, req.user!.userId);
+  const result = await EmployeeService.getAllFromDB(filters, options, {
+    authorId: req.user!.userId,
+  });
 
-    sendResponse(res, {
-      statusCode: httpStatus.OK,
-      success: true,
-      message: 'Employee data fetched!',
-      meta: result.meta,
-      data: result.data,
-    });
-  },
-);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Employee data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByCompany = catchAsync(async (req, res) => {
+  const filters = pick(req.query, employeeFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+
+  const result = await EmployeeService.getAllFromDB(filters, options, {
+    companyId: req.params.companyId,
+  });
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Employee data fetched!',
+    meta: result.meta,
+    data: result.data,
+  });
+});
 
 const getByIdFromDB = catchAsync(async (req, res) => {
   const result = await EmployeeService.getByIdFromDB(req.params.id);
@@ -33,7 +50,11 @@ const getByIdFromDB = catchAsync(async (req, res) => {
 });
 
 const updateIntoDB = catchAsync(async (req, res) => {
-  const result = await EmployeeService.updateIntoDB(req.params.id, req.body, req.file);
+  const result = await EmployeeService.updateIntoDB(
+    req.params.id,
+    req.body,
+    req.file,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -54,7 +75,8 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const EmployeeController = {
   getAllFromDB,
+  getByCompany,
   getByIdFromDB,
   updateIntoDB,
-  deleteFromDB
+  deleteFromDB,
 };

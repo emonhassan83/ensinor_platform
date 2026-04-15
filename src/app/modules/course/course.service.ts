@@ -252,6 +252,109 @@ const insertIntoDB = async (payload: ICourse, file: any) => {
   return result;
 };
 
+const getDraftCourse = async (userId: string): Promise<Course | null> => {
+  // 1. Validate user
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found!');
+  }
+
+  // 2. Get latest draft course (IMPORTANT FIX)
+  const result = await prisma.course.findFirst({
+    where: {
+      authorId: userId,
+      isPublished: false,
+      isDeleted: false,
+    },
+    orderBy: {
+      createdAt: 'desc', // ✅ latest draft
+    },
+    include: {
+      author: {
+        select: { id: true, name: true, email: true, photoUrl: true },
+      },
+      courseSections: {
+        include: { courseContents: true },
+      },
+      resource: true,
+      assignment: true,
+      coupon: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      promoCode: {
+        where: { isActive: true, expireAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { code: true, discount: true, expireAt: true },
+      },
+      quiz: {
+        include: {
+          questionsList: {
+            include: {
+              options: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!result) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No draft course found!');
+  }
+
+  // 3. Enrollment check (FIXED)
+  let isEnrolled = false;
+
+  const enrolled = await prisma.enrolledCourse.findFirst({
+    where: {
+      courseId: result.id, // ✅ fixed
+      userId: userId,
+      isDeleted: false,
+    },
+    select: { id: true },
+  });
+
+  isEnrolled = !!enrolled;
+
+  // 4. Discount logic
+  const coupon = result.coupon?.[0];
+  const promo = result.promoCode?.[0];
+
+  const discountData = coupon || promo;
+  const discount = discountData?.discount ?? 0;
+
+  const couponCode = coupon ? coupon.code : null;
+  const promoCode = !coupon && promo ? promo.code : null;
+  const expiry = discountData?.expireAt ?? null;
+
+  const discountPrice =
+    discount > 0
+      ? result.price - (result.price * discount) / 100
+      : result.price;
+
+  // 5. Clean response
+  const { coupon: _, promoCode: __, ...rest } = result;
+
+  return {
+    ...rest,
+    // @ts-ignore
+    couponCode,
+    promoCode,
+    expiry,
+    discount,
+    discountPrice,
+    isEnrolled,
+  };
+};
+
 const getPopularCoursesFromDB = async () => {
   const andConditions: Prisma.CourseWhereInput[] = [
     {
@@ -513,7 +616,8 @@ const getCombineCoursesFromDB = async (
       const activeDiscount = coupon || promo;
       const discount = activeDiscount ? activeDiscount.discount : 0;
       const expiry = activeDiscount ? activeDiscount.expireAt : null;
-      const discountPrice = discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
+      const discountPrice =
+        discount > 0 ? c.price - (c.price * discount) / 100 : c.price;
 
       return {
         id: c.id,
@@ -1168,6 +1272,7 @@ const deleteFromDB = async (id: string): Promise<Course> => {
 
 export const CourseService = {
   insertIntoDB,
+  getDraftCourse,
   getPopularCoursesFromDB,
   getAllFromDB,
   getCombineCoursesFromDB,

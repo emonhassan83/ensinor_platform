@@ -16,6 +16,17 @@ const insertIntoDB = catchAsync(async (req, res) => {
   });
 });
 
+const getDaftCourse = catchAsync(async (req, res) => {
+  const result = await CourseService.getDraftCourse(req.user!.userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Draft course data fetched!',
+    data: result,
+  });
+});
+
 const getPopularCourses = catchAsync(async (req, res) => {
   const result = await CourseService.getPopularCoursesFromDB();
 
@@ -237,6 +248,7 @@ const deleteFromDB = catchAsync(async (req, res) => {
 
 export const CourseController = {
   insertIntoDB,
+  getDaftCourse,
   getPopularCourses,
   getAllPlatformCourses,
   getCombineCourses,

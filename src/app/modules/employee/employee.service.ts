@@ -11,19 +11,21 @@ import httpStatus from 'http-status';
 const getAllFromDB = async (
   params: IEmployeeFilterRequest,
   options: IPaginationOptions,
-  userId: string,
+  filterBy: { authorId?: string; companyId?: string },
 ) => {
   const { page, limit, skip } = paginationHelpers.calculatePagination(options);
   const { searchTerm, status, ...filterData } = params;
 
   const andConditions: Prisma.EmployeeWhereInput[] = [
     {
-      authorId: userId,
       user: {
         isDeleted: false,
-      }
+      },
     },
   ];
+
+  if (filterBy.authorId) andConditions.push({ authorId: filterBy.authorId });
+  if (filterBy.companyId) andConditions.push({ companyId: filterBy.companyId });
 
   // Search across Employee and nested User fields
   if (searchTerm) {

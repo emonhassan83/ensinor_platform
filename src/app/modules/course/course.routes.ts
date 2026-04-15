@@ -33,6 +33,12 @@ router.get(
 );
 
 router.get(
+  '/draft',
+  auth(UserRole.instructor, UserRole.business_instructors, UserRole.company_admin),
+  CourseController.getDaftCourse,
+);
+
+router.get(
   '/internal-courses',
   optionalAuth(UserRole.company_admin),
   CourseController.getMyInternalCourse,
