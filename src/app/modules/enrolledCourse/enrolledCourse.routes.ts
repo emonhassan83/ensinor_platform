@@ -9,7 +9,12 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(UserRole.student, UserRole.employee, UserRole.company_admin),
+  auth(
+    UserRole.student,
+    UserRole.employee,
+    UserRole.company_admin,
+    UserRole.business_instructors,
+  ),
   validateRequest(EnrolledCourseValidation.createValidationSchema),
   EnrolledCourseController.insertIntoDB,
 );
@@ -23,7 +28,7 @@ router.post(
 
 router.post(
   '/department-enrolled',
-  auth(UserRole.company_admin),
+  auth(UserRole.company_admin, UserRole.business_instructors),
   validateRequest(EnrolledCourseValidation.departmentEnrolledValidationSchema),
   EnrolledCourseController.enrolledCourseByDepartment,
 );
@@ -49,10 +54,7 @@ router.post(
   EnrolledCourseController.bulkEnrollBundleCourses,
 );
 
-router.get(
-  '/total-enrolled-user',
-  EnrolledCourseController.getEnrolledStudent,
-);
+router.get('/total-enrolled-user', EnrolledCourseController.getEnrolledStudent);
 
 router.get(
   '/student-by-author-course/:authorId',
