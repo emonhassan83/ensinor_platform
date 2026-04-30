@@ -99,112 +99,98 @@ const completeAttemptIntoDB = async (
   attemptId: string,
   payload: { timeTaken: number },
 ) => {
-  return await prisma.$transaction(async tx => {
-    // 1. Fetch attempt + answers + quiz
-    const attempt = await tx.quizAttempt.findUnique({
-      where: { id: attemptId, isDeleted: false },
-      include: {
-        quiz: true,
-        quizAnswer: {
-          include: { question: true },
+  // ==================== TRANSACTION শুধু DB Write-এর জন্য ====================
+  const updatedAttempt = await prisma.$transaction(
+    async (tx) => {
+      // 1. Fetch attempt + answers + quiz
+      const attempt = await tx.quizAttempt.findUnique({
+        where: { id: attemptId, isDeleted: false },
+        include: {
+          quiz: true,
+          quizAnswer: {
+            include: { question: true },
+          },
         },
-      },
-    });
+      });
 
-    if (!attempt) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
-    }
-    if (attempt.isCompleted) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Already completed!');
-    }
-
-    const quiz = attempt.quiz;
-
-    // 2. Total questions (isDeleted false)
-    const totalQuestions = await tx.question.count({
-      where: { quizId: quiz.id, isDeleted: false },
-    });
-
-    // 3. Correct answers count
-    const correctAnswers = attempt.quizAnswer.filter(a => a.isCorrect).length;
-
-    // 4. Calculate marks & correctRate
-    const marksPerQuestion =
-      totalQuestions > 0 ? quiz.marks / totalQuestions : 0;
-    const marksObtained = Math.round(correctAnswers * marksPerQuestion);
-    const correctRate =
-      totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
-
-    // 5. Determine if passed
-    const isPassed = marksObtained >= quiz.passingScore;
-
-    // 6. Grade calculation
-    let grade: CourseGrade = CourseGrade.FAIL;
-
-    if (isPassed) {
-      // Grading system
-      const gradingSystem =
-        (await tx.gradingSystem.findFirst({
-          where: { courseId: quiz.courseId, isDeleted: false },
-          include: { grades: true },
-        })) ||
-        (await tx.gradingSystem.findFirst({
-          where: { isDefault: true, isDeleted: false },
-          include: { grades: true },
-        }));
-
-      if (gradingSystem && gradingSystem.grades.length > 0) {
-        const sortedGrades = gradingSystem.grades.sort(
-          (a, b) => b.minScore - a.minScore,
-        );
-        const matchedGrade = sortedGrades.find(g => correctRate >= g.minScore);
-        if (matchedGrade) {
-          grade = matchedGrade.gradeLabel as CourseGrade;
-        } else {
-          grade = CourseGrade.PASS; // fallback
-        }
-      } else {
-        grade = CourseGrade.PASS; // no system → pass
+      if (!attempt) {
+        throw new ApiError(httpStatus.NOT_FOUND, 'Quiz attempt not found!');
       }
+
+      if (attempt.isCompleted) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Quiz attempt already completed!');
+      }
+
+      const quiz = attempt.quiz;
+
+      // 2. Total questions
+      const totalQuestions = await tx.question.count({
+        where: { quizId: quiz.id, isDeleted: false },
+      });
+
+      // 3. Correct answers count
+      const correctAnswers = attempt.quizAnswer.filter((a) => a.isCorrect).length;
+
+      // 4. Calculate marks & correctRate
+      const marksPerQuestion = totalQuestions > 0 ? quiz.marks / totalQuestions : 0;
+      const marksObtained = Math.round(correctAnswers * marksPerQuestion);
+      const correctRate = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+
+      // 5. Determine if passed
+      const isPassed = marksObtained >= quiz.passingScore;
+
+      // 6. Grade calculation (simple fallback)
+      let grade: CourseGrade = isPassed ? CourseGrade.PASS : CourseGrade.FAIL;
+
+      // 7. Update attempt
+      const result = await tx.quizAttempt.update({
+        where: { id: attemptId },
+        data: {
+          marksObtained,
+          totalMarks: quiz.marks,
+          correctRate,
+          grade,
+          timeTaken: payload.timeTaken,
+          isPassed,
+          isCompleted: true,
+          lastAttempt: new Date(),
+        },
+      });
+
+      // 8. Increment quiz totalAttempt
+      await tx.quiz.update({
+        where: { id: quiz.id },
+        data: { totalAttempt: { increment: 1 } },
+      });
+
+      return result;
+    },
+    {
+      timeout: 10000,        // Increased timeout to 10 seconds (safer)
     }
+  );
 
-    // 7. Update attempt
-    const updatedAttempt = await tx.quizAttempt.update({
-      where: { id: attemptId },
-      data: {
-        marksObtained,
-        totalMarks: quiz.marks,
-        correctRate,
-        grade,
-        timeTaken: payload.timeTaken,
-        isPassed,
-        isCompleted: true,
-        lastAttempt: new Date(),
-        attemptNumber: attempt.attemptNumber, // already set
-      },
-    });
+  // ==================== TRANSACTION-এর বাইরে ====================
 
-    // 8. Increment quiz totalAttempt
-    await tx.quiz.update({
-      where: { id: quiz.id },
-      data: { totalAttempt: { increment: 1 } },
-    });
-
-    // 9. check quiz related badges related work
-    if (updatedAttempt.isCompleted && updatedAttempt.userId) {
+  // 9. Badge checking & awarding (heavy logic)
+  if (updatedAttempt.isCompleted && updatedAttempt.userId) {
+    try {
       const awardedBadges = await checkAndAwardQuizBadges(
         updatedAttempt.userId,
-        quiz.id,
-        attemptId,
+        updatedAttempt.quizId!,   // assuming quizId exists
+        attemptId
       );
 
       if (awardedBadges.length > 0) {
         console.log(`Awarded quiz badges: ${awardedBadges.join(', ')}`);
       }
+    } catch (badgeError) {
+      console.error('Badge awarding failed (non-blocking):', badgeError);
+      // Do not throw error here — quiz completion should not fail because of badges
     }
+  }
 
-    return updatedAttempt;
-  });
+  return updatedAttempt;
 };
 
 const getAllFromDB = async (

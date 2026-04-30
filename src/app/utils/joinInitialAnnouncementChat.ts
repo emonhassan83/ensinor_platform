@@ -7,7 +7,7 @@ type TxClient = Prisma.TransactionClient | typeof prisma;
 export const joinInitialAnnouncementChat = async (
   userId: string,
   role: UserRole,
-  tx: TxClient = prisma, // 👈 default to global prisma
+  tx?: any   // optional tx
 ) => {
   let groupName: string | null = null;
 
@@ -21,7 +21,7 @@ export const joinInitialAnnouncementChat = async (
     return;
   }
 
-  const chat = await tx.chat.findFirst({
+  const chat = await (tx || prisma).chat.findFirst({
     where: {
       type: ChatType.announcement,
       groupName,
@@ -32,8 +32,7 @@ export const joinInitialAnnouncementChat = async (
 
   if (!chat) return;
 
-  // ✅ UPSERT = safe, idempotent, no race condition
-  await tx.chatParticipant.upsert({
+  await (tx || prisma).chatParticipant.upsert({
     where: {
       userId_chatId: {
         userId,

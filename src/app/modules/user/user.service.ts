@@ -549,96 +549,104 @@ const createInstructor = async (
   const password = generateDefaultPassword(12);
   const hashPassword = await hashedPassword(password);
 
-  const user = await prisma.$transaction(async tx => {
-    const existingUser = await tx.user.findFirst({
-      where: { email: payload.user.email },
-    });
+  // ==================== TRANSACTION (শুধু DB Operations) ====================
+  const createdUser = await prisma.$transaction(
+    async (tx) => {
+      const existingUser = await tx.user.findFirst({
+        where: { email: payload.user.email },
+      });
 
-    let createdUser;
+      let user;
 
-    if (existingUser) {
-      if (!existingUser.isDeleted) {
-        throw new ApiError(
-          httpStatus.CONFLICT,
-          'This email is already in use by an active user!',
-        );
+      if (existingUser) {
+        if (!existingUser.isDeleted) {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            'This email is already in use by an active user!',
+          );
+        }
+
+        console.log(`Re-activating soft-deleted instructor: ${payload.user.email}`);
+
+        user = await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name: payload.user.name,
+            contactNo: payload.user.contactNo || existingUser.contactNo,
+            bio: payload.user.bio || existingUser.bio,
+            password: hashPassword,
+            role: UserRole.instructor,
+            registerWith: RegisterWith.credentials,
+            status: UserStatus.pending,
+            isDeleted: false,
+            needsPasswordChange: false,
+            passwordChangedAt: new Date(),
+            verification: {
+              update: {
+                where: { userId: existingUser.id },
+                data: { otp: '', expiresAt: null, status: true },
+              },
+            },
+          },
+        });
+      } else {
+        user = await tx.user.create({
+          data: {
+            name: payload.user.name,
+            email: payload.user.email,
+            contactNo: payload.user.contactNo,
+            bio: payload.user.bio,
+            password: hashPassword,
+            role: UserRole.instructor,
+            registerWith: RegisterWith.credentials,
+            status: UserStatus.pending,
+            verification: {
+              create: {
+                otp: '',
+                expiresAt: null,
+                status: true,
+              },
+            },
+          },
+        });
       }
 
-      console.log(
-        `Re-activating soft-deleted instructor: ${payload.user.email}`,
-      );
+      // Instructor profile
+      const existingInstructor = await tx.instructor.findUnique({
+        where: { userId: user.id },
+      });
 
-      createdUser = await tx.user.update({
-        where: { id: existingUser.id },
-        data: {
-          name: payload.user.name,
-          contactNo: payload.user.contactNo || existingUser.contactNo,
-          bio: payload.user.bio || existingUser.bio,
-          password: hashPassword,
-          role: UserRole.instructor,
-          registerWith: RegisterWith.credentials,
-          status: UserStatus.pending,
-          isDeleted: false,
-          needsPasswordChange: false,
-          passwordChangedAt: new Date(),
-          verification: {
-            update: {
-              where: { userId: existingUser.id },
-              data: { otp: '', expiresAt: null, status: true },
-            },
+      if (!existingInstructor) {
+        await tx.instructor.create({
+          data: {
+            userId: user.id,
+            ...payload.instructor,
           },
-        },
-      });
-    } else {
-      createdUser = await tx.user.create({
-        data: {
-          name: payload.user.name,
-          email: payload.user.email,
-          contactNo: payload.user.contactNo,
-          bio: payload.user.bio,
-          password: hashPassword,
-          role: UserRole.instructor,
-          registerWith: RegisterWith.credentials,
-          status: UserStatus.pending,
-          verification: {
-            create: {
-              otp: '',
-              expiresAt: null,
-              status: true,
-            },
-          },
-        },
-      });
+        });
+      } else {
+        await tx.instructor.update({
+          where: { userId: user.id },
+          data: { ...payload.instructor },
+        });
+      }
+
+      return user;
+    },
+    {
+      timeout: 10000,   // 10 seconds (increased)
     }
+  );
 
-    const existingInstructor = await tx.instructor.findUnique({
-      where: { userId: createdUser.id },
-    });
+  // ==================== TRANSACTION-এর বাইরে ====================
 
-    if (!existingInstructor) {
-      await tx.instructor.create({
-        data: {
-          userId: createdUser.id,
-          ...payload.instructor,
-        },
-      });
-    } else {
-      await tx.instructor.update({
-        where: { userId: createdUser.id },
-        data: { ...payload.instructor },
-      });
-    }
+  // Join announcement chat (DB operation, but outside transaction)
+  await joinInitialAnnouncementChat(createdUser.id, UserRole.instructor);
 
-    await joinInitialAnnouncementChat(createdUser.id, UserRole.instructor, tx);
+  // Email & Notification
+  await sendInstructorRequestEmail(createdUser.email, createdUser.name, password);
+  await sendInstructorRequestNotification(createdUser, 'instructor');
 
-    return createdUser;
-  });
-
-  // Transaction-এর বাইরে
-  await sendInstructorRequestEmail(user.email, user.name, password);
-  await sendInstructorRequestNotification(user, 'instructor');
-
-  return user;
+  return createdUser;
 };
 
 const invitationInstructor = async (
